@@ -1,0 +1,13 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
