@@ -44,6 +44,22 @@ _Avoid_: Check-in, claim
 A neutral, group-visible record created when a member's finalized accountability week contains fewer verified completions than their weekly target. A member who reports no workouts and requests no Exception finishes with zero verified completions. Friends may respond to the event in a playful, supportive way.
 _Avoid_: Failure, punishment, public shaming
 
+**Consequence card**:
+An app-authored, system-selected physical activity assigned in response to a missed-target event. It is drawn at random from cards unlocked by the other group members; members neither create, choose, nor filter eligible cards.
+_Avoid_: Punishment, user-selected forfeit
+
+**Card pool**:
+The system-assembled set of unique consequence cards eligible for a member's missed-target event. It combines cards unlocked by the other group members, excludes that member's own cards, and gives duplicate unlocks no extra weight.
+_Avoid_: Hand-picked deck, weighted duplicates
+
+**Consequence completion**:
+A consequence card completed through video evidence approved by two other group members, or by every other member when fewer than two are available.
+_Avoid_: Self-reported consequence
+
+**Proof video**:
+A group-visible recording submitted as evidence of a consequence completion. It is retained for seven days after approval and then deleted, leaving only the completion record.
+_Avoid_: Permanent video archive
+
 **Provisional result**:
 A member's unresolved accountability-week outcome while any timely workout report or Exception request remains pending. It neither updates a streak nor creates a missed-target event until every pending item is resolved.
 _Avoid_: Pending failure, provisional miss
