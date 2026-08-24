@@ -36,24 +36,44 @@ _Avoid_: Group quota, shared workout plan
 The shared period in which every group member's weekly target is evaluated. A group configures one start day and time zone, and each accountability week begins and ends at midnight. Configuration changes take effect only after the current accountability week closes.
 _Avoid_: Personal week, member-local week
 
+**Workout session**:
+A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select one required and up to two optional Proof photos while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the latest selected Proof photo.
+_Avoid_: Passive workout tracking, timed photo assignment
+
 **Workout report**:
-A member's group-visible account of completed exercise, submitted with its completion date, an explicit completion attestation, and a Proof photo. Strength reports identify exercises, sets, reps, and resistance; cardio, class, and sport reports identify the activity, duration, and perceived intensity; mixed reports combine the relevant details.
+A member's group-visible account of completed exercise, submitted with its completion date, an explicit completion attestation, and a Proof photo; each Workout session produces at most one report and one Verified completion. It is freely editable before submission and immutable afterward; strength reports identify exercises, sets, reps, and resistance, while cardio, class, and sport reports identify the activity, duration, and perceived intensity and mixed reports combine the relevant details.
 _Avoid_: Check-in, check-out, post-workout picture
 
 **Proof photo**:
-A private, group-visible image captured at workout time through the product's camera rather than uploaded from a device library. It must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, and is deleted seven days after verification while the report and Verified completion remain.
-_Avoid_: Media upload, mandatory selfie, unrelated image, permanent photo archive
+A private, group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active. It cannot come from a device library, locks when selected, must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, shows the Group its session and capture times but not location, hidden image metadata, or device information, and is deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
+_Avoid_: Media upload, mandatory selfie, unrelated image, permanent photo archive, location proof
 
 **Verified completion**:
 A Workout report accepted after one other group member explicitly verifies it or after it remains unquestioned for 24 hours. Reactions and motivational messages do not verify a report.
 _Avoid_: Check-in, claim, reaction
+
+**Questioned report**:
+A Workout report placed into a Group decision because another member questioned it during its initial 24-hour review period or because its required evidence is missing or poor. It returns to provisional status; the reporting member may explain or withdraw it but cannot change its structured details or Proof photos.
+_Avoid_: Accusation, failed workout
+
+**Group decision**:
+A 48-hour binary vote in which every Group member other than the reporting member may accept or reject a Questioned report. Voting closes when either choice receives a strict majority, every eligible member has voted, or time expires, and its outcome is final in the MVP without appeal or reopening.
+_Avoid_: Trial, punishment vote
+
+**Unsupported report**:
+A Questioned report that is withdrawn or reaches the end of its Group decision without a strict majority accepting or rejecting it. It does not become a Verified completion and does not immediately trigger a Consequence card.
+_Avoid_: Fabricated report, punishment
+
+**Rejected report**:
+A Questioned report rejected by a strict majority of every other Group member. It does not become a Verified completion and immediately triggers a Consequence card independently of any later Missed-target event.
+_Avoid_: Plagiarised workout, public shaming
 
 **Missed-target event**:
 A neutral, group-visible record created when a member's finalized accountability week contains fewer verified completions than their weekly target. A member who reports no workouts and requests no Exception finishes with zero verified completions. Friends may respond to the event in a playful, supportive way.
 _Avoid_: Failure, punishment, public shaming
 
 **Consequence card**:
-An app-authored, system-selected physical activity assigned in response to a missed-target event. It is drawn at random from cards unlocked by the other group members; members neither create, choose, nor filter eligible cards.
+A random, app-authored physical activity assigned in response to a missed-target event or Rejected report. It is drawn from cards unlocked by the other Group members; members neither create, choose, nor filter eligible cards.
 _Avoid_: Punishment, user-selected forfeit
 
 **Card pool**:
