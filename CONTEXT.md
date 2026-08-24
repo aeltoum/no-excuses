@@ -36,9 +36,17 @@ _Avoid_: Group quota, shared workout plan
 The shared period in which every group member's weekly target is evaluated. A group configures one start day and time zone, and each accountability week begins and ends at midnight. Configuration changes take effect only after the current accountability week closes.
 _Avoid_: Personal week, member-local week
 
+**Workout report**:
+A member's group-visible account of completed exercise, submitted with its completion date, an explicit completion attestation, and a Proof photo. Strength reports identify exercises, sets, reps, and resistance; cardio, class, and sport reports identify the activity, duration, and perceived intensity; mixed reports combine the relevant details.
+_Avoid_: Check-in, check-out, post-workout picture
+
+**Proof photo**:
+A private, group-visible image captured at workout time through the product's camera rather than uploaded from a device library. It must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, and is deleted seven days after verification while the report and Verified completion remain.
+_Avoid_: Media upload, mandatory selfie, unrelated image, permanent photo archive
+
 **Verified completion**:
-A workout completion that the product accepts according to its agreed evidence or confirmation rules.
-_Avoid_: Check-in, claim
+A Workout report accepted after one other group member explicitly verifies it or after it remains unquestioned for 24 hours. Reactions and motivational messages do not verify a report.
+_Avoid_: Check-in, claim, reaction
 
 **Missed-target event**:
 A neutral, group-visible record created when a member's finalized accountability week contains fewer verified completions than their weekly target. A member who reports no workouts and requests no Exception finishes with zero verified completions. Friends may respond to the event in a playful, supportive way.
