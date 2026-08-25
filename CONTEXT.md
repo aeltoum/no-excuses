@@ -96,8 +96,16 @@ _Avoid_: Failure, punishment, public shaming
 An app-authored low- or medium-effort physical activity lasting no more than five minutes, selected by a member from a Card offer to satisfy one item in their Consequence backlog. It requires no equipment, fits a small safe space, supports lower-impact adaptation, and never requires maximal effort, exercise to failure, excessive repetition, breath-holding, pain, hazardous surroundings, or a judgment about medical fitness.
 _Avoid_: Punishment, maximal-effort card, user-authored forfeit
 
+**Card catalog**:
+The app-authored inventory of available Consequence cards. The MVP launches with six universal starter cards and eight equally safe, equally ranked progression cards.
+_Avoid_: Card pool, user-created deck, rarity tier
+
+**Card unlock**:
+A permanent record that a person earned one randomly selected progression card they had not already earned. The MVP awards one when a finalized Target streak first reaches one, two, four, and eight weeks; it persists across Group memberships and contributes only to other current Group members' Card pools unless the card is retired.
+_Avoid_: Badge, temporary reward, card ownership
+
 **Card pool**:
-The system-assembled set of unique Consequence cards eligible for a member's Card offer. It combines at least six universally available starter cards with cards unlocked by the other Group members, excludes that member's own unlocks, and gives duplicate unlocks no extra weight.
+The system-assembled set of unique Consequence cards eligible for a member's Card offer. It combines six universal starter cards with Card unlocks contributed by other current Group members, excludes that member's own unlocks, gives duplicates no extra weight, and is fixed when the Card offer begins unless a card is retired.
 _Avoid_: Hand-picked deck, weighted duplicates
 
 **Card offer**:
