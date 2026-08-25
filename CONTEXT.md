@@ -36,6 +36,14 @@ _Avoid_: Unavoidable enforcement, coercion
 Strong but friendly rivalry that motivates members to pursue their individual fitness goals without coercion, humiliation, or treating athletic ability as personal worth.
 _Avoid_: Public status contest, hostile rivalry
 
+**Crown**:
+A competitive award granted after an accountability week finalizes to the top eligible performer in one announced performance category. Crowns earned during the current Season determine member ranking, while Target streak remains a separate measure of long-term consistency.
+_Avoid_: Point, badge, raw-volume reward
+
+**Season**:
+A fixed sequence of accountability weeks during which members compete by accumulating Crowns. A Season provides the boundary for the Group's current Crown ranking rather than creating a permanent all-time status hierarchy.
+_Avoid_: Permanent leaderboard, workout streak
+
 **Consistency**:
 The extent to which a member completes their intended workouts over time, expressed through verified completions, streaks, or adherence to a plan.
 _Avoid_: Engagement, app usage
