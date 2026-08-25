@@ -5,8 +5,24 @@ No Excuses is a group fitness product for friends who are already trying to exer
 ## Language
 
 **Group**:
-A small circle of friends who pursue fitness together and hold one another accountable.
+A private, invitation-only circle of two to ten friends who pursue fitness together and hold one another accountable. A person may belong to only one Group at a time. A Group may temporarily contain only its creator during setup or one remaining member after others depart, but accountability is paused below two members. If membership falls below two, the remaining member's unfinished accountability week ends without a result and their streaks freeze; accountability resumes at the next configured week boundary after a second member joins. A Group with multiple members cannot be closed unilaterally, while its last remaining member may close it and end all member access.
 _Avoid_: Team, cohort
+
+**Group admin**:
+A Group member who may issue Group invitations, manage membership, and manage Group settings. The creator is the first Group admin, a Group may have multiple Group admins, and at least one must remain. Any Group admin may promote a member or demote another admin, and the change is visible to the Group; the last Group admin cannot be demoted and must transfer the role before leaving unless they are the sole remaining member and close the Group. A Group admin may remove a non-admin, while an admin must be demoted before removal. Group admins have no additional authority over workout verification, Exceptions, or social accountability decisions.
+_Avoid_: Owner, leader
+
+**Group invitation**:
+A revocable, single-use invitation created by a Group admin that expires after seven days. Acceptance immediately joins the person to the Group when the Group has capacity and the person belongs to no other Group. A former member may join the same or a different Group immediately through a new invitation without a cooldown.
+_Avoid_: Public join link, membership application
+
+**Group member**:
+A person who has accepted a Group invitation and has not left or been removed. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving or removal, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. Returning begins a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
+_Avoid_: Follower, subscriber
+
+**Membership event**:
+A neutral Group-visible record that a member joined, left voluntarily, was removed by a Group admin, or gained or lost the Group admin role. Members see only Membership events created during their own membership; a removal identifies that it was admin-initiated without publishing a reason.
+_Avoid_: Expulsion notice, public justification
 
 **Accountability**:
 Social or product pressure, including repeated visibility and reminders, that makes missed exercise difficult to ignore while preserving each member's voluntary participation and control.
@@ -69,7 +85,7 @@ A Questioned report rejected by a strict majority of every other Group member. I
 _Avoid_: Plagiarised workout, public shaming
 
 **Missed-target event**:
-A neutral, group-visible record created when a member's finalized accountability week contains fewer verified completions than their weekly target. A member who reports no workouts and requests no Exception finishes with zero verified completions. Friends may respond to the event in a playful, supportive way.
+A neutral, group-visible record created when a member's finalized accountability week contains fewer verified completions than their weekly target. A member who reports no workouts and requests no Exception finishes with zero verified completions. Every current Group member, including the affected member, may respond to the event in a playful, supportive way; Group admins have no additional response powers.
 _Avoid_: Failure, punishment, public shaming
 
 **Consequence card**:
@@ -93,5 +109,5 @@ A member's unresolved accountability-week outcome while any timely workout repor
 _Avoid_: Pending failure, provisional miss
 
 **Exception**:
-A group-approved waiver that pauses one member's weekly target for an accountability week affected by a planned or unexpected interruption. It may be requested before the week begins through 24 hours after it closes; other members' targets and the accountability week continue normally. While approval is pending, the member's result remains provisional and no missed-target event occurs. An approved Exception neither extends nor resets the member's streak.
+A waiver that pauses one member's weekly target for an accountability week affected by a planned or unexpected interruption. It may be requested before the week begins through 24 hours after it closes; other members' targets and the accountability week continue normally. Every other active Group member may vote for 48 hours, the requester cannot vote, and approval requires a strict majority of all eligible members; a tie or timeout denies the request, and Group admins have no override. While approval is pending, the member's result remains provisional and no missed-target event occurs. An approved Exception neither extends nor resets the member's streak.
 _Avoid_: Excuse, escape, group pause
