@@ -17,8 +17,12 @@ A revocable, single-use invitation created by a Group admin that expires after s
 _Avoid_: Public join link, membership application
 
 **Group member**:
-A person who has accepted a Group invitation and has not left or been removed. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving or removal, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. Returning begins a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
+A person aged 18 or older who has accepted a Group invitation and has not left or been removed. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving or removal, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless a deletion request replaces it with Former member while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. Returning begins a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
 _Avoid_: Follower, subscriber
+
+**Former member**:
+The neutral identity shown in retained finalized Group history after a former member's deletion request or removal for being under 18. It preserves the Group's settled outcomes without retaining that person's identity, personal activity details, or media.
+_Avoid_: Deleted user, banned user
 
 **Membership event**:
 A neutral Group-visible record that a member joined, left voluntarily, was removed by a Group admin, or gained or lost the Group admin role. Members see only Membership events created during their own membership; a removal identifies that it was admin-initiated without publishing a reason.
@@ -45,7 +49,7 @@ An individual member's count of verified completions since their most recent mis
 _Avoid_: Daily streak, attendance streak
 
 **Weekly target**:
-The number of workouts a member intends to complete during an accountability week. Each member sets an individual target that carries into future accountability weeks. The product recommends at least two workouts, but a member may deliberately set one after a warning. The target locks when an accountability week begins; later revisions apply to the next accountability week. A member who joins during an accountability week sets a target that locks immediately and may report workouts performed earlier in that same week. Verified completions above the target remain visible but never carry into another week.
+The number of workouts a member intends to complete during an accountability week. Each member sets an individual target that carries into future accountability weeks. The product recommends at least two workouts, has no numerical maximum, and warns about unusually high targets or sharp increases without rewarding target size. The target locks when an accountability week begins; later revisions apply to the next accountability week. A member who joins during an accountability week sets a target that locks immediately and may report workouts performed earlier in that same week. Verified completions above the target remain visible but never carry into another week.
 _Avoid_: Group quota, shared workout plan
 
 **Accountability week**:
@@ -89,20 +93,36 @@ A neutral, group-visible record created when a member's finalized accountability
 _Avoid_: Failure, punishment, public shaming
 
 **Consequence card**:
-A random, app-authored physical activity assigned in response to a missed-target event or Rejected report. It is drawn from cards unlocked by the other Group members; members neither create, choose, nor filter eligible cards.
-_Avoid_: Punishment, user-selected forfeit
+An app-authored low- or medium-effort physical activity lasting no more than five minutes, selected by a member from a Card offer to satisfy one item in their Consequence backlog. It requires no equipment, fits a small safe space, supports lower-impact adaptation, and never requires maximal effort, exercise to failure, excessive repetition, breath-holding, pain, hazardous surroundings, or a judgment about medical fitness.
+_Avoid_: Punishment, maximal-effort card, user-authored forfeit
 
 **Card pool**:
-The system-assembled set of unique consequence cards eligible for a member's missed-target event. It combines cards unlocked by the other group members, excludes that member's own cards, and gives duplicate unlocks no extra weight.
+The system-assembled set of unique Consequence cards eligible for a member's Card offer. It combines at least six universally available starter cards with cards unlocked by the other Group members, excludes that member's own unlocks, and gives duplicate unlocks no extra weight.
 _Avoid_: Hand-picked deck, weighted duplicates
 
+**Card offer**:
+Three distinct random Consequence cards from which a member selects one. A member may instead use one redraw that excludes all three original cards, after which they must select from the three replacements.
+_Avoid_: Assigned card, unlimited redraw
+
+**Consequence backlog**:
+A Group-visible count of Consequence completions a member owes after Missed-target events, Rejected reports, and expired Consequence cards, capped at five with only one active Card offer at a time. Expiration keeps the original completion owed and adds another up to the cap, while each approved Consequence completion removes exactly one.
+_Avoid_: Punishment debt, simultaneous card stack
+
 **Consequence completion**:
-A consequence card completed through video evidence approved by two other group members, or by every other member when fewer than two are available.
+A Consequence card completed through timely Proof video approved by two other Group members, or by every other member when fewer than two are available. It removes exactly one item from the member's Consequence backlog and starts the next Card offer when any remain.
 _Avoid_: Self-reported consequence
 
 **Proof video**:
-A group-visible recording submitted as evidence of a consequence completion. It is retained for seven days after approval and then deleted, leaving only the completion record.
+A Group-visible recording submitted within an active Consequence card's 48-hour deadline as evidence of a Consequence completion. Timely submission pauses expiration during review, unclear evidence receives one 24-hour resubmission window, and approved video is retained for seven days before deletion leaves only the completion record.
 _Avoid_: Permanent video archive
+
+**Safety pause**:
+A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
+_Avoid_: Medical excuse, permanent opt-out
+
+**Media report**:
+A narrow request for the private-pilot operator to review a Proof photo or Proof video for prohibited or nonconsensual content. Review freezes the associated decision; removed Workout-report evidence makes the report Unsupported, while removed consequence evidence may be replaced before the card's original deadline.
+_Avoid_: Member report, public moderation queue
 
 **Provisional result**:
 A member's unresolved accountability-week outcome while any timely workout report or Exception request remains pending. It neither updates a streak nor creates a missed-target event until every pending item is resolved.
