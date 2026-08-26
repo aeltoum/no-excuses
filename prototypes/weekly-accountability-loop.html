@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>No Excuses — Weekly accountability loop prototype</title>
+  <!--
+    THROWAWAY PROTOTYPE — not application code.
+    Four variants of the weekly accountability loop, switchable via ?variant=A|B|C|D.
+    Stages are switchable via ?stage=home|report|close|card.
+  -->
+  <style>
+    :root {
+      --ink: #1a1d29;
+      --muted: #646878;
+      --paper: #f5f1e8;
+      --surface: #fffdf8;
+      --line: #ddd6c8;
+      --lime: #c9f04b;
+      --orange: #ff6b3d;
+      --blue: #4865ff;
+      --teal: #0f8b7b;
+      --red: #c23b31;
+      --shadow: 0 16px 40px rgba(27, 24, 17, .11);
+      --radius: 22px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); min-height: 100vh; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+    .app { min-height: 100vh; padding-bottom: 112px; }
+    .eyebrow { font-size: .72rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: .76rem; }
+    .stack { display: grid; gap: 14px; }
+    .row { display: flex; align-items: center; gap: 10px; }
+    .spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: 999px; padding: 6px 10px; font-size: .76rem; font-weight: 800; }
+    .button { border: 0; border-radius: 14px; padding: 12px 16px; background: var(--ink); color: white; font-weight: 850; }
+    .button.secondary { background: white; color: var(--ink); border: 1px solid var(--line); }
+    .button.orange { background: var(--orange); }
+    .button.blue { background: var(--blue); }
+    .button.ghost { background: transparent; color: inherit; border: 1px solid currentColor; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: white; background: var(--ink); flex: 0 0 auto; }
+    .avatar.j { background: #7b49a8; }
+    .avatar.m { background: #267a6b; }
+    .avatar.r { background: #c94f35; }
+    .progress { height: 10px; border-radius: 99px; overflow: hidden; background: #e5e0d5; }
+    .progress > span { display: block; height: 100%; width: var(--value, 50%); border-radius: inherit; background: var(--blue); }
+
+    .prototype-nav {
+      position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; align-items: center;
+      padding: 10px 14px; background: rgba(245, 241, 232, .92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(50,45,35,.08); overflow-x: auto;
+    }
+    .prototype-nav strong { white-space: nowrap; margin-right: auto; }
+    .stage-button { border: 1px solid var(--line); border-radius: 99px; padding: 8px 11px; background: var(--surface); white-space: nowrap; font-size: .78rem; font-weight: 800; color: var(--muted); }
+    .stage-button.active { background: var(--ink); border-color: var(--ink); color: white; }
+
+    .photo { position: relative; overflow: hidden; min-height: 165px; border-radius: 18px; isolation: isolate; background: #b8d4df; }
+    .photo::before, .photo::after { content: ""; position: absolute; inset: auto; z-index: -1; }
+    .photo.gym { background: linear-gradient(145deg, #2b3344, #95a1ad); }
+    .photo.gym::before { width: 74%; height: 14px; left: 13%; top: 46%; border-radius: 99px; background: #15191f; box-shadow: 0 -22px 0 -4px #353c46, 0 22px 0 -4px #353c46; transform: rotate(-7deg); }
+    .photo.gym::after { width: 24px; height: 82px; left: 47%; top: 26%; background: #181c22; border-radius: 4px; transform: rotate(-7deg); }
+    .photo.trail { background: linear-gradient(#92cbe7 0 45%, #60936f 46% 100%); }
+    .photo.trail::before { width: 140%; height: 100%; left: -20%; top: 51%; background: #d9c099; clip-path: polygon(46% 0,54% 0,70% 100%,25% 100%); }
+    .photo.trail::after { width: 95px; height: 95px; right: -20px; top: -20px; border-radius: 50%; background: rgba(255,236,157,.85); }
+    .photo.bike { background: linear-gradient(135deg, #e7c582, #9aa5ad); }
+    .photo.bike::before { width: 92px; height: 92px; left: 18%; bottom: 10%; border: 10px solid #303641; border-radius: 50%; box-shadow: 130px 0 0 -10px #e7c582, 130px 0 0 0 #303641; }
+    .photo.bike::after { width: 130px; height: 10px; left: calc(18% + 40px); bottom: 28%; background: #303641; transform: rotate(-12deg); transform-origin: left; }
+    .photo-label { position: absolute; left: 12px; bottom: 12px; z-index: 2; color: white; background: rgba(15,17,24,.75); padding: 7px 9px; border-radius: 9px; font-size: .72rem; font-weight: 800; }
+
+    /* Shared flow panels */
+    .flow-panel { max-width: 760px; margin: 28px auto; padding: 0 18px; }
+    .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
+    .flow-panel h1 { font-size: clamp(2rem, 7vw, 3.5rem); line-height: .95; margin: 8px 0 18px; letter-spacing: -.055em; }
+    .field { padding: 14px; background: white; border: 1px solid var(--line); border-radius: 14px; }
+    .field strong { display: block; margin-bottom: 4px; }
+    .report-grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 16px; }
+    .decision { border-left: 4px solid var(--orange); padding: 14px 16px; background: #fff1ea; border-radius: 0 14px 14px 0; }
+    .card-offer { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .consequence { min-height: 230px; border: 2px solid var(--ink); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; background: white; }
+    .consequence:nth-child(2) { background: #eef1ff; transform: translateY(-8px); }
+    .consequence:nth-child(3) { background: #f2f8d9; }
+
+    /* Variant A: social feed */
+    .a-shell { max-width: 1120px; margin: 0 auto; padding: 22px 18px; }
+    .a-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+    .a-brand { font-size: 1.4rem; font-weight: 950; letter-spacing: -.04em; }
+    .a-layout { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.75fr); gap: 22px; align-items: start; }
+    .a-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: 0 6px 25px rgba(27,24,17,.05); }
+    .a-proof-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 8px; margin: 14px 0; }
+    .a-proof-grid .photo:first-child { grid-row: span 2; min-height: 305px; }
+    .a-proof-grid .photo:not(:first-child) { min-height: 148px; }
+    .action-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+    .action-row button { border: 1px solid var(--line); background: white; padding: 10px 6px; border-radius: 12px; font-size: .76rem; font-weight: 800; }
+    .action-row button:last-child { color: var(--red); }
+    .a-side { position: sticky; top: 72px; }
+
+    /* Variant B: scoreboard */
+    .b-shell { min-height: calc(100vh - 52px); background: #11141c; color: #f7f7f5; }
+    .b-top { max-width: 1220px; margin: 0 auto; padding: 24px 22px 8px; }
+    .b-title { font-size: clamp(2.6rem, 8vw, 5.6rem); line-height: .85; letter-spacing: -.07em; margin: 14px 0; }
+    .b-layout { max-width: 1220px; margin: 0 auto; padding: 12px 22px 34px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+    .b-panel { background: #1b202b; border: 1px solid #333a49; border-radius: 8px; padding: 18px; }
+    .b-rank { display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; padding: 15px 0; border-bottom: 1px solid #343b49; }
+    .b-rank:last-child { border-bottom: 0; }
+    .rank-num { font: 900 1.7rem/1 ui-monospace, monospace; color: var(--lime); }
+    .b-photo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .b-photo-row .photo { min-height: 190px; border-radius: 6px; }
+    .b-panel .button.secondary { background: transparent; border-color: #596175; color: white; }
+
+    /* Variant C: path */
+    .c-shell { max-width: 1040px; margin: 0 auto; padding: 26px 18px; }
+    .c-header { background: var(--blue); color: white; border-radius: 32px; padding: 28px; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: end; }
+    .c-header h1 { font-size: clamp(2.2rem, 6vw, 4.4rem); line-height: .9; margin: 8px 0 0; letter-spacing: -.06em; }
+    .c-week { font-size: 4.5rem; font-weight: 950; line-height: .8; }
+    .c-path { margin: 26px 0; position: relative; }
+    .c-path::before { content: ""; position: absolute; width: 4px; background: #c9c4b8; top: 20px; bottom: 20px; left: 27px; }
+    .c-step { position: relative; display: grid; grid-template-columns: 58px 1fr; gap: 14px; margin: 0 0 14px; }
+    .c-dot { width: 56px; height: 56px; z-index: 1; border: 4px solid var(--paper); border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: white; font-weight: 950; }
+    .c-dot.done { background: var(--teal); }
+    .c-dot.now { background: var(--orange); }
+    .c-card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+    .c-proof { display: grid; grid-template-columns: 165px 1fr; gap: 16px; align-items: center; }
+    .c-proof .photo { min-height: 125px; }
+
+    /* Variant D: recommended combination */
+    .d-shell { min-height: calc(100vh - 52px); padding: 0 18px 40px; background: #11141c; color: #f7f7f5; }
+    .d-inner { max-width: 1160px; margin: 0 auto; }
+    .d-top { padding: 24px 0 10px; }
+    .d-top .b-title { margin-bottom: 12px; }
+    .d-top-copy { max-width: 600px; color: #adb4c1; }
+    .d-next { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 22px; background: #1b202b; color: white; border: 1px solid #333a49; border-left: 6px solid var(--lime); border-radius: 8px; padding: 22px 24px; margin-bottom: 18px; }
+    .d-next h1 { font-size: clamp(1.65rem, 4vw, 2.8rem); line-height: 1; letter-spacing: -.045em; margin: 6px 0 9px; }
+    .d-progress-number { min-width: 110px; text-align: right; color: var(--lime); font-size: 3.4rem; font-weight: 950; line-height: .9; }
+    .d-layout { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.7fr); gap: 18px; align-items: start; }
+    .d-card { background: #1b202b; border: 1px solid #333a49; border-radius: 8px; padding: 18px; }
+    .d-card .photo { min-height: 280px; margin: 14px 0 10px; }
+    .d-card .a-proof-grid .photo { margin: 0; }
+    .d-card .button.secondary { background: transparent; border-color: #596175; color: white; }
+    .d-shell .muted { color: #adb4c1; }
+    .d-side { position: sticky; top: 72px; }
+    .d-standing { display: grid; grid-template-columns: 25px 1fr auto; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid #343b49; }
+    .d-standing:last-child { border-bottom: 0; }
+    .d-rank { font: 900 .92rem/1 ui-monospace, monospace; color: var(--lime); }
+    .d-why { border: 1px dashed #596175; border-radius: 8px; padding: 11px 13px; color: #adb4c1; font-size: .76rem; background: #171b24; }
+
+    .switcher { position: fixed; z-index: 100; left: 50%; bottom: 18px; transform: translateX(-50%); display: grid; grid-template-columns: 46px minmax(190px,auto) 46px; align-items: center; background: #05060a; color: white; border: 1px solid #424652; border-radius: 999px; box-shadow: 0 12px 32px rgba(0,0,0,.32); overflow: hidden; }
+    .switcher button { height: 48px; border: 0; background: transparent; color: white; font-size: 1.2rem; }
+    .switcher button:hover { background: #252935; }
+    .switcher-label { text-align: center; font-size: .79rem; font-weight: 850; }
+    .state { position: fixed; right: 14px; bottom: 82px; z-index: 90; max-width: 300px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; box-shadow: var(--shadow); font-size: .7rem; }
+    .state summary { font-weight: 900; cursor: pointer; }
+    .state pre { white-space: pre-wrap; margin: 9px 0 0; font: .68rem/1.4 ui-monospace, monospace; }
+    .toast { position: fixed; z-index: 110; top: 70px; left: 50%; transform: translate(-50%,-20px); opacity: 0; pointer-events: none; background: var(--ink); color: white; border-radius: 12px; padding: 12px 16px; font-weight: 800; transition: .2s ease; }
+    .toast.show { transform: translate(-50%,0); opacity: 1; }
+
+    @media (max-width: 760px) {
+      .prototype-nav strong { display: none; }
+      .a-layout, .b-layout, .d-layout, .report-grid { grid-template-columns: 1fr; }
+      .a-side { position: static; }
+      .action-row { grid-template-columns: 1fr 1fr; }
+      .b-title { font-size: 3.3rem; }
+      .card-offer { grid-template-columns: 1fr; }
+      .consequence:nth-child(2) { transform: none; }
+      .c-header { grid-template-columns: 1fr; }
+      .c-week { font-size: 3rem; }
+      .c-proof { grid-template-columns: 1fr; }
+      .d-next { grid-template-columns: 1fr; }
+      .d-progress-number { text-align: left; }
+      .d-side { position: static; }
+      .state { display: none; }
+      .switcher { width: calc(100% - 28px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const variants = [
+      { key: 'A', name: 'Locker Room' },
+      { key: 'B', name: 'Scoreboard' },
+      { key: 'C', name: 'Weekly Path' },
+      { key: 'D', name: 'Combined' }
+    ];
+    const stages = [
+      { key: 'home', label: '1 · This week' },
+      { key: 'report', label: '2 · Log workout' },
+      { key: 'close', label: '3 · Week closes' },
+      { key: 'card', label: '4 · Consequence' }
+    ];
+    const params = new URLSearchParams(location.search);
+    let variant = variants.some(v => v.key === params.get('variant')) ? params.get('variant') : 'A';
+    let stage = stages.some(s => s.key === params.get('stage')) ? params.get('stage') : 'home';
+
+    const state = {
+      group: 'Tuesday Crew',
+      accountabilityWeek: 'Aug 24–30',
+      member: 'You',
+      target: 3,
+      verified: 2,
+      targetStreak: 4,
+      workoutStreak: 6,
+      season: 2,
+      seasonWeek: 3,
+      crowns: 2,
+      consequenceBacklog: 1,
+      proofReviewHoursRemaining: 18
+    };
+
+    const photo = (kind, label) => `<div class="photo ${kind}" role="img" aria-label="${label}"><span class="photo-label">${label}</span></div>`;
+    const avatar = (letter, cls = '') => `<span class="avatar ${cls}" aria-hidden="true">${letter}</span>`;
+
+    function setQuery(nextVariant = variant, nextStage = stage) {
+      const q = new URLSearchParams(location.search);
+      q.set('variant', nextVariant);
+      q.set('stage', nextStage);
+      history.replaceState({}, '', `${location.pathname}?${q}`);
+      variant = nextVariant;
+      stage = nextStage;
+      render();
+    }
+
+    function toast(message) {
+      const node = document.querySelector('#toast');
+      node.textContent = message;
+      node.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => node.classList.remove('show'), 1900);
+    }
+
+    function prototypeNav() {
+      return `<nav class="prototype-nav" aria-label="Prototype stages">
+        <strong>Weekly loop · rough prototype</strong>
+        ${stages.map(s => `<button class="stage-button ${s.key === stage ? 'active' : ''}" data-stage="${s.key}">${s.label}</button>`).join('')}
+      </nav>`;
+    }
+
+    function proofActions(dark = false) {
+      return `<div class="action-row" aria-label="Proof photo actions">
+        <button data-toast="Reaction added — this does not verify the report">🔥 React</button>
+        <button data-toast="Motivation sent — this does not verify the report">💬 Motivate</button>
+        <button data-toast="Report verified early; its 24-hour question window stays open">✓ Verify</button>
+        <button data-toast="Question flow opened with neutral reasons and a 48-hour Group decision">? Question</button>
+      </div>`;
+    }
+
+    function socialVariant() {
+      return `<main class="a-shell">
+        <header class="a-header">
+          <div><div class="eyebrow">${state.group}</div><div class="a-brand">The locker room</div></div>
+          <div class="row">${avatar('Y')}<span class="pill">Week ${state.seasonWeek} of Season ${state.season}</span></div>
+        </header>
+        <div class="a-layout">
+          <section class="stack" aria-label="Group activity">
+            <article class="a-card">
+              <div class="spread"><div class="row">${avatar('J','j')}<div><strong>Jordan finished strength day</strong><div class="muted tiny">Submitted 42 min ago · review closes in 23h 18m</div></div></div><span class="pill">Pending</span></div>
+              <div class="a-proof-grid">
+                ${photo('gym','Selected Proof · rack after training')}
+                ${photo('trail','Optional Proof · warm-up route')}
+                ${photo('bike','Optional Proof · bike summary')}
+              </div>
+              <div class="spread tiny"><span><strong>Strength</strong> · squat, press, row · moderate</span><span>📷 Captured in session</span></div>
+              <div style="height:12px"></div>${proofActions()}
+            </article>
+            <article class="a-card spread">
+              <div class="row">${avatar('M','m')}<div><strong>Maya reached 3 / 3</strong><div class="muted tiny">Target met · report verified by Jordan</div></div></div><button class="button secondary" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+          </section>
+          <aside class="a-side stack">
+            <section class="a-card">
+              <div class="eyebrow">Your week</div><h2 style="font-size:2.2rem;margin:8px 0">${state.verified} of ${state.target}</h2>
+              <div class="progress" style="--value:66%"><span></span></div>
+              <p class="muted">One Verified completion needed before Sunday midnight.</p>
+              <button class="button orange" style="width:100%" data-stage="report">Start a workout</button>
+            </section>
+            <section class="a-card">
+              <div class="spread"><strong>Season standings</strong><span class="tiny muted">2 weeks left</span></div>
+              <p class="spread"><span>1 · Maya</span><strong>4 👑</strong></p>
+              <p class="spread"><span>2 · You</span><strong>2 👑</strong></p>
+              <p class="spread"><span>3 · Jordan</span><strong>1 👑</strong></p>
+            </section>
+          </aside>
+        </div>
+      </main>`;
+    }
+
+    function scoreboardVariant() {
+      return `<main class="b-shell">
+        <header class="b-top">
+          <div class="spread"><span class="eyebrow">${state.group} · Season ${state.season}</span><span class="pill">Week ${state.seasonWeek} · live</span></div>
+          <h1 class="b-title">EVERY REP<br>COUNTS.</h1>
+          <p style="max-width:600px;color:#adb4c1">Competition up front. Targets measure consistency; Crowns separately recognize weekly performance.</p>
+        </header>
+        <div class="b-layout">
+          <section class="stack">
+            <div class="b-panel">
+              <div class="spread"><div><span class="eyebrow" style="color:var(--lime)">Current Season</span><h2>Standings</h2></div><span class="tiny muted">Resets after week 4</span></div>
+              <div class="b-rank"><span class="rank-num">01</span><div><strong>Maya</strong><div class="tiny muted">Top Steps · Cardio Leap</div></div><strong>4 👑</strong></div>
+              <div class="b-rank"><span class="rank-num">02</span><div><strong>You</strong><div class="tiny muted">Load Progression</div></div><strong>2 👑</strong></div>
+              <div class="b-rank"><span class="rank-num">03</span><div><strong>Jordan</strong><div class="tiny muted">Top Steps</div></div><strong>1 👑</strong></div>
+            </div>
+            <div class="b-panel">
+              <div class="spread"><div><span class="eyebrow" style="color:var(--lime)">Live proof</span><h2>Jordan · strength</h2></div><span class="pill">Pending 42m</span></div>
+              <div class="b-photo-row">${photo('gym','Selected Proof photo')}${photo('bike','Optional Proof photo')}</div>
+              <p class="tiny muted">Captured during Workout session · report locked · question window has 23h 18m left</p>
+              ${proofActions(true)}
+            </div>
+          </section>
+          <aside class="stack">
+            <div class="b-panel">
+              <span class="eyebrow" style="color:var(--orange)">Your contract</span>
+              <h2 style="font-size:3.4rem;margin:8px 0">${state.verified} / ${state.target}</h2>
+              <div class="progress" style="--value:66%"><span></span></div>
+              <p>One more verified workout by Sunday midnight.</p>
+              <button class="button" style="background:var(--lime);color:#111;width:100%" data-stage="report">Log the next one</button>
+            </div>
+            <div class="b-panel">
+              <div class="spread"><strong>Weekly Crowns</strong><span class="tiny muted">Provisional</span></div>
+              <p class="spread"><span>Top Steps</span><strong>Maya · 63,400</strong></p>
+              <p class="spread"><span>Load Progression</span><strong>You · +5.2%</strong></p>
+              <p class="spread"><span>Cardio Leap</span><strong>Jordan · +3.1%</strong></p>
+            </div>
+          </aside>
+        </div>
+      </main>`;
+    }
+
+    function pathVariant() {
+      return `<main class="c-shell">
+        <header class="c-header"><div><div class="eyebrow">${state.group} · your weekly path</div><h1>One clear<br>next move.</h1></div><div><div class="c-week">2/3</div><div>workouts verified</div></div></header>
+        <section class="c-path" aria-label="Weekly accountability path">
+          <article class="c-step"><div class="c-dot done">✓</div><div class="c-card"><div class="spread"><div><strong>Target locked</strong><div class="muted tiny">3 workouts · locked Monday at midnight</div></div><span class="pill">Done</span></div></div></article>
+          <article class="c-step"><div class="c-dot done">2</div><div class="c-card"><div class="spread"><div><strong>Two reports verified</strong><div class="muted tiny">Workout streak 6 · Target streak 4</div></div><button class="button secondary" data-toast="Verified reports opened">Review</button></div></div></article>
+          <article class="c-step"><div class="c-dot now">→</div><div class="c-card"><div class="eyebrow" style="color:var(--orange)">Your next step</div><h2>Complete one workout by Sunday midnight</h2><p class="muted">Start a session, capture Proof in the app, then submit a structured report.</p><button class="button orange" data-stage="report">Start workout session</button></div></article>
+          <article class="c-step"><div class="c-dot">?</div><div class="c-card c-proof">${photo('gym','Jordan’s selected Proof')}<div><div class="spread"><strong>Friend review</strong><span class="pill">23h left</span></div><p class="muted tiny">React, motivate, verify, or question. Only Verify changes report status.</p>${proofActions()}</div></div></article>
+          <article class="c-step"><div class="c-dot">4</div><div class="c-card"><strong>Week finalizes after pending decisions</strong><div class="muted tiny">Targets, streaks, Crowns, and any missed-target events update together.</div></div></article>
+        </section>
+      </main>`;
+    }
+
+    function combinedVariant() {
+      return `<main class="d-shell">
+        <div class="d-inner">
+          <header class="d-top">
+            <div class="spread"><span class="eyebrow">${state.group} · Season ${state.season}</span><div class="row">${avatar('Y')}<span class="pill">Week ${state.seasonWeek} · live</span></div></div>
+            <h1 class="b-title">EVERY REP<br>COUNTS.</h1>
+            <p class="d-top-copy">Competition gives the week energy. Friends’ Proof and one clear next move turn that energy into accountability.</p>
+          </header>
+
+          <section class="d-next" aria-label="Your next weekly action">
+            <div><div class="eyebrow" style="color:var(--lime)">Your next move</div><h1>Complete one workout by Sunday midnight.</h1><div class="muted">Start a session, capture Proof, and submit the report for friend review.</div></div>
+            <div><div class="d-progress-number">${state.verified}/${state.target}</div><button class="button" data-stage="report" style="margin-top:12px;width:100%;background:var(--lime);color:#111">Start workout</button></div>
+          </section>
+
+          <div class="d-layout">
+            <section class="stack" aria-label="Group activity">
+            <article class="d-card">
+              <div class="spread"><div class="row">${avatar('J','j')}<div><strong>Jordan finished strength day</strong><div class="muted tiny">Submitted 42 min ago · review closes in 23h 18m</div></div></div><span class="pill">Pending</span></div>
+
+              <div class="a-proof-grid">
+                ${photo('gym','Required Proof · rack after training')}
+                ${photo('trail','Optional Proof · warm-up route')}
+                ${photo('bike','Optional Proof · bike summary')}
+              </div>
+              <div class="spread tiny"><span><strong>Strength</strong> · squat, press, row · moderate</span><span>📷 Captured in session</span></div>
+              <p class="tiny muted">Three submitted photos use the mosaic layout.</p>
+              ${proofActions()}
+            </article>
+            <article class="d-card">
+              <div class="spread"><div class="row">${avatar('M','m')}<div><strong>Maya finished a trail run</strong><div class="muted tiny">Target met 3 / 3 · verified by Jordan</div></div></div><span class="pill">Verified</span></div>
+              ${photo('trail','Required Proof · trail finish')}
+              <div class="spread tiny"><span><strong>Cardio</strong> · trail run · moderate</span><span>One submitted photo</span></div>
+              <p class="tiny muted">A one-photo report uses the full-width hero layout.</p>
+              <button class="button secondary" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+            </section>
+
+            <aside class="d-side stack">
+            <section class="d-card">
+              <div class="spread"><div><div class="eyebrow">Current Season</div><h2 style="margin:6px 0 0">Standings</h2></div><span class="tiny muted">2 weeks left</span></div>
+              <div class="d-standing"><span class="d-rank">01</span><span>Maya</span><strong>4 👑</strong></div>
+              <div class="d-standing"><span class="d-rank">02</span><span>You</span><strong>2 👑</strong></div>
+              <div class="d-standing"><span class="d-rank">03</span><span>Jordan</span><strong>1 👑</strong></div>
+              <p class="tiny muted" style="margin-bottom:0">Crowns show competition, but the social Proof feed remains the main experience.</p>
+            </section>
+            <div class="d-why"><strong>Photo rule:</strong> one Proof photo uses the hero layout; required plus optional Proof photos use the mosaic.</div>
+            <div class="d-why"><strong>What was combined:</strong> A’s friend activity feed, B’s compact Season standings, and C’s prominent next action.</div>
+            </aside>
+          </div>
+        </div>
+      </main>`;
+    }
+
+    function reportStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · same in every variant</div><h1>Turn exercise<br>into evidence.</h1>
+        <div class="report-grid">
+          <section class="sheet stack">
+            <div class="spread"><strong>Workout session · active</strong><span class="pill">00:48:12</span></div>
+            ${photo('gym','Live camera candidate · captured 6:42 PM')}
+            <div class="row"><button class="button blue" data-toast="New in-app photo candidate captured">Take photo</button><button class="button secondary" data-toast="Session ended; choose one required and up to two optional photos">End session</button></div>
+            <p class="tiny muted">Camera only. Unselected candidates are deleted when the session ends.</p>
+          </section>
+          <section class="sheet stack">
+            <div class="eyebrow">Report preview</div>
+            <div class="field"><strong>Strength</strong><span class="muted">Squat · 3×5 · 185 lb<br>Press · 3×8 · 75 lb</span></div>
+            <div class="field"><strong>Perceived intensity</strong><span class="muted">Moderate</span></div>
+            <div class="field"><strong>Attestation</strong><span class="muted">I completed this workout.</span></div>
+            <button class="button" data-toast="Report submitted and locked; 24-hour review started">Submit locked report</button>
+          </section>
+        </div>
+      </main>`;
+    }
+
+    function closeStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · week finalization</div><h1>The miss is visible.<br>The tone stays human.</h1>
+        <section class="sheet stack">
+          <div class="spread"><div class="row">${avatar('Y')}<div><strong>You finished 2 of 3</strong><div class="muted tiny">Week finalized · one below target</div></div></div><span class="pill" style="color:var(--red)">Missed target</span></div>
+          <div class="decision"><strong>Neutral system event</strong><p style="margin-bottom:0">Your Target streak reset. Your Workout streak reset. One completion was added to your Consequence backlog.</p></div>
+          <div class="row" style="flex-wrap:wrap"><button class="button secondary" data-toast="Supportive reaction added">❤️ Send support</button><button class="button secondary" data-toast="Playful response composer opened with anti-humiliation guardrails">😅 Playful callout</button><button class="button orange" data-stage="card">View Card offer</button></div>
+          <p class="tiny muted">No failure language, no public post, and no peer-authored punishment. A timely unresolved report or Exception would keep this result provisional instead.</p>
+        </section>
+      </main>`;
+    }
+
+    function cardStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · consequence backlog 1</div><h1>Pick your way<br>back in.</h1>
+        <p class="muted">Three random app-authored cards from friends’ unlocked pool. Choose one—or use the single redraw.</p>
+        <div class="card-offer">
+          <article class="consequence"><span class="eyebrow">Unlocked by Maya</span><div><h2>Wall sit relay</h2><p>Three rounds of 25 seconds, with rest.</p></div><button class="button" data-toast="Wall sit relay selected; 48-hour Proof-video deadline started">Choose</button></article>
+          <article class="consequence"><span class="eyebrow">Universal starter</span><div><h2>Low-impact ladder</h2><p>Four minutes of alternating step-backs.</p></div><button class="button blue" data-toast="Low-impact ladder selected; 48-hour Proof-video deadline started">Choose</button></article>
+          <article class="consequence"><span class="eyebrow">Unlocked by Jordan</span><div><h2>Bear-crawl box</h2><p>Trace a small square for three controlled rounds.</p></div><button class="button" data-toast="Bear-crawl box selected; 48-hour Proof-video deadline started">Choose</button></article>
+        </div>
+        <div class="spread" style="margin-top:16px;flex-wrap:wrap"><button class="button secondary" data-toast="One redraw used; the original three cards are excluded">↻ Use one redraw</button><button class="button ghost" data-toast="Safety pause started; no diagnosis or peer approval requested">Cannot safely perform</button></div>
+        <p class="tiny muted">A selected card allows 48 hours for temporary Proof video. Approval removes one backlog item; video deletes seven days later.</p>
+      </main>`;
+    }
+
+    function switcher() {
+      const idx = variants.findIndex(v => v.key === variant);
+      return `<div class="switcher" role="navigation" aria-label="Prototype variants">
+        <button data-variant="${variants[(idx + variants.length - 1) % variants.length].key}" aria-label="Previous variant">←</button>
+        <div class="switcher-label">${variant} · ${variants[idx].name}</div>
+        <button data-variant="${variants[(idx + 1) % variants.length].key}" aria-label="Next variant">→</button>
+      </div>`;
+    }
+
+    function statePanel() {
+      return `<details class="state"><summary>Prototype state</summary><pre>${JSON.stringify({variant, stage, ...state}, null, 2)}</pre></details>`;
+    }
+
+    function render() {
+      let content;
+      if (stage === 'report') content = reportStage();
+      else if (stage === 'close') content = closeStage();
+      else if (stage === 'card') content = cardStage();
+      else if (variant === 'B') content = scoreboardVariant();
+      else if (variant === 'C') content = pathVariant();
+      else if (variant === 'D') content = combinedVariant();
+      else content = socialVariant();
+
+      document.querySelector('#root').innerHTML = `<div class="app">${prototypeNav()}${content}${statePanel()}${switcher()}</div>`;
+      document.querySelectorAll('[data-stage]').forEach(button => button.addEventListener('click', () => setQuery(variant, button.dataset.stage)));
+      document.querySelectorAll('[data-variant]').forEach(button => button.addEventListener('click', () => setQuery(button.dataset.variant, stage)));
+      document.querySelectorAll('[data-toast]').forEach(button => button.addEventListener('click', () => toast(button.dataset.toast)));
+    }
+
+    document.addEventListener('keydown', event => {
+      if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
+      if (event.target.matches('input, textarea, [contenteditable]')) return;
+      const idx = variants.findIndex(v => v.key === variant);
+      const next = event.key === 'ArrowRight' ? (idx + 1) % variants.length : (idx + variants.length - 1) % variants.length;
+      setQuery(variants[next].key, stage);
+    });
+
+    render();
+  </script>
+</body>
+</html>
