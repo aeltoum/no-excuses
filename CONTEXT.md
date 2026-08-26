@@ -93,7 +93,7 @@ The number of workouts a member intends to complete during an accountability wee
 _Avoid_: Group quota, shared workout plan
 
 **Accountability week**:
-The shared period in which every group member's weekly target is evaluated. A group configures one start day and time zone, and each accountability week begins and ends at midnight. Configuration changes take effect only after the current accountability week closes.
+The shared period in which every group member's weekly target is evaluated. A group configures one start day and time zone, and each accountability week begins and ends at midnight. After it ends, members have 24 hours to submit Workout reports for exercise completed during that week and sync eligible Crown activity data; this settlement window does not extend the week or admit later exercise. Configuration changes take effect only after the current accountability week closes.
 _Avoid_: Personal week, member-local week
 
 **Workout session**:
