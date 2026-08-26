@@ -37,7 +37,7 @@ Strong but friendly rivalry that motivates members to pursue their individual fi
 _Avoid_: Public status contest, hostile rivalry
 
 **Crown**:
-A competitive award granted after an accountability week finalizes to every eligible Group member tied for first in an announced performance category. The MVP always runs Top Steps, Load Progression, and Cardio Leap; a member may earn all three, and current-Season Crown totals determine ranking while Target streak remains separate.
+A competitive award granted after an accountability week finalizes to every eligible Group member tied for first in an announced performance category. The MVP always runs Top Steps, Load Progression, and Cardio Leap; a member may earn all three, and current-Season Crown totals determine ranking while Target streak remains separate. Every finalized award remains part of that person's Crown history across Seasons, Groups, and memberships.
 _Avoid_: Point, badge, adherence award
 
 **Crown eligibility**:
@@ -61,8 +61,20 @@ The Crown category ranking recorded percentage improvement against a Performance
 _Avoid_: Raw cardio ranking, route race, fitness diagnosis
 
 **Season**:
-A fixed sequence of accountability weeks during which members compete by accumulating Crowns. A Season provides the boundary for the Group's current Crown ranking rather than creating a permanent all-time status hierarchy.
-_Avoid_: Permanent leaderboard, workout streak
+A Group-local, sequentially numbered series of four active accountability weeks during which Group members compete by accumulating Crowns. A Group's first Season begins at the first configured accountability-week boundary after accountability becomes active; time below two members pauses the Season and consumes no week. Seasons run back-to-back, so the next Season begins at the boundary after the fourth week even while the previous Season's final results remain provisional. A Season provides a short, recurring chance to win rather than creating a permanent all-time status hierarchy.
+_Avoid_: Permanent leaderboard, workout streak, elapsed calendar month
+
+**Season standings**:
+The Group-visible ranking of current Group members by Crowns earned during the current Season. A mid-Season joiner enters immediately with zero Crowns and a visible joining-week marker, without proration or Crowns transferred from another membership. A departure removes the former member from active standings while preserving finalized weekly awards in history; returning begins again at zero. Equal Crown totals share rank, and every member tied for first when the Season ends is a co-champion. Crown totals and Season standings reset when the next Season begins; Weekly targets, Target streaks, Workout streaks, Performance baselines, Card unlocks, Consequence backlogs, and membership continue across the boundary.
+_Avoid_: All-time ranking, prorated score, transferred Crowns, tiebreaker
+
+**Season summary**:
+A Group-visible record created when a Season's final results settle. It gives the champion or co-champions equal top billing, shows final standings and Crown totals, identifies each member's category wins, and recaps existing consistency and performance results without awarding another currency, Card unlock, or permanent status score. Every summary remains available while its Group exists to people who were Group members when it finalized; a departure ends access, and a new or returning membership cannot see earlier summaries.
+_Avoid_: Lifetime leaderboard, additional Crown, progression reward
+
+**Lifetime Crown total**:
+The number of finalized Crowns a person has earned across all Seasons, Groups, and memberships, derived from their Crown history. Each category award adds one even when first place was shared, so winning all three categories in one accountability week adds three. The MVP preserves the underlying history but does not display, rank by, reward, or otherwise use the lifetime total; a future Season-championship count remains a distinct statistic.
+_Avoid_: Current-Season score, Season championship count, MVP leaderboard
 
 **Consistency**:
 The extent to which a member completes their intended workouts over time, expressed through verified completions, streaks, or adherence to a plan.
