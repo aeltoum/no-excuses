@@ -37,8 +37,28 @@ Strong but friendly rivalry that motivates members to pursue their individual fi
 _Avoid_: Public status contest, hostile rivalry
 
 **Crown**:
-A competitive award granted after an accountability week finalizes to the top eligible performer in one announced performance category. Crowns earned during the current Season determine member ranking, while Target streak remains a separate measure of long-term consistency.
-_Avoid_: Point, badge, raw-volume reward
+A competitive award granted after an accountability week finalizes to every eligible Group member tied for first in an announced performance category. The MVP always runs Top Steps, Load Progression, and Cardio Leap; a member may earn all three, and current-Season Crown totals determine ranking while Target streak remains separate.
+_Avoid_: Point, badge, adherence award
+
+**Crown eligibility**:
+Qualification to compete in one Crown category during an accountability week, requiring timely category data from at least two Group members; missing data means ineligible rather than a zero score. A midweek joiner competes immediately using only post-join activity, an approved Exception makes a member ineligible, and leaving before finalization forfeits the result.
+_Avoid_: Crown penalty, automatic zero
+
+**Performance baseline**:
+A member-private best comparable result from the previous eight accountability weeks used to calculate Load Progression or Cardio Leap, retained across Group memberships without exposing the underlying pre-membership activity. A first comparable result establishes a baseline but cannot win, while the Group sees only the current result and percentage progression.
+_Avoid_: Group baseline, lifetime personal record
+
+**Top Steps**:
+The absolute Crown category ranking all steps from an authorized aggregate activity source during the accountability week, including movement outside Workout sessions and only post-join activity for a midweek joiner. Scores round to the nearest hundred steps; source connection is optional, source-attributed rather than anti-cheat proof, and missing, limited, stale, or late data makes a member ineligible.
+_Avoid_: Workout steps, manual step claim, verified exercise
+
+**Load Progression**:
+The Crown category ranking the percentage increase in numerical resistance against a Performance baseline for the same exercise, equipment, variation, and completed repetition count. It uses ordinary workout data from Verified completions without estimating maximum strength or prompting maximal tests; bodyweight-only work and bands without standardized numerical resistance are ineligible.
+_Avoid_: Strength Leap, estimated maximum, repetition progression
+
+**Cardio Leap**:
+The Crown category ranking recorded percentage improvement against a Performance baseline for the same cardio activity, benchmark, equipment or environment, timing semantics, and source class. A fixed-distance benchmark compares completion time and a fixed-duration benchmark compares distance; routes are unnecessary, scores round to one decimal percentage point, and the result is a friendly performance ranking rather than proof of physiological change.
+_Avoid_: Raw cardio ranking, route race, fitness diagnosis
 
 **Season**:
 A fixed sequence of accountability weeks during which members compete by accumulating Crowns. A Season provides the boundary for the Group's current Crown ranking rather than creating a permanent all-time status hierarchy.
