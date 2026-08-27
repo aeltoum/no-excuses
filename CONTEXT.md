@@ -105,7 +105,7 @@ A member's group-visible account of completed exercise, submitted with its compl
 _Avoid_: Check-in, check-out, post-workout picture
 
 **Proof photo**:
-A private, group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active. It cannot come from a device library, locks when selected, must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, shows the Group its session and capture times but not location, hidden image metadata, or device information, and is deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
+A private, group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active, paired with a short factual description the member may type or dictate. The image locks when selected and its description remains editable until report submission, then both become immutable; it cannot come from a device library, must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, shows the Group its description plus session and capture times but not location, hidden image metadata, or device information, and is deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
 _Avoid_: Media upload, mandatory selfie, unrelated image, permanent photo archive, location proof
 
 **Verified completion**:
@@ -117,7 +117,7 @@ A Workout report placed into a Group decision because another member questioned 
 _Avoid_: Accusation, failed workout
 
 **Group decision**:
-A 48-hour binary vote in which every Group member other than the reporting member may accept or reject a Questioned report. Voting closes when either choice receives a strict majority, every eligible member has voted, or time expires, and its outcome is final in the MVP without appeal or reopening.
+A 48-hour binary vote in which every Group member other than the reporting member may accept or reject a Questioned report. An eligible member may instead record **Cannot assess this evidence**, which casts no vote, stops their reminders, and may be replaced by a vote until closure without changing the majority threshold; voting closes when either choice receives a strict majority, every eligible member has voted or recused, or time expires, and its outcome is final in the MVP without appeal or reopening.
 _Avoid_: Trial, punishment vote
 
 **Unsupported report**:
@@ -161,12 +161,16 @@ A Consequence card completed through timely Proof video approved by two other Gr
 _Avoid_: Self-reported consequence
 
 **Proof video**:
-A Group-visible recording submitted within an active Consequence card's 48-hour deadline as evidence of a Consequence completion. Timely submission pauses expiration during review, unclear evidence receives one 24-hour resubmission window, and approved video is retained for seven days before deletion leaves only the completion record.
+A Group-visible recording submitted within an active Consequence card's 48-hour deadline as evidence of a Consequence completion, paired with a short factual description and captions or a transcript for meaningful audio. Timely submission pauses expiration during review, unclear evidence receives one 24-hour resubmission window, and approved video is retained for seven days before deletion leaves only the completion record.
 _Avoid_: Permanent video archive
 
 **Safety pause**:
 A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
 _Avoid_: Medical excuse, permanent opt-out
+
+**Technical pause**:
+A neutral, Group-visible suspension of an affected personal or shared accountability deadline when the private-pilot operator confirms that a product accessibility defect prevented timely action. It restores the remaining time after access is repaired, never requires an Exception or creates an accountability consequence, and leaves unrelated Group deadlines unchanged.
+_Avoid_: Exception, Safety pause, discretionary extension
 
 **Media report**:
 A narrow request for the private-pilot operator to review a Proof photo or Proof video for prohibited or nonconsensual content. Review freezes the associated decision; removed Workout-report evidence makes the report Unsupported, while removed consequence evidence may be replaced before the card's original deadline.
