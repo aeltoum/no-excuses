@@ -88,6 +88,10 @@ _Avoid_: Current-Season score, Season championship count, MVP leaderboard
 The extent to which a member completes their intended workouts over time, expressed through verified completions, streaks, or adherence to a plan.
 _Avoid_: Engagement, app usage
 
+**Target attainment**:
+An evaluable member-week outcome in which the member meets or exceeds their Weekly target through Verified completions. A member-week covered by an approved Exception or ended without a result is excluded; the Validation pilot's primary completion measure is the proportion of evaluable member-weeks with Target attainment.
+_Avoid_: App engagement, uncapped workout volume, excused completion
+
 **Target streak**:
 An individual member's count of consecutive finalized accountability weeks in which they met or exceeded their weekly target. A missed-target event resets it; an approved Exception freezes it without incrementing. It is scoped to the member within the group and is never shared by the whole group.
 _Avoid_: Group streak, shared streak
@@ -175,6 +179,26 @@ _Avoid_: Permanent video archive
 **Safety pause**:
 A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
 _Avoid_: Medical excuse, permanent opt-out
+
+**Critical safety incident**:
+A Validation-pilot event involving injury attributable to product pressure, coercion, humiliation or harassment, nonconsensual media exposure, retaliation for using a safeguard, or a serious privacy breach. Appropriate use of a Safety pause, reviewer recusal, or Media report is evidence that a safeguard was used and is not itself a Critical safety incident.
+_Avoid_: Any safeguard use, ordinary discomfort, unverified allegation treated as settled fact
+
+**Validation pilot**:
+A small, controlled, time-bounded real-world trial of the complete MVP with intact friend Groups before a broader beta. Participants use the actual weekly accountability experience, while the people running the trial may onboard them, provide technical and safety support, and collect predefined product outcomes and feedback without influencing exercise or peer accountability decisions. Its purpose is to decide whether to broaden testing, revise the MVP, or reconsider the concept.
+_Avoid_: Prototype, demo, usability test, public launch
+
+**Pilot retention**:
+The continued voluntary use of the core accountability experience through the end of a Validation pilot. A Group is retained when at least two original pilot members remain through the final live week; an original member is retained when they remain in the Group and perform at least one core accountability action during that week, such as reporting or reviewing a workout, participating in an Exception decision, or acting on or reviewing a Consequence card. Merely opening the product or reacting socially does not establish retention.
+_Avoid_: Account existence, passive membership, research-interview completion
+
+**Trust integrity**:
+The extent to which members experience Workout reporting and peer verification as credible without surveillance. The Validation pilot evaluates it through Questioned, Unsupported, Rejected, and withdrawn reports together with anonymous disclosures and interviews about dishonest reporting, social pressure, and confidence in peer review; a low dispute count alone is not evidence of Trust integrity.
+_Avoid_: Honesty score, anti-cheat proof, absence of disputes
+
+**Founding pilot contributor**:
+A person who completes Validation-pilot onboarding and provides at least one structured feedback response, including departure feedback when applicable. They receive a permanent, non-competitive profile marker that grants no Crowns, Card unlocks, streak credit, rank, product access, or other gameplay advantage; exercise, continued participation, and favorable feedback are never required.
+_Avoid_: Performance reward, retention incentive, privileged account
 
 **Private-pilot operator**:
 The person or small team running the invitation-only MVP who may manually complete rare support and safety operations, including deletion requests, Media reports, removal of an underage member, and confirmed Technical pauses. The role is outside Group membership and has no authority to verify Workout reports, approve Exceptions, decide Consequence completions, alter Crowns, or override Group decisions.
