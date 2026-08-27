@@ -36,6 +36,14 @@ _Avoid_: Unavoidable enforcement, coercion
 Strong but friendly rivalry that motivates members to pursue their individual fitness goals without coercion, humiliation, or treating athletic ability as personal worth.
 _Avoid_: Public status contest, hostile rivalry
 
+**Immediate social push**:
+An optional device notification sent only to the member receiving a reaction, motivational message, or playful response. The first response sends immediately, responses arriving during the next 15 minutes are bundled into one follow-up, and no interaction pushes the rest of the Group. Immediate social pushes and the Social and competition digest have separate default-on controls and together produce no more than three social deliveries per member per day, independently of the three-delivery allowance for actions, deadlines, reviews, and votes.
+_Avoid_: Group-wide social alert, one push per response, unlimited social notifications
+
+**Social and competition digest**:
+An optional daily device notification summarizing new Group social and competition activity. It remains enabled by default, may be rescheduled or disabled independently of Immediate social pushes, and repeats relevant activity even when an Immediate social push was already delivered.
+_Avoid_: Immediate social push, required notification, per-event alert
+
 **Crown**:
 A competitive award granted after an accountability week finalizes to every eligible Group member tied for first in an announced performance category. The MVP always runs Top Steps, Load Progression, and Cardio Leap; a member may earn all three, and current-Season Crown totals determine ranking while Target streak remains separate. Every finalized award remains part of that person's Crown history across Seasons, Groups, and memberships.
 _Avoid_: Point, badge, adherence award
@@ -97,7 +105,7 @@ The shared period in which every group member's weekly target is evaluated. A gr
 _Avoid_: Personal week, member-local week
 
 **Workout session**:
-A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select one required and up to two optional Proof photos while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the latest selected Proof photo.
+A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select one required Proof photo while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the selected Proof photo.
 _Avoid_: Passive workout tracking, timed photo assignment
 
 **Workout report**:
@@ -113,7 +121,7 @@ A Workout report accepted after one other group member explicitly verifies it or
 _Avoid_: Check-in, claim, reaction
 
 **Questioned report**:
-A Workout report placed into a Group decision because another member questioned it during its initial 24-hour review period or because its required evidence is missing or poor. It returns to provisional status; the reporting member may explain or withdraw it but cannot change its structured details or Proof photos.
+A Workout report placed into a Group decision because another member questioned it during its initial 24-hour review period or because its required evidence is missing or poor. It returns to provisional status; the reporting member may explain or withdraw it but cannot change its structured details or Proof photo.
 _Avoid_: Accusation, failed workout
 
 **Group decision**:
@@ -167,6 +175,10 @@ _Avoid_: Permanent video archive
 **Safety pause**:
 A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
 _Avoid_: Medical excuse, permanent opt-out
+
+**Private-pilot operator**:
+The person or small team running the invitation-only MVP who may manually complete rare support and safety operations, including deletion requests, Media reports, removal of an underage member, and confirmed Technical pauses. The role is outside Group membership and has no authority to verify Workout reports, approve Exceptions, decide Consequence completions, alter Crowns, or override Group decisions.
+_Avoid_: Group admin, accountability moderator, general-purpose administrator
 
 **Technical pause**:
 A neutral, Group-visible suspension of an affected personal or shared accountability deadline when the private-pilot operator confirms that a product accessibility defect prevented timely action. It restores the remaining time after access is repaired, never requires an Exception or creates an accountability consequence, and leaves unrelated Group deadlines unchanged.
