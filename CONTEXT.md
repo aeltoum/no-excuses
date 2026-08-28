@@ -109,23 +109,31 @@ The shared period in which every group member's weekly target is evaluated. A gr
 _Avoid_: Personal week, member-local week
 
 **Workout session**:
-A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select one required Proof photo while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the selected Proof photo.
+A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select exactly one Activity photo and one Member-presence photo while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the later selected Proof photo.
 _Avoid_: Passive workout tracking, timed photo assignment
 
 **Workout report**:
-A member's group-visible account of completed exercise, submitted with its completion date, an explicit completion attestation, and a Proof photo; each Workout session produces at most one report and one Verified completion. It is freely editable before submission and immutable afterward; strength reports identify exercises, sets, reps, and resistance, while cardio, class, and sport reports identify the activity, duration, and perceived intensity and mixed reports combine the relevant details.
+A member's Group-visible account of completed exercise, submitted with its completion date, an explicit completion attestation, confirmation that its Member-presence photo depicts the member, one Activity photo, and one Member-presence photo; each Workout session produces at most one report and one Verified completion. It is freely editable before submission and immutable afterward; strength reports identify exercises, sets, reps, and resistance, while cardio, class, and sport reports identify the activity, duration, and perceived intensity and mixed reports combine the relevant details.
 _Avoid_: Check-in, check-out, post-workout picture
 
 **Proof photo**:
-A private, group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active, paired with a short factual description the member may type or dictate. The image locks when selected and its description remains editable until report submission, then both become immutable; it cannot come from a device library, must reasonably relate to the Workout report without requiring the member's face, body, location, or a live exercise recording, shows the Group its description plus session and capture times but not location, hidden image metadata, or device information, and is deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
-_Avoid_: Media upload, mandatory selfie, unrelated image, permanent photo archive, location proof
+A private, Group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active, paired with a short factual description the member may type or dictate. A Workout report requires exactly one Activity photo and one Member-presence photo; each image locks when selected and its description locks at report submission; the Group sees both descriptions and session and capture times but not location, hidden metadata, or device information; both images are deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
+_Avoid_: Media upload, device-library photo, permanent photo archive, location proof
+
+**Activity photo**:
+The required Proof photo showing content reasonably related to the reported exercise, such as equipment, a workout area, trail, class, or machine summary. It is the dominant report image and does not have to depict the member, reveal a location, or record live exercise.
+_Avoid_: Generic gym photo, unrelated image, location proof
+
+**Member-presence photo**:
+The required Proof photo visibly depicting some part of the reporting member, with the member controlling its framing and how much of their face or body appears; no face, full-body view, or identifying feature is required, and non-explicit shirtless, sports-bra, swimwear, cropped, body-only, flexing, or post-workout-exertion images are permitted while explicit nudity and sexual content are prohibited. It supplies member presence and social context rather than biometric identity or independent completion proof, and never uses face detection, body recognition, biometric comparison, or appearance scoring.
+_Avoid_: Mandatory selfie, identity proof, biometric check, body-composition proof, explicit content
 
 **Verified completion**:
 A Workout report accepted after one other group member explicitly verifies it or after it remains unquestioned for 24 hours. Reactions and motivational messages do not verify a report.
 _Avoid_: Check-in, claim, reaction
 
 **Questioned report**:
-A Workout report placed into a Group decision because another member questioned it during its initial 24-hour review period or because its required evidence is missing or poor. It returns to provisional status; the reporting member may explain or withdraw it but cannot change its structured details or Proof photo.
+A Workout report placed into a Group decision because another member questioned it during its initial 24-hour review period or because its required evidence is missing or poor. It returns to provisional status; the reporting member may explain or withdraw it but cannot change its structured details or Proof photos.
 _Avoid_: Accusation, failed workout
 
 **Group decision**:
