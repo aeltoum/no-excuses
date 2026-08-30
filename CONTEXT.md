@@ -216,6 +216,10 @@ _Avoid_: Group admin, accountability moderator, general-purpose administrator
 A neutral, Group-visible suspension of an affected personal or shared accountability deadline when the private-pilot operator confirms that a product accessibility defect prevented timely action. It restores the remaining time after access is repaired, never requires an Exception or creates an accountability consequence, and leaves unrelated Group deadlines unchanged.
 _Avoid_: Exception, Safety pause, discretionary extension
 
+**Service pause**:
+A neutral, Group-visible freeze of only the accountability deadlines affected by a confirmed core outage, initiated by the Private-pilot operator when the outage lasts more than 30 minutes or threatens a deadline. It preserves remaining time, creates no accountability consequence, leaves unrelated deadlines running, and resumes only after the developer verifies the repair and the operator resumes the deadlines.
+_Avoid_: Technical pause, Safety pause, Exception, Group-wide shutdown, discretionary extension
+
 **Media report**:
 A narrow request for the private-pilot operator to review a Proof photo or Proof video for prohibited or nonconsensual content. Review freezes the associated decision; removed Workout-report evidence makes the report Unsupported, while removed consequence evidence may be replaced before the card's original deadline.
 _Avoid_: Member report, public moderation queue
