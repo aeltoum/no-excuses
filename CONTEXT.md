@@ -9,7 +9,7 @@ A private, invitation-only circle of two to ten friends who pursue fitness toget
 _Avoid_: Team, cohort
 
 **Group admin**:
-A Group member who may issue Group invitations, manage membership, and manage Group settings. The creator is the first Group admin, a Group may have multiple Group admins, and at least one must remain. Any Group admin may promote a member or demote another admin, and the change is visible to the Group; the last Group admin cannot be demoted and must transfer the role before leaving unless they are the sole remaining member and close the Group. A Group admin may remove a non-admin, while an admin must be demoted before removal. Group admins have no additional authority over workout verification, Exceptions, or social accountability decisions.
+A Group member who may issue Group invitations, manage membership, and manage Group settings. The creator is the first Group admin, a Group may have multiple Group admins, and at least one must remain during ordinary membership changes. Any Group admin may promote a member or demote another admin, and the change is visible to the Group; the last Group admin cannot be demoted and must transfer the role before leaving unless they are the sole remaining member and close the Group. Confirmed Account deletion or service termination is never delayed for a transfer: the system first promotes the longest-tenured remaining member when one exists. A Group admin may remove a non-admin, while an admin must be demoted before removal. Group admins have no additional authority over workout verification, Exceptions, moderation, or social accountability decisions.
 _Avoid_: Owner, leader
 
 **Group invitation**:
@@ -17,7 +17,7 @@ A revocable, single-use invitation created by a Group admin that expires after s
 _Avoid_: Public join link, membership application
 
 **Group member**:
-A person aged 18 or older who has accepted a Group invitation and has not left or been removed. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving or removal, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless a deletion request replaces it with Former member while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. Returning begins a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
+A person aged 18 or older who has accepted a Group invitation and has not left, been removed, or had service access terminated. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving, removal, or termination, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless Account deletion replaces it with Former member while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. A person whose account remains eligible may return through a new invitation, beginning a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
 _Avoid_: Follower, subscriber
 
 **Former member**:
@@ -25,7 +25,7 @@ The neutral identity shown in retained finalized Group history after a former me
 _Avoid_: Deleted user, banned user
 
 **Membership event**:
-A neutral Group-visible record that a member joined, left voluntarily, was removed by a Group admin, or gained or lost the Group admin role. Members see only Membership events created during their own membership; a removal identifies that it was admin-initiated without publishing a reason.
+A neutral Group-visible record that a member joined, left voluntarily, was removed by a Group admin, had membership ended by the service, or gained or lost the Group admin role. Members see only Membership events created during their own membership; an involuntary end identifies whether it was admin- or service-initiated without publishing a reason, report, or moderation detail.
 _Avoid_: Expulsion notice, public justification
 
 **Accountability**:
@@ -189,7 +189,7 @@ A Group-visible suspension of an active Consequence card when a member cannot sa
 _Avoid_: Medical excuse, permanent opt-out
 
 **Critical safety incident**:
-A Validation-pilot event involving injury attributable to product pressure, coercion, humiliation or harassment, nonconsensual media exposure, retaliation for using a safeguard, or a serious privacy breach. Appropriate use of a Safety pause, reviewer recusal, or Media report is evidence that a safeguard was used and is not itself a Critical safety incident.
+A Validation-pilot event involving injury attributable to product pressure, coercion, humiliation or harassment, nonconsensual media exposure, retaliation for using a safeguard, or a serious privacy breach. Appropriate use of a Safety pause, Safety block, reviewer recusal, or Content report is evidence that a safeguard was used and is not itself a Critical safety incident.
 _Avoid_: Any safeguard use, ordinary discomfort, unverified allegation treated as settled fact
 
 **Validation pilot**:
@@ -209,8 +209,32 @@ A person who completes Validation-pilot onboarding and provides at least one str
 _Avoid_: Performance reward, retention incentive, privileged account
 
 **Private-pilot operator**:
-The person or small team running the invitation-only MVP who may manually complete rare support and safety operations, including deletion requests, Media reports, removal of an underage member, and confirmed Technical pauses. The role is outside Group membership and has no authority to verify Workout reports, approve Exceptions, decide Consequence completions, alter Crowns, or override Group decisions.
+The person or small team running the invitation-only MVP who may manually complete rare support and safety operations, including Account deletion, Content reports, Moderation cases, removal of an underage member, and confirmed Technical pauses. The role may quarantine or remove prohibited member-authored content, restrict content creation, apply a Moderation hold, suspend access, and terminate access for confirmed severe or repeated conduct violations, but remains outside Group membership and has no authority to verify Workout reports, approve Exceptions, decide Consequence completions, alter Crowns, or override Group decisions.
 _Avoid_: Group admin, accountability moderator, general-purpose administrator
+
+**Group conduct rules**:
+The plain-language content and behavior policy a member accepts before first creating Group-visible content and again after any material revision. It prohibits explicit sexual content, threats, harassment, humiliation, slurs, nonconsensual media, disclosure of another person's private information, and dangerous content while preserving permitted non-explicit Member-presence photos.
+_Avoid_: Anything-goes private-group policy, public community guidelines
+
+**Content report**:
+An operator-restricted request by a Group member to review a specific Group-visible member-authored artifact or another member's conduct under the Group conduct rules. It starts a Moderation case without creating a Group-visible report event or revealing the reporter to the reported member.
+_Avoid_: Media report, accusation, public moderation queue
+
+**Safety block**:
+A member-controlled interaction boundary that immediately prevents new reactions, messages, mentions, playful responses, and related notifications between two Group members while suppressing the blocked member's optional free-form content for the blocker. It persists until the blocker removes it or either membership ends, opens a Moderation case, and does not change structured accountability visibility, voting eligibility, thresholds, Crowns, streaks, or finalized history.
+_Avoid_: Group removal, accusation, automatic departure
+
+**Moderation case**:
+An operator-restricted review opened by a Content report or Safety block to record the policy category, evidence, actions, timestamps, and outcome. Quarantined content is limited to the operator and developer backup through the case and seven-day appeal window, after which only pseudonymous non-content audit metadata may remain for the approved audit period unless a narrower legal preservation duty applies.
+_Avoid_: Group decision, public case, accountability appeal
+
+**Moderation hold**:
+A neutral suspension of the affected personal deadlines and open-vote participation while urgent access suspension prevents a member from using the product. If the member is cleared, access and remaining time resume with the membership intact; confirmed termination instead applies ordinary departure cleanup after the appeal is resolved or waived, without changing finalized outcomes.
+_Avoid_: Safety pause, Technical pause, Service pause, accountability penalty
+
+**Account deletion**:
+A member-initiated, reauthenticated request available in the product and through a public web path that immediately revokes access after confirmation and applies ordinary departure cleanup. Associated active-system and processor data is deleted within seven days, backups expire within 30 days, restricted audit evidence is pseudonymized within seven days and retained for at most 90 days, finalized Group history uses Former member, and no explanation, Group approval, or support contact is required.
+_Avoid_: Account deactivation, membership departure, support-gated deletion
 
 **Technical pause**:
 A neutral, Group-visible suspension of an affected personal or shared accountability deadline when the private-pilot operator confirms that a product accessibility defect prevented timely action. It restores the remaining time after access is repaired, never requires an Exception or creates an accountability consequence, and leaves unrelated Group deadlines unchanged.
@@ -219,10 +243,6 @@ _Avoid_: Exception, Safety pause, discretionary extension
 **Service pause**:
 A neutral, Group-visible freeze of only the accountability deadlines affected by a confirmed core outage, initiated by the Private-pilot operator when the outage lasts more than 30 minutes or threatens a deadline. It preserves remaining time, creates no accountability consequence, leaves unrelated deadlines running, and resumes only after the developer verifies the repair and the operator resumes the deadlines.
 _Avoid_: Technical pause, Safety pause, Exception, Group-wide shutdown, discretionary extension
-
-**Media report**:
-A narrow request for the private-pilot operator to review a Proof photo or Proof video for prohibited or nonconsensual content. Review freezes the associated decision; removed Workout-report evidence makes the report Unsupported, while removed consequence evidence may be replaced before the card's original deadline.
-_Avoid_: Member report, public moderation queue
 
 **Provisional result**:
 A member's unresolved accountability-week outcome while any timely workout report or Exception request remains pending. It neither updates a streak nor creates a missed-target event until every pending item is resolved.
