@@ -5,7 +5,7 @@ No Excuses is a group fitness product for friends who are already trying to exer
 ## Language
 
 **Group**:
-A private, invitation-only circle of two to ten friends who pursue fitness together and hold one another accountable. A person may belong to only one Group at a time. A Group may temporarily contain only its creator during setup or one remaining member after others depart, but accountability is paused below two members. If membership falls below two, the remaining member's unfinished accountability week ends without a result and their streaks freeze; accountability resumes at the next configured week boundary after a second member joins. A Group with multiple members cannot be closed unilaterally, while its last remaining member may close it and end all member access.
+A private, invitation-only circle of two to ten friends who pursue fitness together and hold one another accountable. A person may belong to only one Group at a time. A Group may temporarily contain only its creator during setup or one remaining member after others depart, but accountability is paused below two members. If membership falls below two, the remaining member's unfinished accountability week ends without a result and their streaks freeze; when a second member joins, their acceptance immediately resumes accountability for both members from one shared activation time. A Group with multiple members cannot be closed unilaterally, while its last remaining member may close it and end all member access.
 _Avoid_: Team, cohort
 
 **Group admin**:
@@ -17,7 +17,7 @@ A revocable, single-use invitation created by a Group admin that expires after s
 _Avoid_: Public join link, membership application
 
 **Group member**:
-A person aged 18 or older who has accepted a Group invitation and has not left, been removed, or had service access terminated. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. Any member may leave at any time; on leaving, removal, or termination, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless Account deletion replaces it with Former member while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. A person whose account remains eligible may return through a new invitation, beginning a new membership with new targets and streaks and the ordinary from-joining-forward visibility boundary.
+A person aged 18 or older who has accepted a Group invitation and has not left, been removed, or had service access terminated. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward, but not earlier Workout reports, Proof photos, Proof videos, Missed-target events, Exceptions, or discussions. A midweek join is marked neutrally with its date and reduced target; it never reveals pre-membership activity. Any member may leave at any time; on leaving, removal, or termination, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless Account deletion replaces it with Former member while Proof photos and Proof videos follow their existing deletion periods. The former member's pending Workout reports become Unsupported, pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. A person whose account remains eligible may return through a new invitation, beginning a new membership with new targets and streaks and the ordinary midweek-join and from-joining-forward visibility rules.
 _Avoid_: Follower, subscriber
 
 **Former member**:
@@ -49,7 +49,7 @@ A competitive award granted after an accountability week finalizes to every elig
 _Avoid_: Point, badge, adherence award
 
 **Crown eligibility**:
-Qualification to compete in one Crown category during an accountability week, requiring timely category data from at least two Group members; missing data means ineligible rather than a zero score. A midweek joiner competes immediately using only post-join activity, an approved Exception makes a member ineligible, and leaving before finalization forfeits the result.
+Qualification to compete in one Crown category during an accountability week, requiring timely category data from at least two Group members; missing data means ineligible rather than a zero score. A midweek joiner competes immediately using only post-join activity; when that join resumes paused accountability, both members use only activity at or after the shared activation time. An approved Exception makes a member ineligible, and leaving before finalization forfeits the result.
 _Avoid_: Crown penalty, automatic zero
 
 **Performance baseline**:
@@ -69,7 +69,7 @@ The Crown category ranking recorded percentage improvement against a Performance
 _Avoid_: Raw cardio ranking, route race, fitness diagnosis
 
 **Season**:
-A Group-local, sequentially numbered series of four active accountability weeks during which Group members compete by accumulating Crowns. A Group's first Season begins at the first configured accountability-week boundary after accountability becomes active; time below two members pauses the Season and consumes no week. Seasons run back-to-back, so the next Season begins at the boundary after the fourth week even while the previous Season's final results remain provisional. A Season provides a short, recurring chance to win rather than creating a permanent all-time status hierarchy.
+A Group-local, sequentially numbered series of four active accountability weeks during which Group members compete by accumulating Crowns. A Group's first Season begins when accountability becomes active; when a second member joins midweek, the shortened interval through the next boundary is its first active week. Time below two members pauses the Season and consumes no week, while a midweek resumption consumes the next active week. Seasons run back-to-back, so the next Season begins at the boundary after the fourth week even while the previous Season's final results remain provisional. A Season provides a short, recurring chance to win rather than creating a permanent all-time status hierarchy.
 _Avoid_: Permanent leaderboard, workout streak, elapsed calendar month
 
 **Season standings**:
@@ -101,7 +101,7 @@ An individual member's count of verified completions since their most recent mis
 _Avoid_: Daily streak, attendance streak
 
 **Weekly target**:
-The number of workouts a member intends to complete during an accountability week. Each member sets an individual target that carries into future accountability weeks. The product recommends at least two workouts, has no numerical maximum, and warns about unusually high targets or sharp increases without rewarding target size. The target locks when an accountability week begins; later revisions apply to the next accountability week. A member who joins during an accountability week sets a target that locks immediately and may report workouts performed earlier in that same week. Verified completions above the target remain visible but never carry into another week.
+The number of workouts a member intends to complete during an accountability week. Each member sets an individual target that carries into future accountability weeks. The product recommends at least two workouts, has no numerical maximum, and warns about unusually high targets or sharp increases without rewarding target size. The target locks when an accountability week begins; later revisions apply to the next accountability week. A member joining an active Group midweek sets a recurring target and a reduced current-week target from one through that recurring target; invitation acceptance atomically starts the membership, locks both targets, and shows the exact Group-zone deadline and ordinary target consequences. Only Workout sessions and Crown activity at or after the membership time count. Post-join Verified completions, target attainment, Crown activity, and a miss have their ordinary Workout-streak, Target-streak, Card-unlock, Crown, Missed-target, and Consequence effects. When a second member's acceptance resumes paused accountability, the joiner follows that rule and the existing member must choose a reduced target before starting a Workout session; the Group sees Target pending until they choose, and their recurring target applies if they do not choose before the earlier of 24 hours after activation or the week boundary. Verified completions above the target remain visible but never carry into another week.
 _Avoid_: Group quota, shared workout plan
 
 **Accountability week**:
@@ -109,7 +109,7 @@ The shared period in which every group member's weekly target is evaluated. A gr
 _Avoid_: Personal week, member-local week
 
 **Workout session**:
-A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; a member may have only one active session, and when it ends they select exactly one Activity photo and one Member-presence photo while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the later selected Proof photo.
+A member-started period during which exercise occurs and contemporaneous photo candidates may be captured freely; it cannot begin before Group membership, and a member whose reduced activation-week target is pending cannot start one. A member may have only one active session, and when it ends they select exactly one Activity photo and one Member-presence photo while every unselected candidate is deleted. It ends manually or after 12 hours, its start is immutable, and its recorded end may be moved earlier before report submission but never before the later selected Proof photo.
 _Avoid_: Passive workout tracking, timed photo assignment
 
 **Workout report**:
@@ -117,7 +117,7 @@ A member's Group-visible account of completed exercise, submitted with its compl
 _Avoid_: Check-in, check-out, post-workout picture
 
 **Proof photo**:
-A private, Group-visible image selected when ending a Workout session from photos captured through the product's camera while that session was active, paired with a short factual description the member may type or dictate. A Workout report requires exactly one Activity photo and one Member-presence photo; each image locks when selected and its description locks at report submission; the Group sees both descriptions and session and capture times but not location, hidden metadata, or device information; both images are deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
+A private image selected when ending a Workout session from photos captured through the product's camera while that session was active, paired with a short factual description the member may type or dictate. A Workout report requires exactly one Activity photo and one Member-presence photo; each image locks when selected and its description locks at report submission. Selected images remain member-private until explicit submission, and an unsubmitted draft may be deleted by the member and otherwise deletes with its selected images when its reporting cutoff passes or membership ends. After submission the Group sees both descriptions and session and capture times but not location, hidden metadata, or device information; both images are deleted immediately after a withdrawn, Unsupported, or Rejected report or seven days after verification.
 _Avoid_: Media upload, device-library photo, permanent photo archive, location proof
 
 **Activity photo**:
