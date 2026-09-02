@@ -4,6 +4,10 @@ No Excuses is a group fitness product for friends who are already trying to exer
 
 ## Language
 
+**Account**:
+A person's private, durable No Excuses identity for access, consent, verified contact, preferences, and person-level history across Group memberships. It may exist without an active Group membership; Account deletion ends access and replaces the person's identity in retained Group history with Former member while the defined deletion rules run.
+_Avoid_: User account, profile, Group member
+
 **Group**:
 A private, invitation-only circle of two to ten friends who pursue fitness together and hold one another accountable. A person may belong to only one Group at a time. A Group may temporarily contain only its creator during setup or one remaining member after others depart, but accountability is paused below two members. If membership falls below two, the remaining member's unfinished accountability week ends without a result and their streaks freeze; when a second member joins, their acceptance immediately resumes accountability for both members from one shared activation time. A Group with multiple members cannot be closed unilaterally, while its last remaining member may close it and end all member access.
 _Avoid_: Team, cohort
