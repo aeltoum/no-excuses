@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:,">
+  <title>No Excuses — Weekly home design prototype</title>
+  <!--
+    THROWAWAY PROTOTYPE — not application code.
+    Four weekly-home designs, switchable via ?variant=D|E|F|G.
+    Shared stages are switchable via ?stage=home|report|close|card.
+    Preview: python3 -m http.server 4173 --directory prototypes
+    Open: http://127.0.0.1:4173/weekly-accountability-loop.html?variant=D&stage=home
+  -->
+  <style>
+    :root {
+      --ink: #151a1e; --muted: #646878; --paper: #f4f5f2; --surface: #fff;
+      --line: #d7d9d4; --orange: #ff5c35; --blue: #2443e8; --red: #b72c36;
+      --shadow: 0 16px 40px rgba(18,21,28,.14);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; }
+    body { margin: 0; min-height: 100vh; overflow-x: hidden; color: var(--ink); background: var(--paper); }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid #51e4e8; outline-offset: 3px; }
+    .app { min-height: 100vh; padding-bottom: 112px; }
+    .eyebrow { font-size: .72rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: .76rem; }
+    .stack { display: grid; gap: 14px; }
+    .row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: 999px; padding: 6px 10px; font-size: .76rem; font-weight: 800; white-space: nowrap; }
+    .button { border: 0; border-radius: 12px; padding: 12px 16px; background: var(--ink); color: #fff; font-weight: 850; }
+    .button.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .button.orange { background: var(--orange); }
+    .button.blue { background: var(--blue); }
+    .button.ghost { background: transparent; color: inherit; border: 1px solid currentColor; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; color: #fff; background: var(--ink); font-weight: 900; }
+    .avatar.j { background: #7b49a8; }
+    .avatar.m { background: #267a6b; }
+
+    .prototype-nav {
+      position: sticky; top: 0; z-index: 30; display: flex; gap: 8px; align-items: center;
+      padding: 10px 14px; overflow-x: auto; color: #151a1e; background: rgba(244,245,242,.94);
+      backdrop-filter: blur(14px); border-bottom: 1px solid rgba(20,24,30,.14);
+    }
+    .prototype-nav strong { white-space: nowrap; margin-right: auto; }
+    .stage-button { border: 1px solid #ced1ca; border-radius: 99px; padding: 8px 11px; color: #5e6470; background: #fff; white-space: nowrap; font-size: .78rem; font-weight: 800; }
+    .stage-button.active { color: #fff; background: #151a1e; border-color: #151a1e; }
+
+    .photo { position: relative; min-height: 165px; overflow: hidden; isolation: isolate; background: #b8d4df; }
+    .photo::before, .photo::after { content: ""; position: absolute; z-index: -1; }
+    .photo.gym { background: linear-gradient(145deg, #2b3344, #95a1ad); }
+    .photo.gym::before { width: 74%; height: 14px; left: 13%; top: 46%; border-radius: 99px; background: #15191f; box-shadow: 0 -22px 0 -4px #353c46, 0 22px 0 -4px #353c46; transform: rotate(-7deg); }
+    .photo.gym::after { width: 24px; height: 82px; left: 47%; top: 26%; border-radius: 4px; background: #181c22; transform: rotate(-7deg); }
+    .photo.trail { background: linear-gradient(#92cbe7 0 45%, #60936f 46% 100%); }
+    .photo.trail::before { width: 140%; height: 100%; left: -20%; top: 51%; background: #d9c099; clip-path: polygon(46% 0,54% 0,70% 100%,25% 100%); }
+    .photo.trail::after { width: 95px; height: 95px; right: -20px; top: -20px; border-radius: 50%; background: rgba(255,236,157,.85); }
+    .photo.bike { background: linear-gradient(135deg, #e7c582, #9aa5ad); }
+    .photo.bike::before { width: 92px; height: 92px; left: 18%; bottom: 10%; border: 10px solid #303641; border-radius: 50%; box-shadow: 130px 0 0 -10px #e7c582, 130px 0 0 0 #303641; }
+    .photo.bike::after { width: 130px; height: 10px; left: calc(18% + 40px); bottom: 28%; background: #303641; transform: rotate(-12deg); transform-origin: left; }
+    .photo-label { position: absolute; left: 12px; bottom: 12px; z-index: 2; max-width: calc(100% - 24px); padding: 7px 9px; border-radius: 6px; color: #fff; background: rgba(15,17,24,.78); font-size: .72rem; font-weight: 800; }
+
+    .proof-actions { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+    .proof-actions button { min-height: 42px; padding: 9px 6px; border: 1px solid currentColor; border-radius: 8px; color: inherit; background: transparent; font-size: .76rem; font-weight: 800; }
+    .proof-actions button:last-child { color: #ff8b79; }
+
+    /* Shared flow panels: approved behavior is identical across D–G. */
+    .flow-panel { max-width: 760px; margin: 28px auto; padding: 0 18px; }
+    .sheet { padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+    .flow-panel h1 { margin: 8px 0 18px; font-size: clamp(2rem,7vw,3.5rem); line-height: .95; letter-spacing: -.055em; }
+    .field { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .field strong { display: block; margin-bottom: 4px; }
+    .report-grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 16px; }
+    .decision { padding: 14px 16px; border-left: 4px solid var(--orange); border-radius: 0 14px 14px 0; background: #fff1ea; }
+    .card-offer { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .consequence { min-height: 230px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; border: 2px solid var(--ink); border-radius: 18px; background: #fff; }
+    .consequence:nth-child(2) { background: #eef1ff; transform: translateY(-8px); }
+    .consequence:nth-child(3) { background: #f2f8d9; }
+
+    /* D · Approved control */
+    .d-shell { min-height: calc(100vh - 52px); padding: 0 18px 40px; color: #f7f7f5; background: #11141c; }
+    .d-inner { max-width: 1160px; margin: 0 auto; }
+    .d-top { padding: 24px 0 10px; }
+    .d-title { margin: 14px 0 12px; font: 900 clamp(2.6rem,8vw,5.6rem)/.85 Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; letter-spacing: -.07em; }
+    .d-top-copy { max-width: 600px; color: #adb4c1; }
+    .d-next { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 22px; margin-bottom: 18px; padding: 22px 24px; border: 1px solid #333a49; border-left: 6px solid #c9f04b; border-radius: 8px; background: #1b202b; }
+    .d-next h2 { margin: 6px 0 9px; font-size: clamp(1.65rem,4vw,2.8rem); line-height: 1; letter-spacing: -.045em; }
+    .d-progress-number { min-width: 110px; color: #c9f04b; text-align: right; font-size: 3.4rem; font-weight: 950; line-height: .9; }
+    .d-layout { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.7fr); gap: 18px; align-items: start; }
+    .d-card { min-width: 0; padding: 18px; border: 1px solid #333a49; border-radius: 8px; background: #1b202b; }
+    .d-proof-grid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 8px; margin: 14px 0; }
+    .d-proof-grid .photo:first-child { grid-row: span 2; min-height: 305px; }
+    .d-proof-grid .photo:not(:first-child) { min-height: 148px; }
+    .d-hero { min-height: 280px; margin: 14px 0 10px; }
+    .d-shell .muted { color: #adb4c1; }
+    .d-shell .proof-actions button { border-color: #596175; }
+    .d-side { position: sticky; top: 72px; }
+    .d-standing { display: grid; grid-template-columns: 25px 1fr auto; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid #343b49; }
+    .d-standing:last-child { border-bottom: 0; }
+    .d-rank { color: #c9f04b; font: 900 .92rem/1 ui-monospace, monospace; }
+    .d-note { padding: 11px 13px; border: 1px dashed #596175; border-radius: 8px; color: #adb4c1; background: #171b24; font-size: .76rem; }
+
+    /* E · Starting Blocks */
+    .e-shell {
+      --track-cobalt: #2443e8; --lane-coral: #ff5a45; --chalk: #fbf6e8;
+      --rubber: #151924; --signal-yellow: #ffd84a; --steel: #8b97a8;
+      min-height: calc(100vh - 52px); padding: 0 20px 44px; color: var(--rubber); background: var(--chalk);
+      font-family: "Trebuchet MS", Avenir, sans-serif;
+    }
+    .e-inner { max-width: 1220px; margin: 0 auto; }
+    .e-mast { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 24px; padding: 34px 0 22px; border-bottom: 5px solid var(--rubber); }
+    .e-title { margin: 6px 0 0; font: 900 clamp(3rem,8vw,7rem)/.78 Impact, Haettenschweiler, "Arial Narrow", sans-serif; letter-spacing: -.035em; text-transform: uppercase; }
+    .e-title em { color: var(--track-cobalt); font-style: normal; }
+    .e-week-tag { max-width: 225px; padding: 12px 14px; border: 2px solid var(--rubber); font: 700 .74rem/1.45 Menlo, monospace; text-transform: uppercase; }
+    .e-course { display: grid; grid-template-columns: minmax(360px,.9fr) minmax(0,1.25fr); margin: 24px 0; overflow: hidden; color: #fff; background: var(--track-cobalt); border: 4px solid var(--rubber); border-radius: 92px 10px 10px 92px; }
+    .e-lanes { position: relative; min-height: 360px; padding: 34px 28px 34px 74px; display: grid; align-content: center; gap: 14px; overflow: hidden; }
+    .e-lanes::before, .e-lanes::after { content: ""; position: absolute; pointer-events: none; border: 2px solid rgba(251,246,232,.72); border-right: 0; border-radius: 130px 0 0 130px; }
+    .e-lanes::before { inset: 18px 0 18px 18px; }
+    .e-lanes::after { inset: 54px 0 54px 54px; }
+    .e-score { position: relative; z-index: 2; font: 900 clamp(4.6rem,9vw,8.5rem)/.8 Impact, Haettenschweiler, "Arial Narrow", sans-serif; letter-spacing: -.05em; }
+    .e-lap-copy { position: relative; z-index: 2; max-width: 240px; font-weight: 700; }
+    .e-markers { position: relative; z-index: 2; display: flex; gap: 8px; }
+    .e-marker { width: 48px; height: 48px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; font: 800 .78rem Menlo, monospace; }
+    .e-marker.done { color: var(--rubber); background: var(--signal-yellow); border-color: var(--signal-yellow); }
+    .e-marker.next { background: var(--lane-coral); }
+    .e-launch { align-self: stretch; display: grid; align-content: center; gap: 12px; padding: 34px; color: var(--rubber); background: var(--signal-yellow); border-left: 4px solid var(--rubber); }
+    .e-launch h2 { max-width: 570px; margin: 0; font: 900 clamp(1.7rem,4vw,3.3rem)/.93 Impact, Haettenschweiler, "Arial Narrow", sans-serif; text-transform: uppercase; }
+    .e-launch .button { justify-self: start; border: 2px solid var(--rubber); border-radius: 0; color: var(--rubber); background: var(--lane-coral); box-shadow: 6px 6px 0 var(--rubber); }
+    .e-grid { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(280px,.55fr); gap: 20px; align-items: start; }
+    .e-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 3px solid var(--rubber); }
+    .e-section-title h2 { margin: 0; font: 900 1.65rem Impact, Haettenschweiler, "Arial Narrow", sans-serif; text-transform: uppercase; }
+    .e-report { padding: 16px; border: 3px solid var(--rubber); background: #fff; box-shadow: 8px 8px 0 var(--steel); }
+    .e-report + .e-report { margin-top: 22px; }
+    .e-proof-grid { display: grid; grid-template-columns: 1.4fr .6fr; gap: 7px; margin: 14px 0; }
+    .e-proof-grid .photo:first-child { grid-row: span 2; min-height: 300px; border-radius: 70px 8px 8px 70px; }
+    .e-proof-grid .photo:not(:first-child) { min-height: 146px; border-radius: 5px; }
+    .e-hero { min-height: 245px; margin: 14px 0; border-radius: 70px 8px 8px 70px; }
+    .e-report .proof-actions button { border-radius: 0; border-color: var(--rubber); }
+    .e-rail { position: sticky; top: 72px; display: grid; gap: 18px; }
+    .e-standings { padding: 16px; color: #fff; background: var(--rubber); border-top: 9px solid var(--lane-coral); }
+    .e-standing { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 8px; padding: 13px 0; border-bottom: 1px solid #465064; }
+    .e-standing:last-child { border-bottom: 0; }
+    .e-standing b:first-child { color: var(--signal-yellow); font: 800 .78rem Menlo, monospace; }
+    .e-data { font-family: Menlo, monospace; font-size: .72rem; text-transform: uppercase; }
+
+    /* F · Raid Replay */
+    .f-shell {
+      --midnight: #17122b; --cyan: #51e4e8; --magenta: #ff4f9b;
+      --lavender: #b8a6ff; --soft-white: #f7f5ff; --panel: #25203d;
+      min-height: calc(100vh - 52px); padding: 0 20px 46px; color: var(--soft-white); background: var(--midnight);
+      font-family: "Avenir Next", Avenir, sans-serif;
+    }
+    .f-inner { max-width: 1240px; margin: 0 auto; }
+    .f-mast { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 20px; padding: 30px 0 20px; }
+    .f-title { margin: 8px 0 0; font: 900 clamp(2.5rem,7vw,6.4rem)/.83 "Eurostile Extended", "Avenir Next", sans-serif; letter-spacing: -.055em; text-transform: uppercase; }
+    .f-live { align-self: start; color: var(--cyan); font: 800 .74rem Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
+    .f-command { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 16px; padding: 15px 18px; color: var(--midnight); background: var(--cyan); border-left: 8px solid var(--magenta); }
+    .f-command-code { font: 900 .78rem Menlo, monospace; }
+    .f-command h2 { margin: 0; font-size: clamp(1rem,2.5vw,1.45rem); }
+    .f-command .button { border-radius: 2px; color: var(--soft-white); background: var(--midnight); }
+    .f-broadcast { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(290px,.55fr); gap: 14px; margin-top: 14px; }
+    .f-replay { min-width: 0; border: 1px solid #494162; background: #0f0b20; }
+    .f-replay-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #494162; background: var(--panel); font: .72rem Menlo, monospace; text-transform: uppercase; }
+    .f-replay-main { position: relative; }
+    .f-replay-main .photo { min-height: clamp(360px,51vw,610px); border-radius: 0; }
+    .f-replay-main::after { content: "SELECTED PROOF"; position: absolute; left: 16px; top: 16px; z-index: 3; padding: 6px 8px; color: #fff; background: var(--magenta); font: 800 .68rem Menlo, monospace; letter-spacing: .08em; }
+    .f-replay-meta { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 16px; }
+    .f-replay-meta h2 { margin: 2px 0 6px; }
+    .f-replay-thumbs { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; padding: 0 16px 16px; }
+    .f-thumb { padding: 0; border: 2px solid transparent; color: #fff; background: transparent; text-align: left; }
+    .f-thumb.active { border-color: var(--cyan); }
+    .f-thumb .photo { min-height: 90px; border-radius: 0; }
+    .f-thumb-name { display: block; padding-top: 5px; font: 700 .65rem Menlo, monospace; }
+    .f-actions { padding: 0 16px 16px; }
+    .f-actions .proof-actions button { border-color: #63597f; border-radius: 2px; color: var(--soft-white); }
+    .f-actions .proof-actions button:last-child { color: #ff8ec0; }
+    .f-roster { display: grid; gap: 14px; align-content: start; }
+    .f-panel { padding: 16px; border: 1px solid #494162; background: var(--panel); }
+    .f-panel h2 { margin: 4px 0 10px; }
+    .f-member { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #494162; }
+    .f-member:last-child, .f-rank:last-child { border-bottom: 0; }
+    .f-status { color: var(--lavender); font: 700 .67rem Menlo, monospace; text-transform: uppercase; }
+    .f-rank { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 11px 0; border-bottom: 1px solid #494162; }
+    .f-rank span:first-child { color: var(--cyan); font: 800 .72rem Menlo, monospace; }
+    .f-one-photo { padding: 14px; border: 1px solid #494162; background: #1c1731; }
+    .f-one-photo .photo { min-height: 155px; margin: 10px 0; border-radius: 0; }
+
+    /* G · Proof Wall */
+    .g-shell {
+      --signal-orange: #ff5c35; --locker-blue: #0d4d78; --tape-yellow: #ffd166;
+      --concrete: #d7d9d4; --ink: #151a1e; --paper: #fcfcf7;
+      min-height: calc(100vh - 52px); padding: 0 20px 50px; color: var(--ink); background-color: var(--concrete);
+      background-image: radial-gradient(circle at 12% 18%,rgba(255,255,255,.8) 0 1px,transparent 2px), radial-gradient(circle at 70% 52%,rgba(21,26,30,.12) 0 1px,transparent 2px);
+      background-size: 23px 23px, 31px 31px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+    .g-inner { max-width: 1220px; margin: 0 auto; }
+    .g-mast { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 24px; align-items: end; padding: 30px 0 20px; }
+    .g-title { margin: 8px 0 0; color: var(--locker-blue); font: 900 clamp(3rem,8vw,7.2rem)/.82 "Arial Black", "Franklin Gothic Heavy", sans-serif; letter-spacing: -.055em; text-transform: uppercase; }
+    .g-target-ticket { width: 250px; padding: 15px; border: 3px solid var(--ink); background: var(--paper); box-shadow: 7px 7px 0 var(--signal-orange); font: 700 .72rem/1.45 "Courier New", monospace; }
+    .g-target-ticket strong { display: block; margin: 5px 0; font: 900 1.7rem "Arial Black", sans-serif; }
+    .g-workarea { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.5fr); gap: 24px; align-items: start; }
+    .g-wall { position: relative; min-width: 0; padding: 34px 26px; border: 10px solid #083a5b; background: var(--locker-blue); box-shadow: inset 0 0 0 2px rgba(255,255,255,.2); }
+    .g-wall::before { content: ""; position: absolute; inset: 12px; border: 1px dashed rgba(255,255,255,.35); pointer-events: none; }
+    .g-wall-label { position: relative; z-index: 1; display: inline-block; padding: 6px 9px; color: var(--ink); background: var(--tape-yellow); font: 700 .72rem "Courier New", monospace; transform: rotate(-1deg); }
+    .g-paper { position: relative; z-index: 1; padding: 22px 18px 18px; background: var(--paper); box-shadow: 8px 10px 20px rgba(0,0,0,.27); }
+    .g-paper::before { content: ""; position: absolute; width: 112px; height: 24px; left: 50%; top: -13px; background: rgba(255,209,102,.92); box-shadow: 0 1px 2px rgba(0,0,0,.2); transform: translateX(-50%) rotate(-2deg); }
+    .g-paper + .g-paper { margin-top: 32px; }
+    .g-paper:nth-of-type(3) { transform: rotate(.5deg); }
+    .g-paper-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 10px; border-bottom: 4px solid var(--ink); }
+    .g-stamp { display: inline-block; padding: 5px 8px; border: 3px solid currentColor; color: var(--signal-orange); font: 900 .7rem "Arial Black", sans-serif; letter-spacing: .08em; text-transform: uppercase; transform: rotate(-3deg); }
+    .g-stamp.verified { color: var(--locker-blue); transform: rotate(2deg); }
+    .g-proof-grid { display: grid; grid-template-columns: 1.45fr .55fr; gap: 8px; margin: 14px 0; }
+    .g-proof-grid .photo:first-child { grid-row: span 2; min-height: 300px; border-radius: 1px; }
+    .g-proof-grid .photo:not(:first-child) { min-height: 146px; border-radius: 1px; }
+    .g-hero { min-height: 250px; margin: 14px 0; border-radius: 1px; }
+    .g-paper .proof-actions button { border-radius: 0; color: var(--ink); }
+    .g-paper .proof-actions button:last-child { color: #a82929; }
+    .g-rail { position: sticky; top: 72px; display: grid; gap: 18px; }
+    .g-rail-card { padding: 17px; border: 3px solid var(--ink); background: var(--paper); box-shadow: 6px 6px 0 var(--locker-blue); }
+    .g-rail-card h2 { margin: 5px 0 12px; font-family: "Arial Black", "Franklin Gothic Heavy", sans-serif; text-transform: uppercase; }
+    .g-start { width: 100%; border: 2px solid var(--ink); border-radius: 0; color: var(--ink); background: var(--signal-orange); box-shadow: 4px 4px 0 var(--ink); }
+    .g-standing { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; padding: 11px 0; border-bottom: 2px dotted #777d7e; font: .78rem "Courier New", monospace; }
+    .g-standing:last-child { border-bottom: 0; }
+    .g-streak { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 2px dotted #777d7e; font: .78rem "Courier New", monospace; }
+    .g-streak:last-child { border-bottom: 0; }
+
+    .switcher { position: fixed; z-index: 100; left: 50%; bottom: 18px; display: grid; grid-template-columns: 46px minmax(190px,auto) 46px; align-items: center; overflow: hidden; color: #fff; background: #05060a; border: 1px solid #5c6270; border-radius: 999px; box-shadow: 0 12px 32px rgba(0,0,0,.32); transform: translateX(-50%); }
+    .switcher button { height: 48px; border: 0; color: #fff; background: transparent; font-size: 1.2rem; }
+    .switcher button:hover { background: #252935; }
+    .switcher-label { text-align: center; font-size: .79rem; font-weight: 850; }
+    .state { position: fixed; right: 14px; bottom: 82px; z-index: 90; max-width: 300px; padding: 9px 11px; color: #151a1e; background: #fff; border: 1px solid #d7d9d4; border-radius: 12px; box-shadow: var(--shadow); font-size: .7rem; }
+    .state summary { font-weight: 900; cursor: pointer; }
+    .state pre { margin: 9px 0 0; white-space: pre-wrap; font: .68rem/1.4 ui-monospace, monospace; }
+    .toast { position: fixed; z-index: 110; top: 70px; left: 50%; max-width: calc(100% - 28px); padding: 12px 16px; opacity: 0; pointer-events: none; color: #fff; background: #151a1e; border-radius: 12px; text-align: center; font-weight: 800; transform: translate(-50%,-20px); transition: transform .2s ease, opacity .2s ease; }
+    .toast.show { opacity: 1; transform: translate(-50%,0); }
+
+    @media (max-width: 820px) {
+      .prototype-nav strong { display: none; }
+      .d-layout, .e-grid, .f-broadcast, .g-workarea, .report-grid { grid-template-columns: 1fr; }
+      .d-next, .e-mast, .f-mast, .g-mast { grid-template-columns: 1fr; }
+      .d-progress-number { text-align: left; }
+      .d-side, .e-rail, .g-rail { position: static; }
+      .e-course { grid-template-columns: 1fr; border-radius: 70px 8px 8px; }
+      .e-launch { border-top: 4px solid var(--rubber); border-left: 0; }
+      .f-replay-main .photo { min-height: 440px; }
+      .g-target-ticket { width: 100%; }
+      .card-offer { grid-template-columns: 1fr; }
+      .consequence:nth-child(2) { transform: none; }
+      .state { display: none; }
+    }
+    @media (max-width: 520px) {
+      .d-shell, .e-shell, .f-shell, .g-shell { padding-right: 12px; padding-left: 12px; }
+      .d-title, .f-title { font-size: 3.25rem; }
+      .d-top .spread, .d-card > .spread, .e-report > .spread, .g-paper-head { align-items: flex-start; }
+      .d-proof-grid, .e-proof-grid, .g-proof-grid { grid-template-columns: 1fr 1fr; }
+      .d-proof-grid .photo:first-child, .e-proof-grid .photo:first-child, .g-proof-grid .photo:first-child { grid-column: 1 / -1; grid-row: auto; min-height: 245px; border-radius: 4px; }
+      .d-proof-grid .photo:not(:first-child), .e-proof-grid .photo:not(:first-child), .g-proof-grid .photo:not(:first-child) { min-height: 120px; }
+      .proof-actions { grid-template-columns: 1fr 1fr; }
+      .e-title { font-size: 3.45rem; }
+      .g-title { min-width: 0; font-size: 3.3rem; }
+      .e-week-tag { max-width: none; }
+      .e-course { border-radius: 52px 7px 7px; }
+      .e-lanes { min-height: 300px; padding: 34px 22px 34px 50px; }
+      .e-lanes::before { left: 10px; }
+      .e-lanes::after { left: 38px; }
+      .e-launch { padding: 26px 20px; }
+      .e-launch .button, .f-command .button { width: 100%; }
+      .f-command, .f-replay-meta { grid-template-columns: 1fr; }
+      .f-replay-main .photo { min-height: 330px; }
+      .f-replay-thumbs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+      .f-thumb .photo { min-height: 72px; }
+      .g-wall { padding: 30px 15px; border-width: 7px; }
+      .g-paper { padding-right: 12px; padding-left: 12px; }
+      .switcher { width: calc(100% - 28px); grid-template-columns: 46px minmax(0,1fr) 46px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    const variants = [
+      { key: 'D', name: 'Approved control' },
+      { key: 'E', name: 'Starting Blocks' },
+      { key: 'F', name: 'Raid Replay' },
+      { key: 'G', name: 'Proof Wall' }
+    ];
+    const stages = [
+      { key: 'home', label: '1 · This week' },
+      { key: 'report', label: '2 · Log workout' },
+      { key: 'close', label: '3 · Week closes' },
+      { key: 'card', label: '4 · Consequence' }
+    ];
+    const params = new URLSearchParams(location.search);
+    let variant = variants.some(item => item.key === params.get('variant')) ? params.get('variant') : 'D';
+    let stage = stages.some(item => item.key === params.get('stage')) ? params.get('stage') : 'home';
+    let selectedReplay = 'gym';
+
+    const state = {
+      group: 'Tuesday Crew', accountabilityWeek: 'Aug 24–30', member: 'You',
+      target: 3, verified: 2, targetStreak: 4, workoutStreak: 6,
+      season: 2, seasonWeek: 3, crowns: 2, consequenceBacklog: 1,
+      proofReviewHoursRemaining: 18
+    };
+    const replayProofs = {
+      gym: { label: 'Required Proof · rack after training', short: 'Rack' },
+      trail: { label: 'Optional Proof · warm-up route', short: 'Route' },
+      bike: { label: 'Optional Proof · bike summary', short: 'Summary' }
+    };
+    const photo = (kind, label) => `<div class="photo ${kind}" role="img" aria-label="${label}"><span class="photo-label">${label}</span></div>`;
+    const avatar = (letter, cls = '') => `<span class="avatar ${cls}" aria-hidden="true">${letter}</span>`;
+    const heroPhoto = (kind, label, cls) => photo(kind, label).replace(`class="photo ${kind}"`, `class="photo ${kind} ${cls}"`);
+
+    function setQuery(nextVariant = variant, nextStage = stage) {
+      const query = new URLSearchParams(location.search);
+      query.set('variant', nextVariant);
+      query.set('stage', nextStage);
+      history.replaceState({}, '', `${location.pathname}?${query}`);
+      variant = nextVariant;
+      stage = nextStage;
+      render();
+    }
+    function toast(message) {
+      const node = document.querySelector('#toast');
+      node.textContent = message;
+      node.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => node.classList.remove('show'), 1900);
+    }
+    function prototypeNav() {
+      return `<nav class="prototype-nav" aria-label="Prototype stages">
+        <strong>Weekly home · design prototype</strong>
+        ${stages.map(item => `<button class="stage-button ${item.key === stage ? 'active' : ''}" data-stage="${item.key}" ${item.key === stage ? 'aria-current="page"' : ''}>${item.label}</button>`).join('')}
+      </nav>`;
+    }
+    function proofActions() {
+      return `<div class="proof-actions" aria-label="Workout report actions">
+        <button data-toast="Reaction added — this does not verify the report">🔥 React</button>
+        <button data-toast="Motivation sent — this does not verify the report">💬 Motivate</button>
+        <button data-toast="Report verified — reactions and motivation do not verify it">✓ Verify</button>
+        <button data-toast="Question flow opened with neutral reasons and a 48-hour Group decision">? Question</button>
+      </div>`;
+    }
+
+    function combinedVariant() {
+      return `<main class="d-shell"><div class="d-inner">
+        <header class="d-top">
+          <div class="spread"><span class="eyebrow">${state.group} · Season ${state.season}</span><div class="row">${avatar('Y')}<span class="pill">Week ${state.seasonWeek} · live</span></div></div>
+          <h1 class="d-title">EVERY REP<br>COUNTS.</h1>
+          <p class="d-top-copy">Competition gives the week energy. Friends’ Proof and one clear next move turn that energy into accountability.</p>
+        </header>
+        <section class="d-next" aria-label="Your next weekly action">
+          <div><div class="eyebrow" style="color:#c9f04b">Your next move</div><h2>Complete one workout by Sunday midnight.</h2><div class="muted">Start a session, capture Proof, and submit the report for friend review.</div></div>
+          <div><div class="d-progress-number">${state.verified}/${state.target}</div><button class="button" data-stage="report" style="margin-top:12px;width:100%;background:#c9f04b;color:#111">Start workout</button></div>
+        </section>
+        <div class="d-layout">
+          <section class="stack" aria-label="Friend Workout reports">
+            <article class="d-card">
+              <div class="spread"><div class="row">${avatar('J','j')}<div><strong>Jordan finished strength day</strong><div class="muted tiny">Submitted 42 min ago · review closes in 23h 18m</div></div></div><span class="pill">Pending</span></div>
+              <div class="d-proof-grid">${photo('gym','Required Proof · rack after training')}${photo('trail','Optional Proof · warm-up route')}${photo('bike','Optional Proof · bike summary')}</div>
+              <div class="spread tiny"><span><strong>Strength</strong> · squat, press, row · moderate</span><span>📷 Captured in session</span></div>
+              <p class="tiny muted">Three submitted photos use the required-photo-dominant mosaic.</p>${proofActions()}
+            </article>
+            <article class="d-card">
+              <div class="spread"><div class="row">${avatar('M','m')}<div><strong>Maya finished a trail run</strong><div class="muted tiny">Target met 3 / 3 · verified by Jordan</div></div></div><span class="pill">Verified</span></div>
+              ${heroPhoto('trail','Required Proof · trail finish','d-hero')}
+              <div class="spread tiny"><span><strong>Cardio</strong> · trail run · moderate</span><span>One submitted photo</span></div>
+              <p class="tiny muted">A one-photo report uses the full-width hero layout.</p><button class="button secondary" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+          </section>
+          <aside class="d-side stack">
+            <section class="d-card">
+              <div class="spread"><div><div class="eyebrow">Current Season</div><h2 style="margin:6px 0 0">Standings</h2></div><span class="tiny muted">2 weeks left</span></div>
+              <div class="d-standing"><span class="d-rank">01</span><span>Maya</span><strong>4 👑</strong></div>
+              <div class="d-standing"><span class="d-rank">02</span><span>You</span><strong>2 👑</strong></div>
+              <div class="d-standing"><span class="d-rank">03</span><span>Jordan</span><strong>1 👑</strong></div>
+              <p class="tiny muted" style="margin-bottom:0">Crowns show competition, but friend Proof remains the main experience.</p>
+            </section>
+            <div class="d-note"><strong>Photo rule:</strong> one Proof photo uses the hero layout; required plus optional Proof photos use the mosaic.</div>
+            <div class="d-note"><strong>Control:</strong> this is the previously approved D structure, content, color, and headline.</div>
+          </aside>
+        </div>
+      </div></main>`;
+    }
+
+    function startingBlocksVariant() {
+      return `<main class="e-shell"><div class="e-inner">
+        <header class="e-mast">
+          <div><div class="eyebrow">${state.group} · Season ${state.season} · Week ${state.seasonWeek}</div><h1 class="e-title">LAST LAP.<br><em>ONE REP LEFT.</em></h1></div>
+          <div class="e-week-tag">Accountability week<br>${state.accountabilityWeek}<br>Sunday midnight finish</div>
+        </header>
+        <section class="e-course" aria-label="You completed two of three workouts and have one next action">
+          <div class="e-lanes">
+            <div class="e-data">Weekly target progress</div><div class="e-score">2/3</div>
+            <div class="e-markers" aria-label="Workout progress: two verified, one remaining"><span class="e-marker done">01 ✓</span><span class="e-marker done">02 ✓</span><span class="e-marker next">03 →</span></div>
+            <p class="e-lap-copy">Two Verified completions are over the line. Lane three routes directly to your next workout.</p>
+          </div>
+          <div class="e-launch">
+            <div class="e-data">Lane 03 · your next move</div><h2>Complete one workout by Sunday midnight.</h2>
+            <p>Start a session, capture Proof, and submit the report for friend review.</p><button class="button" data-stage="report">Start workout</button>
+          </div>
+        </section>
+        <div class="e-grid">
+          <section aria-label="Friend Workout reports">
+            <div class="e-section-title"><h2>Proof exchange</h2><span class="e-data">Review what your friends submitted</span></div>
+            <article class="e-report">
+              <div class="spread"><div class="row">${avatar('J','j')}<div><strong>Jordan finished strength day</strong><div class="muted tiny">Submitted 42 min ago · review closes in 23h 18m</div></div></div><span class="pill">Pending</span></div>
+              <div class="e-proof-grid">${photo('gym','Required Proof · rack after training')}${photo('trail','Optional Proof · warm-up route')}${photo('bike','Optional Proof · bike summary')}</div>
+              <div class="spread tiny"><span><strong>Strength</strong> · squat, press, row · moderate</span><span>3 submitted photos</span></div><div style="height:12px"></div>${proofActions()}
+            </article>
+            <article class="e-report">
+              <div class="spread"><div class="row">${avatar('M','m')}<div><strong>Maya finished a trail run</strong><div class="muted tiny">Target met 3 / 3 · verified by Jordan</div></div></div><span class="pill">Verified</span></div>
+              ${heroPhoto('trail','Required Proof · trail finish','e-hero')}<button class="button secondary" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+          </section>
+          <aside class="e-rail">
+            <section class="e-standings">
+              <div class="e-section-title" style="border-color:white"><h2>Season standings</h2><span class="e-data">2 weeks left</span></div>
+              <div class="e-standing"><b>01</b><span>Maya</span><strong>4 👑</strong></div><div class="e-standing"><b>02</b><span>You</span><strong>2 👑</strong></div><div class="e-standing"><b>03</b><span>Jordan</span><strong>1 👑</strong></div>
+            </section>
+            <div class="e-week-tag" style="max-width:none"><strong>Streak board</strong><br>Target streak · 4<br>Workout streak · 6</div>
+          </aside>
+        </div>
+      </div></main>`;
+    }
+
+    function raidReplayVariant() {
+      const selected = replayProofs[selectedReplay];
+      return `<main class="f-shell"><div class="f-inner">
+        <header class="f-mast">
+          <div><div class="eyebrow" style="color:var(--lavender)">${state.group} · friend review live</div><h1 class="f-title">SQUAD CHECK:<br>YOU'RE UP.</h1></div>
+          <span class="f-live">● Review window open</span>
+        </header>
+        <section class="f-command" aria-label="Your next weekly action"><span class="f-command-code">YOU · 2/3</span><h2>Complete one workout by Sunday midnight.</h2><button class="button" data-stage="report">Start workout</button></section>
+        <div class="f-broadcast">
+          <section class="f-replay" aria-label="Selected Jordan Proof replay">
+            <div class="f-replay-head"><span>Jordan · strength day · pending</span><span>23h 18m to review</span></div>
+            <div class="f-replay-main">${photo(selectedReplay, selected.label)}</div>
+            <div class="f-replay-meta"><div><div class="f-status">Now reviewing · ${selected.short}</div><h2>Squat, press, row</h2><span class="tiny" style="color:var(--lavender)">Moderate · submitted 42 min ago · captured in session</span></div><span class="pill">Report pending</span></div>
+            <div class="f-replay-thumbs" aria-label="Choose Jordan Proof to review">
+              ${Object.entries(replayProofs).map(([kind, proof]) => `<button class="f-thumb ${selectedReplay === kind ? 'active' : ''}" data-replay="${kind}" aria-pressed="${selectedReplay === kind}">${photo(kind, proof.label)}<span class="f-thumb-name">${proof.short}</span></button>`).join('')}
+            </div>
+            <div class="f-actions">${proofActions()}</div>
+          </section>
+          <aside class="f-roster">
+            <section class="f-panel">
+              <div class="f-status">Individual weekly targets</div><h2>Roster</h2>
+              <div class="f-member">${avatar('M','m')}<div><strong>Maya</strong><div class="f-status">Target met</div></div><strong>3/3</strong></div>
+              <div class="f-member">${avatar('Y')}<div><strong>You</strong><div class="f-status">One workout needed</div></div><strong>2/3</strong></div>
+              <div class="f-member">${avatar('J','j')}<div><strong>Jordan</strong><div class="f-status">Report pending</div></div><strong>2/3</strong></div>
+            </section>
+            <section class="f-panel">
+              <div class="f-status">Current Season · 2 weeks left</div><h2>Standings</h2>
+              <div class="f-rank"><span>01</span><span>Maya</span><strong>4 👑</strong></div><div class="f-rank"><span>02</span><span>You</span><strong>2 👑</strong></div><div class="f-rank"><span>03</span><span>Jordan</span><strong>1 👑</strong></div>
+            </section>
+            <article class="f-one-photo">
+              <div class="spread"><strong>Maya · trail run</strong><span class="f-status">Verified</span></div>${photo('trail','Required Proof · trail finish')}
+              <div class="tiny" style="color:var(--lavender)">One submitted photo · target met 3/3</div><button class="button ghost" style="margin-top:10px" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+          </aside>
+        </div>
+      </div></main>`;
+    }
+
+    function proofWallVariant() {
+      return `<main class="g-shell"><div class="g-inner">
+        <header class="g-mast">
+          <div><div class="eyebrow">${state.group} · locker-room record</div><h1 class="g-title">THE WALL<br>REMEMBERS.</h1></div>
+          <div class="g-target-ticket">YOUR WEEK · ${state.accountabilityWeek}<strong>2 OF 3</strong>One workout remains<br>Due Sunday midnight</div>
+        </header>
+        <div class="g-workarea">
+          <section class="g-wall" aria-label="Friend Proof wall">
+            <span class="g-wall-label">FRIEND PROOF · POSTED FOR REVIEW</span>
+            <article class="g-paper">
+              <div class="g-paper-head"><div class="row">${avatar('J','j')}<div><strong>Jordan · strength day</strong><div class="tiny muted">Submitted 42 min ago · review closes in 23h 18m</div></div></div><span class="g-stamp">Pending</span></div>
+              <div class="g-proof-grid">${photo('gym','Required Proof · rack after training')}${photo('trail','Optional Proof · warm-up route')}${photo('bike','Optional Proof · bike summary')}</div>
+              <div class="spread tiny"><span><strong>Strength</strong> · squat, press, row · moderate</span><span>3 submitted photos</span></div><div style="height:12px"></div>${proofActions()}
+            </article>
+            <article class="g-paper">
+              <div class="g-paper-head"><div class="row">${avatar('M','m')}<div><strong>Maya · trail run</strong><div class="tiny muted">Target met 3 / 3 · verified by Jordan</div></div></div><span class="g-stamp verified">Verified</span></div>
+              ${heroPhoto('trail','Required Proof · trail finish','g-hero')}<div class="spread tiny"><span><strong>Cardio</strong> · trail run · moderate</span><span>One submitted photo</span></div>
+              <button class="button secondary" style="margin-top:12px" data-toast="Cheer sent to Maya">Send cheer</button>
+            </article>
+          </section>
+          <aside class="g-rail">
+            <section class="g-rail-card"><div class="eyebrow">Your next move</div><h2>Put one more workout on the wall.</h2><p class="tiny">Start a session, capture Proof, and submit the report before Sunday midnight.</p><button class="button g-start" data-stage="report">Start workout</button></section>
+            <section class="g-rail-card">
+              <div class="eyebrow">Current Season · 2 weeks left</div><h2>Standings rail</h2>
+              <div class="g-standing"><strong>01</strong><span>Maya</span><b>4 👑</b></div><div class="g-standing"><strong>02</strong><span>You</span><b>2 👑</b></div><div class="g-standing"><strong>03</strong><span>Jordan</span><b>1 👑</b></div>
+            </section>
+            <section class="g-rail-card"><div class="eyebrow">Your streaks</div><div class="g-streak"><span>Target streak</span><b>4 weeks</b></div><div class="g-streak"><span>Workout streak</span><b>6</b></div></section>
+          </aside>
+        </div>
+      </div></main>`;
+    }
+
+    function reportStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · same in every variant</div><h1>Turn exercise<br>into evidence.</h1>
+        <div class="report-grid">
+          <section class="sheet stack">
+            <div class="spread"><strong>Workout session · active</strong><span class="pill">00:48:12</span></div>${photo('gym','Live camera candidate · captured 6:42 PM')}
+            <div class="row"><button class="button blue" data-toast="New in-app photo candidate captured">Take photo</button><button class="button secondary" data-toast="Session ended; choose the report’s Proof photos">End session</button></div>
+            <p class="tiny muted">Camera only. Unselected candidates are deleted when the session ends.</p>
+          </section>
+          <section class="sheet stack">
+            <div class="eyebrow">Report preview</div>
+            <div class="field"><strong>Strength</strong><span class="muted">Squat · 3×5 · 185 lb<br>Press · 3×8 · 75 lb</span></div>
+            <div class="field"><strong>Perceived intensity</strong><span class="muted">Moderate</span></div>
+            <div class="field"><strong>Attestation</strong><span class="muted">I completed this workout.</span></div>
+            <button class="button" data-toast="Report submitted and locked; 24-hour review started">Submit locked report</button>
+          </section>
+        </div>
+      </main>`;
+    }
+    function closeStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · week finalization</div><h1>The miss is visible.<br>The tone stays human.</h1>
+        <section class="sheet stack">
+          <div class="spread"><div class="row">${avatar('Y')}<div><strong>You finished 2 of 3</strong><div class="muted tiny">Week finalized · one below target</div></div></div><span class="pill" style="color:var(--red)">Missed target</span></div>
+          <div class="decision"><strong>Neutral Group event</strong><p style="margin-bottom:0">Your Target streak reset. Your Workout streak reset. One completion was added to your Consequence backlog.</p></div>
+          <div class="row" style="flex-wrap:wrap"><button class="button secondary" data-toast="Supportive reaction added">❤️ Send support</button><button class="button secondary" data-toast="Playful response composer opened with anti-humiliation guardrails">😅 Playful callout</button><button class="button orange" data-stage="card">View Card offer</button></div>
+          <p class="tiny muted">No failure language, no public post, and no peer-authored punishment. A timely unresolved report or Exception would keep this result provisional instead.</p>
+        </section>
+      </main>`;
+    }
+    function cardStage() {
+      return `<main class="flow-panel">
+        <div class="eyebrow">Shared flow · Consequence backlog 1</div><h1>Pick your way<br>back in.</h1>
+        <p class="muted">Three random app-authored cards from friends’ unlocked pool. Choose one—or use the single redraw.</p>
+        <div class="card-offer">
+          <article class="consequence"><span class="eyebrow">Unlocked by Maya</span><div><h2>Wall sit relay</h2><p>Three rounds of 25 seconds, with rest.</p></div><button class="button" data-toast="Wall sit relay selected; 48-hour Proof-video deadline started">Choose</button></article>
+          <article class="consequence"><span class="eyebrow">Universal starter</span><div><h2>Low-impact ladder</h2><p>Four minutes of alternating step-backs.</p></div><button class="button blue" data-toast="Low-impact ladder selected; 48-hour Proof-video deadline started">Choose</button></article>
+          <article class="consequence"><span class="eyebrow">Unlocked by Jordan</span><div><h2>Bear-crawl box</h2><p>Trace a small square for three controlled rounds.</p></div><button class="button" data-toast="Bear-crawl box selected; 48-hour Proof-video deadline started">Choose</button></article>
+        </div>
+        <div class="spread" style="margin-top:16px;flex-wrap:wrap"><button class="button secondary" data-toast="One redraw used; the original three cards are excluded">↻ Use one redraw</button><button class="button ghost" data-toast="Safety pause started; no diagnosis or peer approval requested">Cannot safely perform</button></div>
+        <p class="tiny muted">A selected card allows 48 hours for temporary Proof video. Approval removes one backlog item; video deletes seven days later.</p>
+      </main>`;
+    }
+    function switcher() {
+      const index = variants.findIndex(item => item.key === variant);
+      return `<nav class="switcher" aria-label="Prototype variants">
+        <button data-variant="${variants[(index + variants.length - 1) % variants.length].key}" aria-label="Previous variant">←</button>
+        <div class="switcher-label" aria-live="polite">${variant} · ${variants[index].name}</div>
+        <button data-variant="${variants[(index + 1) % variants.length].key}" aria-label="Next variant">→</button>
+      </nav>`;
+    }
+    function statePanel() {
+      return `<details class="state"><summary>Prototype state</summary><pre>${JSON.stringify({variant, stage, selectedReplay, ...state}, null, 2)}</pre></details>`;
+    }
+    function render() {
+      let content;
+      if (stage === 'report') content = reportStage();
+      else if (stage === 'close') content = closeStage();
+      else if (stage === 'card') content = cardStage();
+      else if (variant === 'E') content = startingBlocksVariant();
+      else if (variant === 'F') content = raidReplayVariant();
+      else if (variant === 'G') content = proofWallVariant();
+      else content = combinedVariant();
+
+      document.querySelector('#root').innerHTML = `<div class="app">${prototypeNav()}${content}${statePanel()}${switcher()}</div>`;
+      document.querySelectorAll('[data-stage]').forEach(button => button.addEventListener('click', () => setQuery(variant, button.dataset.stage)));
+      document.querySelectorAll('[data-variant]').forEach(button => button.addEventListener('click', () => setQuery(button.dataset.variant, stage)));
+      document.querySelectorAll('[data-toast]').forEach(button => button.addEventListener('click', () => toast(button.dataset.toast)));
+      document.querySelectorAll('[data-replay]').forEach(button => button.addEventListener('click', () => { selectedReplay = button.dataset.replay; render(); }));
+    }
+    document.addEventListener('keydown', event => {
+      if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
+      if (event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      const index = variants.findIndex(item => item.key === variant);
+      const next = event.key === 'ArrowRight' ? (index + 1) % variants.length : (index + variants.length - 1) % variants.length;
+      setQuery(variants[next].key, stage);
+    });
+    render();
+  </script>
+</body>
+</html>
