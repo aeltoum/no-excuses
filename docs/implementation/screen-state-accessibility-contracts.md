@@ -6,7 +6,7 @@ This document is the implementation contract resolved by [Define screen, state, 
 
 Use a **task-first member shell** and a physically separate **operator shell**.
 
-- Member navigation has four stable destinations: **Home**, **Group**, **Season**, and **You**. A persistent global banner region above route content carries offline, deadline-pause, restricted-access, and update-required states. The current route and every status are expressed in text, never by icon, color, position, motion, sound, or haptics alone.
+- Member navigation has five stable destinations: **Home**, **Wall**, **Group**, **Season**, and **You**. A persistent global banner region above route content carries offline, deadline-pause, restricted-access, and update-required states. The current route and every status are expressed in text, never by icon, color, position, motion, sound, or haptics alone.
 - Home preserves the approved hierarchy: **Needs you**, personal weekly progress, friend Proof feed, then compact Season standings. A new Group-visible item never steals focus or displaces an in-progress action.
 - Tasks deep-link to a full screen. Bottom sheets and dialogs are reserved for reversible choice, explanation, or a single confirmation; they never contain a multi-step core flow.
 - Drafting is local and auto-saved. Consequential commands receive a review screen, one submission, visible pending state, authoritative server acknowledgement, and a stable receipt. Safety block and **Cannot safely perform** remain immediate and omit confirmation.
@@ -21,6 +21,7 @@ No new domain term or ADR is required. These are reversible presentation and int
 | Destination | Purpose | Stable routes |
 | --- | --- | --- |
 | Home | Next required action, current week, Proof feed, compact standings | `/home`; `/tasks/:task-id`; `/notifications` |
+| Wall | Authorized retained Proof and structured outcomes by week | `/wall`; `/wall/reports/:report-id` |
 | Group | Members, invitations, settings, conduct and safety | `/group`; `/group/members`; `/group/invitations`; `/group/settings`; `/group/conduct` |
 | Season | Current standings, weekly Crown results, membership-bounded summaries | `/season`; `/season/weeks/:week-id`; `/season/summaries/:season-id` |
 | You | Account, notification/accessibility preferences, source permissions, support, privacy, export, deletion | `/you`; `/you/preferences`; `/you/activity-sources`; `/you/privacy`; `/you/support`; `/you/account` |
@@ -78,7 +79,7 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 | W04 | Camera and capture review | Keep or retake capture | permission undecided/denied/restricted; camera unavailable; ready; captured; processing; failed; Activity/Member-presence requirement remaining |
 | W05 | End session and select Proof | Create report draft | neither/one/both required photos selected; descriptions missing; end-time edit; invalid end; local save failure; session expired |
 | W06 | Workout report editor | Review report | strength; cardio; class; sport; mixed; incomplete; auto-saved; save failed; reporting cutoff passed; membership ended |
-| W07 | Report review | Submit locked report | complete summary; policy check; upload queued/progress/interrupted/resuming; rejected content; quarantined; durable-storage failure; duplicate submit |
+| W07 | Report review | Submit locked report | complete summary; current media-sharing consent; consent missing/submission blocked; policy check; upload queued/progress/interrupted/resuming; rejected content; quarantined; durable-storage failure; duplicate submit |
 | W08 | Report receipt/detail | View review status | submitted; pending review; Questioned; Verified; Unsupported; Rejected; withdrawn; media expired/deleted; blocked-content suppression |
 | W09 | Peer report review | Accept, Reject, or Cannot assess | media loading/unavailable/deleted; both Proof photos; descriptions; Safety-block suppression; vote pending/recorded/changeable/closed; own report denial |
 | W10 | Question report | Submit factual question | draft; conduct warning/rejection/quarantine; review; submitting; sent; failure |
@@ -111,7 +112,8 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 | G05 | Leave Group | Confirm departure | effect review; last/sole member; unresolved work cleanup; reauthentication if closure; pending; receipt/failure |
 | G06 | Group settings | Schedule week setting change | current/scheduled; admin/non-admin; Group-zone preview; boundary effect; failure |
 | G07 | Conduct and policies | Accept or review | current; acceptance required; version changed; declined/content creation restricted; offline cached copy |
-| F01 | Proof feed item/detail | React, motivate, review, question, report, or block | own/peer; new/seen; media loading/failure/deleted; blocked text; action pending/failure; finalized |
+| F01 | Proof feed item/detail | React, motivate, review, question, report, or block | own/peer; new/seen; active review; media loading/failure/deleted; blocked text; action pending/failure; finalized |
+| L01 | Historical Wall | Filter, open an item, remove own pair, or load older weeks | newest-first week sections; All/Verified/Strength/Cardio/Class/Sport filter selected; authorized count; loading; error/retry; empty Wall; no filter results; retained pair; removal review/pending/receipt; author-removed; expired; moderation unavailable/quarantined; cleared with original deadline unchanged; Safety-block suppression; late-join/return access; progressive loading; beginning of authorized history |
 | N01 | Social composer | Send permitted text | empty; conduct warning/rejected/quarantined; offline; pending; sent; failure |
 | R01 | Current Season standings | Open category/week detail | active; paused; insufficient data; ties; new member; source missing/stale; finalized |
 | R02 | Crown week detail | Inspect result explanation | eligible/ineligible; baseline establishing; tie; provisional/final; missing/late source; category explanation |
@@ -125,7 +127,7 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 | A02 | Notification preferences | Save channels/schedule | permission undecided/denied; social/action controls independent; daily caps explained; Group-zone schedule; failure |
 | A03 | Accessibility preferences/help | Follow platform settings/help | screen reader; text size/reflow; reduced motion; captions/transcript; haptic/audio supplements; Technical-pause support path |
 | A04 | Activity sources | Connect, sync, or disconnect | unsupported platform; permission undecided/partial/denied; connected; syncing; stale; missing data; revoked; disconnect review |
-| A05 | Privacy and data use | Request export or review policy | current/version changed; processor/country status; export unavailable/pending/ready/expired; offline cached policy |
+| A05 | Privacy and data use | Manage media-sharing consent, request export, or review policy | consent current/withdrawal review/pending/receipt; retained media hidden and deletion queued; Proof-required submission blocked; re-consent granted without media restoration; policy current/version changed; processor/country status; export unavailable/pending/ready/expired; offline cached policy |
 | A06 | Account deletion | Confirm deletion after reauth | effect review; reauth; pending; access revoked receipt; retry/status through public web path; completed |
 | A07 | Support | Submit request | ordinary/critical category; factual note; offline draft; sent with response target; status; resolved |
 | A08 | Global sign-out | Sign out all devices after reauth | review; reauth; pending; receipt; failure |
@@ -172,8 +174,8 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 
 ### Offline and synchronization
 
-- Offline-safe: viewing previously authorized cached data, editing local drafts, capture during an acknowledged active Workout session, and immediate local Safety blocking.
-- Online-required: session start, invitation acceptance, report/Proof submission, votes, finalization, role or membership changes, sensitive account actions, activity sync, and operator commands.
+- Offline-safe: viewing previously authorized non-Wall cached data, editing local drafts, capture during an acknowledged active Workout session, and immediate local Safety blocking. Historical Wall media and descriptions require a live authorization check and are unavailable offline.
+- Online-required: session start, invitation acceptance, report/Proof submission, Wall media, counts, filters, and pagination, votes, finalization, role or membership changes, sensitive account actions, activity sync, and operator commands.
 - Pending work survives app restart. Each item shows created time, last attempt, current stage, and one safe retry/cancel choice where cancellation is valid.
 - Reconnection synchronizes in dependency order and surfaces any expired deadline or revoked authority before upload. No optimistic final outcome.
 
@@ -218,7 +220,7 @@ Buttons use action-result labels: **Submit Workout report**, **Approve waiver**,
 
 ### Compact width and default text
 
-Single column. Bottom tabs remain stable. **Needs you** fills width; progress precedes feed; standings use a compact ranked list. Activity photo dominates two-photo Proof, with Member-presence photo secondary.
+Single column. Bottom tabs remain stable. **Needs you** fills width; progress precedes feed; standings use a compact ranked list. Activity photo dominates two-photo Proof, with Member-presence photo secondary. Wall weeks remain newest first; each pair stacks with Activity first when the grid cannot preserve readable descriptions and targets.
 
 ### Wide phone, tablet, and windowed layout
 
@@ -226,7 +228,7 @@ Use a bounded reading column plus one contextual rail. Home rail contains weekly
 
 ### Enlarged text and constrained width
 
-At roughly 200-percent text, reflow to one column; replace bottom tabs with a labeled scroll-safe destination menu if labels no longer fit; stack both Proof photos with Activity first; convert tables to labeled definition lists; move trailing actions below content; allow vertical growth without clipping or horizontal scrolling. Text never overlays media.
+At roughly 200-percent text, reflow to one column; replace bottom tabs with a labeled scroll-safe destination menu if labels no longer fit; stack both Proof photos with Activity first; render Wall weeks as chronological heading/list groups rather than a dense grid; convert tables to labeled definition lists; move trailing actions below content; allow vertical growth without clipping or horizontal scrolling. Text never overlays media.
 
 ### Orientation and device accommodation
 
@@ -250,6 +252,7 @@ Core flows support portrait and landscape except camera capture, which may follo
 
 - Every screen has one level-one-equivalent route title and ordered section headings. Card collections expose list position only when useful.
 - Proof accessible name combines evidence type, author, status, and description. It does not infer identity, exercise quality, body, location, or health.
+- The Wall exposes the same newest-first chronology as week headings and ordered report items with author, workout type, verification date, status, both image roles, descriptions, and structured comparison details. Filters expose their selected state and authorized result count; changing a filter or appending an older week announces the result without moving focus.
 - Progress exposes text such as “2 of 3 Verified completions” rather than a percentage alone. Season ranks expose ties explicitly.
 - Status chips expose name and state once. Decorative icons/images are hidden. Member-presence media uses its authored factual description, not automated recognition.
 - Live regions are scoped: polite for person-initiated completion and connection state; assertive only for immediate access/safety interruption. Repeated progress updates are throttled to meaningful stage changes.
@@ -269,8 +272,9 @@ Core flows support portrait and landscape except camera capture, which may follo
 
 - Lock-screen notifications contain no Group name, category, note, exercise detail, Proof, moderation reason, or member identity unless future explicit consent changes this contract.
 - Skeletons, analytics, crash diagnostics, screenshots, task switcher previews, and logs must not leak Proof, descriptions, Exception text, messages, email, activity/health details, or restricted operator material.
-- Safety-block suppression removes optional free-form content from the blocker while preserving required structured accountability state. Layout does not reveal hidden text length.
-- Media-deleted states retain permitted structured record and description only for its approved lifetime; they never show broken private object URLs.
+- Safety-block suppression removes optional free-form content from the blocker while preserving required structured accountability state. It suppresses historical Wall media and descriptions in both directions, but not evidence needed during active review. Layout, counts, filters, and pagination do not reveal suppressed content or text length.
+- Media-removed, expired, and moderation-unavailable states retain only permitted structured records; descriptions expire with their photos and screens never show broken private object URLs. Wall queries, authorized counts, filter results, and opaque cursors are computed after live membership and Safety-block authorization, so a departed member, outsider, or other Group learns nothing and a current late joiner or rejoiner sees only still-retained Verified pairs.
+- A Content report immediately replaces a retained Wall pair with the moderation-unavailable state while the same object is quarantined. Clearance may restore it only until its original 90-day-from-verification deadline; no moderation or appeal state restarts or extends that deadline. Consent withdrawal immediately hides the author's retained pairs and blocks new Proof-required submission until current consent is granted; re-consent never restores deleted media.
 
 ## Representative prototype scenarios
 
