@@ -93,9 +93,9 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 | X03 | Exception detail and vote | Approve, Deny, or Abstain | eligible; requester; later joiner; blocked-note suppression; aggregate pending; ballot change; quarantined; approved; denied/tied/timed out; withdrawn; reason expired |
 | C01 | Missed-target event | View Card offer | neutral event; responses available/suppressed; reason-free; event closed; membership-bounded unavailable |
 | C02 | Consequence Card offer | Choose, redraw, or Cannot safely perform | three safe offers; redraw available/used; backlog position; no countdown-only cue; safety action immediate |
-| C03 | Consequence Card detail | Start or submit | available; active; expired; paused; media permission; draft; cutoff approaching; membership ended |
-| C04 | Consequence Proof editor/review | Submit Proof | capture; description/transcript; review; upload/retry; policy rejected/quarantined; submitted |
-| C05 | Consequence peer review | Approve, Reject, or Cannot assess | eligible/ineligible; evidence available/unavailable; aggregate decision; replacement window; completed/closed |
+| C03 | Consequence Card detail | Submit completion claim | available; active; expired; paused; claim draft; cutoff approaching; membership ended |
+| C04 | Consequence completion claim review | Attest and submit | fixed Card; completion time; attestation missing/confirmed; review; submitting/retry; submitted |
+| C05 | Consequence peer review | Approve, Reject, or Cannot assess | eligible/ineligible; claim available/unavailable; aggregate decision; completed/rejected/timed out/closed |
 | S01 | Safety controls | Block or get help | unblocked; blocked; unblock; reporting paths; urgent-danger guidance; offline local enforcement with server sync pending |
 | S02 | Content report | Submit report | artifact/conduct target; bounded reason; optional factual note; review; sent; confidential status; unavailable artifact; failure |
 | S03 | Restricted/held access | Follow next safe step | Moderation hold; underage suspension; termination pending appeal; terminated; appeal available/expired; no private case detail |
@@ -203,7 +203,7 @@ Buttons use action-result labels: **Submit Workout report**, **Approve waiver**,
 ### Media alternatives
 
 - Each submitted Activity photo and Member-presence photo requires a concise factual description, typeable or dictatable, locked on submission with capture/session timestamps.
-- Meaningful Consequence-video audio requires captions or transcript. Video never autoplays; play/pause, seek, mute, captions, and transcript are labeled.
+- Consequence completion claims contain no media or free text. Approval acknowledges a trusted peer's structured claim rather than certifying independently observed performance.
 - Camera announces readiness, capture success, elapsed recording time, and remaining media. Audio/haptic cues supplement visible text and can be disabled.
 - Reviewer option **Cannot assess this evidence** is equally reachable, neutral, reminder-stopping, and changeable until decision closure.
 - Descriptions and structured details enable understanding but never independently verify visual Proof. MVP supplies no nonvisual substitute evidence.
@@ -260,7 +260,6 @@ Core flows support portrait and landscape except camera capture, which may follo
 | Permission | Ask when | Denied/restricted path |
 | --- | --- | --- |
 | Camera | Member chooses first capture inside acknowledged session | Explain Proof cannot be created; retain active session; settings path; Support and Technical-pause path if product access defect, not permission refusal |
-| Microphone | Member starts Consequence video requiring audio | Allow silent video where meaningful evidence remains; otherwise explain requirement; captions/transcript still required for meaningful audio |
 | Notifications | After member reaches active Group context and sees value | Full in-app tasks/reminders remain; settings path; never block accountability flow |
 | HealthKit/Health Connect | Member chooses one Crown source | Crown category shows permission missing/ineligible; target/accountability continues; granular reconnect/disconnect |
 | Photos/library | Never for Workout Proof | No request. Proof must originate from in-app session capture |
