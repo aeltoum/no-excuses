@@ -37,3 +37,9 @@ git push -u origin <branch-name>
 ## Current phase
 
 Repository setup only. No application stack, scripts, CI, or deployment configuration has been selected.
+
+## Product and design context
+
+- [`CONTEXT.md`](CONTEXT.md) defines the product's canonical language.
+- [`docs/implementation/screen-state-accessibility-contracts.md`](docs/implementation/screen-state-accessibility-contracts.md) defines app navigation, states, and accessible interaction.
+- [`docs/design/no-excuses-visual-system.md`](docs/design/no-excuses-visual-system.md) defines the approved charcoal and Safety-yellow visual language for the website and member app.
