@@ -107,17 +107,17 @@
 
     /* E · Starting Blocks */
     .e-shell {
-      --track-cobalt: #2443e8; --lane-coral: #ff5a45; --chalk: #fbf6e8;
-      --rubber: #151924; --signal-yellow: #ffd84a; --steel: #8b97a8;
+      --track-cobalt: #1847b8; --lane-coral: #ff6b57; --signal-yellow: #ffd84a;
+      --rubber: #202633; --chalk: #fbf6e8;
       min-height: calc(100vh - 52px); padding: 0 20px 44px; color: var(--rubber); background: var(--chalk);
-      font-family: "Trebuchet MS", Avenir, sans-serif;
+      font-family: "Avenir Next", Avenir, sans-serif;
     }
     .e-inner { max-width: 1220px; margin: 0 auto; }
     .e-mast { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 24px; padding: 34px 0 22px; border-bottom: 5px solid var(--rubber); }
     .e-title { margin: 6px 0 0; font: 900 clamp(3rem,8vw,7rem)/.78 Impact, Haettenschweiler, "Arial Narrow", sans-serif; letter-spacing: -.035em; text-transform: uppercase; }
     .e-title em { color: var(--track-cobalt); font-style: normal; }
     .e-week-tag { max-width: 225px; padding: 12px 14px; border: 2px solid var(--rubber); font: 700 .74rem/1.45 Menlo, monospace; text-transform: uppercase; }
-    .e-course { display: grid; grid-template-columns: minmax(360px,.9fr) minmax(0,1.25fr); margin: 24px 0; overflow: hidden; color: #fff; background: var(--track-cobalt); border: 4px solid var(--rubber); border-radius: 92px 10px 10px 92px; }
+    .e-course { display: grid; grid-template-columns: minmax(360px,.9fr) minmax(0,1.25fr); margin: 24px 0; overflow: hidden; color: var(--chalk); background: var(--track-cobalt); border: 4px solid var(--rubber); border-radius: 92px 10px 10px 92px; }
     .e-lanes { position: relative; min-height: 360px; padding: 34px 28px 34px 74px; display: grid; align-content: center; gap: 14px; overflow: hidden; }
     .e-lanes::before, .e-lanes::after { content: ""; position: absolute; pointer-events: none; border: 2px solid rgba(251,246,232,.72); border-right: 0; border-radius: 130px 0 0 130px; }
     .e-lanes::before { inset: 18px 0 18px 18px; }
@@ -125,7 +125,7 @@
     .e-score { position: relative; z-index: 2; font: 900 clamp(4.6rem,9vw,8.5rem)/.8 Impact, Haettenschweiler, "Arial Narrow", sans-serif; letter-spacing: -.05em; }
     .e-lap-copy { position: relative; z-index: 2; max-width: 240px; font-weight: 700; }
     .e-markers { position: relative; z-index: 2; display: flex; gap: 8px; }
-    .e-marker { width: 48px; height: 48px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%; font: 800 .78rem Menlo, monospace; }
+    .e-marker { width: 48px; height: 48px; display: grid; place-items: center; border: 2px solid var(--chalk); border-radius: 50%; font: 800 .78rem Menlo, monospace; }
     .e-marker.done { color: var(--rubber); background: var(--signal-yellow); border-color: var(--signal-yellow); }
     .e-marker.next { background: var(--lane-coral); }
     .e-launch { align-self: stretch; display: grid; align-content: center; gap: 12px; padding: 34px; color: var(--rubber); background: var(--signal-yellow); border-left: 4px solid var(--rubber); }
@@ -134,7 +134,7 @@
     .e-grid { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(280px,.55fr); gap: 20px; align-items: start; }
     .e-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 3px solid var(--rubber); }
     .e-section-title h2 { margin: 0; font: 900 1.65rem Impact, Haettenschweiler, "Arial Narrow", sans-serif; text-transform: uppercase; }
-    .e-report { padding: 16px; border: 3px solid var(--rubber); background: #fff; box-shadow: 8px 8px 0 var(--steel); }
+    .e-report { padding: 16px; border: 3px solid var(--rubber); background: var(--chalk); box-shadow: 8px 8px 0 var(--rubber); }
     .e-report + .e-report { margin-top: 22px; }
     .e-proof-grid { display: grid; grid-template-columns: 1.4fr .6fr; gap: 7px; margin: 14px 0; }
     .e-proof-grid .photo:first-child { grid-row: span 2; min-height: 300px; border-radius: 70px 8px 8px 70px; }
@@ -142,7 +142,7 @@
     .e-hero { min-height: 245px; margin: 14px 0; border-radius: 70px 8px 8px 70px; }
     .e-report .proof-actions button { border-radius: 0; border-color: var(--rubber); }
     .e-rail { position: sticky; top: 72px; display: grid; gap: 18px; }
-    .e-standings { padding: 16px; color: #fff; background: var(--rubber); border-top: 9px solid var(--lane-coral); }
+    .e-standings { padding: 16px; color: var(--chalk); background: var(--rubber); border-top: 9px solid var(--lane-coral); }
     .e-standing { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 8px; padding: 13px 0; border-bottom: 1px solid #465064; }
     .e-standing:last-child { border-bottom: 0; }
     .e-standing b:first-child { color: var(--signal-yellow); font: 800 .78rem Menlo, monospace; }
@@ -188,7 +188,7 @@
     .f-rank { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 11px 0; border-bottom: 1px solid #494162; }
     .f-rank span:first-child { color: var(--cyan); font: 800 .72rem Menlo, monospace; }
     .f-one-photo { padding: 14px; border: 1px solid #494162; background: #1c1731; }
-    .f-one-photo .photo { min-height: 155px; margin: 10px 0; border-radius: 0; }
+    .f-one-photo .f-hero { min-height: 255px; margin: 10px 0; border-radius: 0; }
 
     /* G · Proof Wall */
     .g-shell {
@@ -423,7 +423,7 @@
           </section>
           <aside class="e-rail">
             <section class="e-standings">
-              <div class="e-section-title" style="border-color:white"><h2>Season standings</h2><span class="e-data">2 weeks left</span></div>
+              <div class="e-section-title" style="border-color:var(--chalk)"><h2>Season standings</h2><span class="e-data">2 weeks left</span></div>
               <div class="e-standing"><b>01</b><span>Maya</span><strong>4 👑</strong></div><div class="e-standing"><b>02</b><span>You</span><strong>2 👑</strong></div><div class="e-standing"><b>03</b><span>Jordan</span><strong>1 👑</strong></div>
             </section>
             <div class="e-week-tag" style="max-width:none"><strong>Streak board</strong><br>Target streak · 4<br>Workout streak · 6</div>
@@ -462,7 +462,7 @@
               <div class="f-rank"><span>01</span><span>Maya</span><strong>4 👑</strong></div><div class="f-rank"><span>02</span><span>You</span><strong>2 👑</strong></div><div class="f-rank"><span>03</span><span>Jordan</span><strong>1 👑</strong></div>
             </section>
             <article class="f-one-photo">
-              <div class="spread"><strong>Maya · trail run</strong><span class="f-status">Verified</span></div>${photo('trail','Required Proof · trail finish')}
+              <div class="spread"><strong>Maya · trail run</strong><span class="f-status">Verified</span></div>${heroPhoto('trail','Required Proof · trail finish','f-hero')}
               <div class="tiny" style="color:var(--lavender)">One submitted photo · target met 3/3</div><button class="button ghost" style="margin-top:10px" data-toast="Cheer sent to Maya">Send cheer</button>
             </article>
           </aside>
@@ -574,7 +574,7 @@
     }
     document.addEventListener('keydown', event => {
       if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
-      if (event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.target.closest?.('input, textarea, select, [contenteditable]')) return;
       event.preventDefault();
       const index = variants.findIndex(item => item.key === variant);
       const next = event.key === 'ArrowRight' ? (index + 1) % variants.length : (index + variants.length - 1) % variants.length;
