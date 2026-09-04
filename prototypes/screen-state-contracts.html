@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>No Excuses screen-state prototype</title>
+  <!-- Three structural variants of weekly home, switchable via ?variant=A|B|C. Throwaway prototype, never production. -->
+  <style>
+    :root { color-scheme: dark; --bg:#151714; --panel:#20231e; --soft:#2b3028; --lime:#c7ff38; --ink:#f6f7f2; --muted:#b8bdb0; --warn:#ffd166; --danger:#ff8178; --focus:#8cc8ff; font: 16px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); }
+    button,select { font:inherit; min-height:48px; min-width:48px; }
+    button,select,a { border-radius:.65rem; }
+    button { border:1px solid #596050; background:var(--soft); color:var(--ink); padding:.7rem 1rem; cursor:pointer; }
+    button.primary { background:var(--lime); color:#111; border-color:var(--lime); font-weight:800; }
+    button:focus-visible,select:focus-visible,a:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+    a { color:var(--lime); padding:.3rem; }
+    header { max-width:1120px; margin:auto; padding:1rem; display:flex; gap:1rem; align-items:center; justify-content:space-between; }
+    .brand { font-weight:900; letter-spacing:.08em; }
+    .eyebrow { color:var(--lime); text-transform:uppercase; letter-spacing:.12em; font-size:.78rem; font-weight:800; }
+    .statebar { max-width:1120px; margin:0 auto 1rem; padding:1rem; background:#313727; border-left:5px solid var(--warn); }
+    main { max-width:1120px; margin:auto; padding:0 1rem 7rem; }
+    .layout { display:grid; gap:1rem; }
+    .panel { background:var(--panel); border:1px solid #3c4237; padding:1rem; border-radius:1rem; }
+    h1,h2,h3,p { margin-top:0; }
+    h1 { font-size:clamp(2rem,7vw,5rem); line-height:.9; letter-spacing:-.04em; max-width:12ch; }
+    h2 { font-size:1.25rem; }
+    .task { border:2px solid var(--lime); }
+    .progress { font-size:1.6rem; font-weight:800; }
+    .feed { display:grid; gap:1rem; }
+    .proof { display:grid; grid-template-columns:2fr 1fr; gap:.5rem; margin:.8rem 0; }
+    .photo { min-height:170px; display:grid; place-items:center; background:linear-gradient(135deg,#44533b,#202c22); border-radius:.7rem; color:var(--muted); text-align:center; padding:1rem; }
+    .photo.secondary { min-height:110px; background:linear-gradient(135deg,#4b4043,#292327); }
+    .actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .status { display:inline-flex; gap:.4rem; align-items:center; font-weight:800; }
+    .status::before { content:"●"; color:var(--warn); }
+    .meta { color:var(--muted); }
+    ol { padding-left:1.5rem; }
+    .tabs { display:flex; gap:.25rem; max-width:1120px; margin:auto; padding:.5rem 1rem 1rem; overflow:auto; }
+    .tabs a { color:var(--ink); text-decoration:none; white-space:nowrap; }
+    .tabs a[aria-current="page"] { background:var(--lime); color:#111; font-weight:800; }
+    .switcher { position:fixed; z-index:5; left:50%; bottom:1rem; transform:translateX(-50%); display:flex; align-items:center; gap:.5rem; background:#070807; border:1px solid #758068; box-shadow:0 8px 30px #000b; padding:.4rem; border-radius:999px; font-size:16px; }
+    .switcher span { min-width:11rem; text-align:center; font-weight:800; }
+    .controls { max-width:1120px; margin:0 auto 1rem; padding:0 1rem; display:flex; flex-wrap:wrap; gap:.7rem; align-items:end; }
+    label { display:grid; gap:.25rem; font-weight:700; }
+    select { background:var(--panel); color:var(--ink); border:1px solid #596050; padding:.5rem; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    body.large { font-size:200%; }
+    body.large .proof { grid-template-columns:1fr; }
+    body.large .tabs { flex-wrap:wrap; }
+    body.reduce *, body.reduce *::before, body.reduce *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+    .variant-b .layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(16rem,1fr); }
+    .variant-b .feed { grid-column:1; grid-row:1 / span 3; }
+    .variant-b .task,.variant-b .week,.variant-b .standings { grid-column:2; }
+    .variant-c .layout { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .variant-c .task { grid-column:1 / -1; display:grid; grid-template-columns:2fr 1fr; gap:1rem; align-items:center; }
+    .variant-c .feed { grid-column:1; }
+    .variant-c .rail { grid-column:2; display:grid; gap:1rem; align-content:start; }
+    @media (max-width:720px) { .variant-b .layout,.variant-c .layout,.variant-c .task { grid-template-columns:1fr; } .variant-b .feed,.variant-b .task,.variant-b .week,.variant-b .standings,.variant-c .task,.variant-c .feed,.variant-c .rail { grid-column:auto; grid-row:auto; } }
+  </style>
+</head>
+<body>
+  <header><div class="brand">NO EXCUSES</div><div class="eyebrow">Throwaway contract prototype</div></header>
+  <nav class="tabs" aria-label="Primary"><a href="#" aria-current="page">Home</a><a href="#">Group</a><a href="#">Season</a><a href="#">You</a></nav>
+  <div class="controls">
+    <label>Hard state<select id="state"><option value="active">Needs peer review</option><option value="offline">Offline Workout draft</option><option value="large">200% text reflow</option><option value="blocked">Exception with blocked note</option><option value="pause">Service pause</option></select></label>
+    <button id="motion" type="button" aria-pressed="false">Reduced motion: off</button>
+  </div>
+  <div id="statebar" class="statebar" role="status" aria-live="polite">Online. One report needs your review before Friday, 8:00 PM Central Time.</div>
+  <main id="app"></main>
+  <div class="switcher" aria-label="Prototype variant switcher"><button id="prev" type="button" aria-label="Previous variant">←</button><span id="variantLabel"></span><button id="next" type="button" aria-label="Next variant">→</button></div>
+  <script>
+    const variants = {
+      A: { name: 'Task first', cls: 'variant-a' },
+      B: { name: 'Feed first', cls: 'variant-b' },
+      C: { name: 'Command center', cls: 'variant-c' }
+    };
+    const states = {
+      active: 'Online. One report needs your review before Friday, 8:00 PM Central Time.',
+      offline: 'Offline. Active Workout session acknowledged at 6:12 PM. Draft and captures stay on this device; submission waits for connection.',
+      large: 'Text size demonstration: 200 percent. Content reflows to one column; no information or action is removed.',
+      blocked: 'Exception vote needs you. Optional note hidden because you blocked this member; category and voting authority remain visible.',
+      pause: 'Service pause active for report and review deadlines. 3 hours 14 minutes remain and resume only after verified repair.'
+    };
+    function currentVariant() { const key = new URLSearchParams(location.search).get('variant') || 'A'; return variants[key] ? key : 'A'; }
+    function taskContent(state) {
+      if (state === 'offline') return `<div><div class="eyebrow">Workout in progress</div><h1>Draft safe on this device.</h1><p>Session started 6:12 PM. Capture both required photos now; submit after connection returns.</p></div><button class="primary">Open active session</button>`;
+      if (state === 'blocked') return `<div><div class="eyebrow">Needs you</div><h1>Vote on an Exception.</h1><p>Travel or access disruption · due Friday, 8:00 PM CT. Optional note hidden by your Safety block.</p></div><button class="primary">Review request</button>`;
+      if (state === 'pause') return `<div><div class="eyebrow">Deadlines paused</div><h1>Your time is preserved.</h1><p>Report and review clocks resume with 3 hours 14 minutes after verified repair.</p></div><button class="primary">View pause details</button>`;
+      return `<div><div class="eyebrow">Needs you</div><h1>Review Maya’s report.</h1><p>Both Proof photos and descriptions ready. Due Friday, 8:00 PM CT.</p></div><button class="primary">Review Proof</button>`;
+    }
+    function feed() { return `<section class="panel feed" aria-labelledby="feed-title"><h2 id="feed-title">Friend Proof</h2><article><p><strong>Maya</strong> · Strength · 42 min</p><div class="status">Review pending</div><div class="proof"><div class="photo" role="img" aria-label="Activity photo: barbell and plates beside a squat rack">Activity photo<br>Barbell and plates beside squat rack</div><div class="photo secondary" role="img" aria-label="Member-presence photo: Maya’s hand holding workout notebook">Member-presence photo<br>Hand holding workout notebook</div></div><p>3 sets of squats and rows. Both descriptions lock on submission.</p><div class="actions"><button>React</button><button>Motivate</button><button>Review Proof</button><button>Question report</button><button>More safety actions</button></div></article></section>`; }
+    function week() { return `<section class="panel week" aria-labelledby="week-title"><h2 id="week-title">Your week</h2><p class="progress">2 of 3 Verified</p><p>Ends Sunday, September 6 at 12:00 AM Central Time.</p><button>Start Workout session</button></section>`; }
+    function standings() { return `<section class="panel standings" aria-labelledby="season-title"><h2 id="season-title">Season standings</h2><ol><li>You — 4 Crowns</li><li>Maya — 3 Crowns</li><li>Devin — 1 Crown</li></ol><a href="#">Open Season details</a></section>`; }
+    function render() {
+      const key = currentVariant(), state = document.querySelector('#state').value, app = document.querySelector('#app');
+      document.body.classList.toggle('large', state === 'large');
+      document.querySelector('#statebar').textContent = states[state];
+      document.querySelector('#variantLabel').textContent = `${key} (${variants[key].name})`;
+      let inner;
+      if (key === 'A') inner = `<section class="panel task">${taskContent(state)}</section>${week()}${feed()}${standings()}`;
+      if (key === 'B') inner = `${feed()}<section class="panel task">${taskContent(state)}</section>${week()}${standings()}`;
+      if (key === 'C') inner = `<section class="panel task">${taskContent(state)}</section>${feed()}<div class="rail">${week()}${standings()}</div>`;
+      app.className = variants[key].cls; app.innerHTML = `<div class="layout">${inner}</div>`;
+    }
+    function cycle(delta) { const keys = Object.keys(variants), at = keys.indexOf(currentVariant()), key = keys[(at + delta + keys.length) % keys.length], url = new URL(location.href); url.searchParams.set('variant', key); history.replaceState({}, '', url); render(); }
+    document.querySelector('#prev').addEventListener('click', () => cycle(-1));
+    document.querySelector('#next').addEventListener('click', () => cycle(1));
+    document.querySelector('#state').addEventListener('change', render);
+    document.querySelector('#motion').addEventListener('click', event => { const on = event.currentTarget.getAttribute('aria-pressed') !== 'true'; event.currentTarget.setAttribute('aria-pressed', String(on)); event.currentTarget.textContent = `Reduced motion: ${on ? 'on' : 'off'}`; document.body.classList.toggle('reduce', on); });
+    addEventListener('keydown', event => { if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return; if (event.key === 'ArrowLeft') cycle(-1); if (event.key === 'ArrowRight') cycle(1); });
+    render();
+  </script>
+</body>
+</html>
