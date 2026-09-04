@@ -1,0 +1,61 @@
+# Supabase Storage Proof deletion and restore guarantees
+
+Research snapshot: 2026-09-04. Sources are first-party Supabase documentation, pricing, DPA, and maintained source. This note tests managed Supabase Storage against the resolved No Excuses Proof-media contract; it does not provision or purchase anything.
+
+## Decision
+
+Managed Supabase Storage can satisfy the private-pilot Proof contract with application-owned lifecycle controls and a paid Pro-or-higher hosted project, but Supabase alone does not supply the complete deletion ledger, derivative cascade, restore orchestration, or end-to-end deletion proof. The application must own those controls and rehearse them.
+
+Supabase documents Storage API deletion as permanent and unrecoverable, and S3 versioning is unsupported. Database backups contain Storage metadata but not object bytes; restoring an older database does not restore objects deleted after that backup. These properties prevent a normal database restore from resurrecting deleted Proof bytes ([Delete objects](https://supabase.com/docs/guides/storage/management/delete-objects), [S3 compatibility](https://supabase.com/docs/guides/storage/s3/compatibility), [Database backups](https://supabase.com/docs/guides/platform/backups)).
+
+This is a documented service behavior, not cryptographic proof of physical erasure from every provider replica. Supabase exposes no customer-facing deletion certificate or replica-level verification API in the reviewed official material. Therefore No Excuses can prove its workflow completed and the object is no longer retrievable/listed, but must not claim independently verified physical erasure inside Supabase.
+
+## Contract fit
+
+| Requirement | Supabase fact | Required No Excuses control |
+|---|---|---|
+| Private immutable upload | Buckets are private by default; private reads and writes are subject to RLS. Distinct paths avoid overwrite/CDN staleness. | One private Proof bucket; opaque unique keys; bucket MIME/size restrictions; signed upload created only after live server authorization; never set `upsert` or reuse a path. |
+| Resumable Proof video | Storage implements TUS and recommends it above 6 MB or on unstable networks. Each upload URL lasts up to 24 hours. Competing uploads to one path return conflict unless upsert is enabled. Signed upload tokens work with resumable upload ([Resumable uploads](https://supabase.com/docs/guides/storage/uploads/resumable-uploads)). | Use direct Storage hostname, fixed reserved key, signed TUS token, no upsert, idempotent finalize, and 24-hour abandoned-upload reconciliation. |
+| 100 MiB video | Free projects cap files at 50 MB. Pro and above permit a configurable limit up to 500 GB ([Storage limits](https://supabase.com/docs/guides/storage/uploads/file-limits)). | Hosted rehearsal/live pilot requires Pro or higher unless product lowers its settled 100 MiB maximum. Keep 100 MiB bucket limit; reject larger content in client and server. Fresh approval required before purchase. |
+| Short-lived reads | Private objects may be read through authenticated requests or signed URLs. Signed URLs stay valid until expiry and cannot be individually revoked without Supabase support ([Private buckets](https://supabase.com/docs/guides/storage/buckets/fundamentals), [Serving downloads](https://supabase.com/docs/guides/storage/serving/downloads)). | Authorize each read against live app state, mint per-object five-minute URLs, never persist/share them, use short browser/app cache TTL, and delete/quarantine object to terminate access rather than relying only on token revocation. |
+| CDN deletion propagation | Pro Smart CDN automatically invalidates deleted objects and transformed variants; propagation can take up to 60 seconds. A cached response can outlive signed-token expiry until cache TTL, but object deletion invalidates all token-specific entries ([Smart CDN](https://supabase.com/docs/guides/storage/cdn/smart-cdn)). | Treat visibility revocation in app/database as immediate; stop issuing URLs; use short client cache TTL; allow up to 60 seconds for CDN invalidation in physical-deletion verification; purge app caches on lifecycle transitions. |
+| Parent and derivatives | Supabase deletes named objects, up to 1,000 per `remove` request. SQL deletion only removes metadata and orphans bytes ([Delete objects](https://supabase.com/docs/guides/storage/management/delete-objects)). | Store explicit parent-child rows for every thumbnail, transcode, screening artifact, and text payload. Worker enumerates and deletes every Storage key via API before finalizing one terminal operation. Do not use SQL cascade as byte deletion. Built-in image transforms should remain disabled so every recoverable derivative is app-enumerable. |
+| No recoverable secondary Proof store | Database backups exclude Storage object bytes; clone/restore is database-only and does not copy Storage objects ([Database backups](https://supabase.com/docs/guides/platform/backups), [Restore to a new project](https://supabase.com/docs/guides/platform/clone-project)). | Exclude Proof bytes from DB, logs, exports, moderation diagnostics, device backups, and off-site DB dumps. Do not copy Storage to another object store. Any screening processor must meet its separately selected deletion contract. |
+| Deletion verification | Successful Storage API deletion is documented permanent; object metadata lives in Postgres. Supabase provides no replica-erasure receipt. | Ledger records requested keys, API result, repeated authenticated `HEAD`/download-not-found and list absence after CDN window, derivative count, processor deletion result, retries, and verification time. Alert after bounded retries. Describe this as operational verification, not independent physical-erasure attestation. |
+| Restore ordering and non-reappearance | Restoring a database can restore old `storage.objects` metadata, but not deleted bytes. It can also lose metadata for objects created after the restore point, leaving unreferenced bytes. Project clone omits both Storage objects and bucket settings. | Keep service isolated. Before restore when possible, export current pseudonymous deletion tombstones and object inventory without bytes. Restore DB first; reapply post-restore tombstones; recreate/verify private bucket config if cloning; enumerate Storage through API/S3; delete every object not referenced by an active, unexpired application media row; delete every tombstoned key; verify referenced objects; only then reopen traffic. Never repair `storage.objects` directly. |
+| Account deletion and 30-day backup expiry | Database backup retention depends on plan: Pro daily backups retain seven days; Team retains 14; Enterprise up to 30. PITR is optional and separately priced. Storage bytes are outside DB backups ([Database backups](https://supabase.com/docs/guides/platform/backups)). | Hard-delete Proof bytes within seven days. Pseudonymize restored structured identity using backup-independent deletion tombstones/reconciliation before traffic. Configure no recoverable DB backup window beyond 30 days. A longer Enterprise/custom retention would violate contract unless excluded or narrowed. |
+
+## Restore-safe operating plan
+
+1. Make application media rows authoritative for allowed existence; every object key and derivative has exactly one lifecycle record. Keep deletion intent in the transactional outbox and restricted ledger.
+2. Delete all enumerated Storage objects through the Storage API, never SQL. Retry idempotently. Only after API success and absence checks mark active deletion verified; then remove raw digest and direct identity on their approved schedules.
+3. Maintain a minimal, encrypted, access-restricted export of deletion/account tombstones outside the rollback domain, containing opaque identity/key, deletion timestamp, and status but no media, text, digest, or direct identity. Rotate it inside the 90-day ledger limit. This is evidence, not a second Proof store.
+4. For every restore, block member/operator traffic and upload workers; capture pre-restore tombstones/inventory when available; restore DB; overlay tombstones; reconcile all bucket keys against active unexpired media rows; delete orphans/tombstoned keys; verify absence/presence; then reopen.
+5. Rehearse: delete parent plus every derivative, retry partial failures, signed URL and CDN behavior, Account deletion, restore to a point before deletion, restore to a point before upload, clone restore, and lost-current-DB recovery. Pass only when deleted media never becomes retrievable and no orphan remains.
+
+The backup-independent tombstone export is necessary because restoring only the authoritative database rolls its deletion ledger backward. It contains no Proof bytes and should be designed as the smallest operational evidence needed to reapply deletion. If policy rejects even this pseudonymous secondary record, the alternative is a provider/platform feature that preserves deletion markers outside database restore; reviewed Supabase documentation does not establish one.
+
+## Limits and cost
+
+- Free remains suitable for local/synthetic development but cannot accept the settled 100 MiB video maximum and has no automatic backups. It includes 1 GB Storage and 50 MB maximum file size ([Supabase pricing](https://supabase.com/pricing)).
+- Pro is the minimum compatible hosted tier: currently $25/month, 100 GB Storage included, 250 GB egress included, 500 GB configurable maximum file size, Smart CDN, and seven days of daily DB backups. Storage beyond quota is currently $0.0213/GB-month; standard egress beyond quota is $0.09/GB and cached egress $0.03/GB ([Supabase pricing](https://supabase.com/pricing), [Storage pricing](https://supabase.com/docs/guides/storage/pricing)). Actual pilot spend depends on retained media volume and views.
+- Seven-day PITR is currently an additional approximately $100/month and requires at least Small compute; it is not needed to prove Storage deletion because PITR backs up database state, not Storage bytes. Enable only if the 15-minute structured-data RPO cannot be met by another approved backup plan ([Database backups](https://supabase.com/docs/guides/platform/backups), [PITR usage](https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery)).
+- Pro Smart CDN invalidation is material to the one-minute bounded cache behavior. Five-minute signed reads do not themselves guarantee immediate revocation.
+
+No purchase or provisioning is authorized by this research.
+
+## Acceptance evidence
+
+Pilot readiness should retain a synthetic rehearsal record showing:
+
+- private RLS denial and server-only URL issuance across current, departed, later, and returning memberships;
+- TUS resume, expiry, duplicate completion conflict, no-upsert behavior, finalization only after durable-object checks, and abandoned-upload cleanup;
+- a deletion matrix for every media state and derivative, including API failure/retry and processor cleanup;
+- post-delete download and listing absence after the Smart CDN propagation bound, plus absence after restoring DB to before the deletion;
+- orphan deletion after restoring DB to before an upload, and no member traffic until reconciliation passes;
+- Account-deletion tombstone replay after restore, direct-identity pseudonymization, seven-day active deletion, 30-day maximum backup expiry, and 90-day ledger expiry;
+- cost check using expected retained GB, upload/download volume, and whether separately approved PITR is required.
+
+## Residual risk
+
+Supabase's public contract supports permanent nonrecoverable object deletion, but does not expose replica-level deletion evidence or promise a customer-visible deletion completion time beyond Smart CDN invalidation. This is acceptable for a small private pilot only with the operational verification language above, a documented DPA/subprocessor review before live personal data, and a rehearsal proving restore isolation and reconciliation. If legal/privacy review requires certified per-object erasure or a hard provider-side deletion SLA, managed Supabase Storage is not yet proved sufficient; obtain a written Supabase commitment or select another store before pilot launch.
