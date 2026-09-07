@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node"]
+  },
+  "include": ["packages/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts"],
+  "exclude": ["node_modules"]
+}

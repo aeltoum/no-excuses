@@ -11,3 +11,13 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+.DS_Store
+.env
+.env.*
+!.env.example
+.expo/
+node_modules/
+dist/
+coverage/
+supabase/.branches/
+supabase/.temp/

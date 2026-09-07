@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "No Excuses",
+    "slug": "no-excuses",
+    "scheme": "noexcuses",
+    "version": "0.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "ios": {
+      "bundleIdentifier": "com.noexcuses.mobile",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.noexcuses.mobile"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

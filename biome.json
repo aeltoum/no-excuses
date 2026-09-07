@@ -1,0 +1,23 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  "files": {
+    "includes": [
+      "apps/**",
+      "packages/**",
+      "tests/**",
+      "scripts/**",
+      "*.json",
+      "*.yaml",
+      "!!packages/contracts/src/generated.ts",
+      "!!pnpm-lock.yaml"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": { "preset": "recommended" }
+  }
+}
