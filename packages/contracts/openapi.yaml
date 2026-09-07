@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: No Excuses local baseline
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Local service health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, status]
+      properties:
+        contractVersion:
+          type: integer
+          enum: [0, 1]
+          description: Current and immediately previous baseline wire versions.
+        status:
+          type: string
+          enum: [ok]
