@@ -12,7 +12,7 @@ The implementation hierarchy is:
 
 No Excuses should feel like a private training record made public to exactly the friends whose opinion matters: blunt, disciplined, competitive, and earned. It is not a wellness dashboard, lifestyle brand, or public social network.
 
-The signature is **the proof grid**: dense square imagery, hard status marks, and week dividers that make consistency visible at a glance. The grid may summarize durable structured outcomes today. Historical Proof photos remain blocked on the retention decision described under [The Wall](#the-wall).
+The signature is **the proof grid**: dense square imagery, hard status marks, and week dividers that make consistency visible at a glance. The grid presents authorized Verified Proof pairs during their bounded retention period and durable structured outcomes afterward, as described under [The Wall](#the-wall).
 
 ## Core palette
 
@@ -155,15 +155,16 @@ The supplied Wall reference establishes this presentation direction:
 - progressively revealed older weeks with an explicit beginning-of-history state;
 - no public discovery, sharing, downloading, or cross-Group access.
 
-It does **not** settle the Wall's data and privacy contract. The current product rules delete both Proof photos seven days after verification, remove media immediately for several other terminal outcomes, prohibit a permanent photo archive, and prevent later or returning members from seeing earlier media. Therefore:
+The Wall's data and privacy contract is bounded even though its chronology may span more time. Therefore:
 
-- Do not promise “every proof ever,” durable photos, or permanent empty squares in website copy yet.
-- Until a replacement decision is approved, the historical Wall may show only authorized, still-retained Proof media plus durable structured outcomes that are already permitted to remain.
-- If deleted media is represented, use a neutral structured record; never retain or regenerate a thumbnail, blur, palette, embedding, caption, or other recoverable derivative to simulate the deleted photo.
-- The Wall must distinguish `photo available`, `structured outcome only`, and `not visible to this membership` without revealing that hidden activity exists.
-- A later or returning member may not infer pre-membership activity through counts, gaps, filters, dates, or loading boundaries.
+- A Verified Proof pair and its descriptions remain available for exactly 90 days from verification while every access and consent condition remains satisfied; the Wall is never a permanent photo archive.
+- Every current Group member, including a later joiner or rejoiner, may see authorized retained pairs. Other pre-membership activity remains hidden.
+- Consent withdrawal, the author's removal of the pair, departure or removal, Account deletion, service termination, Group closure, moderation removal, Unsupported, or Rejected revokes access and starts the approved early-deletion lifecycle.
+- A Content report immediately suppresses the pair during moderation. Clearance may restore it only for the remainder of its original retention period and never restarts the clock.
+- If deleted media is represented, use only the finalized structured outcome already allowed to remain; never retain or regenerate a thumbnail, blur, palette, embedding, caption, or other recoverable derivative to simulate the deleted photo.
+- Counts, gaps, filters, dates, and loading boundaries are computed after authorization and must not reveal hidden activity.
 
-[Reconcile the historical Wall with Proof retention and membership privacy](https://github.com/aeltoum/no-excuses/issues/89) must settle historical photo retention, consent, member departure, Account deletion, moderation, screenshot risk, later-membership visibility, storage cost, and the comparison purpose before the reference's permanent-photo behavior can be implemented.
+[Issue #89](https://github.com/aeltoum/no-excuses/issues/89) records the resolved retention, consent, membership, moderation, deletion, and accessible-comparison decision. `CONTEXT.md` and the screen-state contract remain authoritative if this presentation guidance drifts from that decision.
 
 ## Motion
 

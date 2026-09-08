@@ -1,0 +1,23 @@
+{
+  "dataPolicy": "synthetic-only",
+  "personas": [
+    { "id": "alex-admin", "role": "group-admin" },
+    { "id": "blair-member", "role": "group-member" },
+    { "id": "casey-outsider", "role": "outsider" },
+    { "id": "devon-operator", "role": "private-pilot-operator" }
+  ],
+  "scenarioKinds": [
+    "happy-path",
+    "boundary",
+    "failure",
+    "authorization",
+    "compatibility",
+    "accessibility"
+  ],
+  "timeAnchors": {
+    "groupZone": "America/Chicago",
+    "before": "2026-01-10T05:59:59Z",
+    "at": "2026-01-10T06:00:00Z",
+    "after": "2026-01-10T06:00:01Z"
+  }
+}

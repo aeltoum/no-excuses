@@ -105,12 +105,13 @@ At minimum, compose scenarios across:
 - Group setup, activation, capacity, pause below two, midweek join, departure, removal, return, last-admin protection, and closure;
 - invitation issue, revoke, expiry, normalization, concurrent acceptance, one-Group conflict, and preview without acceptance;
 - Workout-session start, capture, end, expiry, draft deletion, reporting cutoff, submission, questioning, verification, withdrawal, rejection, Unsupported outcome, and finalization;
-- two-photo Proof selection, normalization, reservation, interruption, retry, duplicate upload, unfinalized object cleanup, screening result, quarantine, live audience loss, terminal deletion, and restore reconciliation;
+- two-photo Proof selection, plain-language media-sharing consent, withdrawal, blocked future submission, re-consent without restoration, normalization, reservation, interruption, retry, duplicate upload, unfinalized object cleanup, screening result, same-object moderation quarantine, clearance without deadline extension, active-review visibility, exact 90-day Verified Wall retention, every early deletion trigger, live audience loss, and restore reconciliation;
 - Exception, Questioned-report, and Consequence decisions across thresholds, recusal, departure, timeout, stale ballot, Safety block, moderation interruption, and all terminal outcomes;
 - Weekly target, Target streak, Workout streak, Missed-target event, Card unlock, offer, redraw, backlog, safe-decline, claim, review, and expiry boundaries;
 - Top Steps, Load Progression, Cardio Leap, Performance baseline, missing/partial/late activity, tie, first-result ineligibility, Season pause, rollover, and provisional/final standings;
 - notification creation, priority, bundling, separate daily caps, cancellation, rescheduling, denied permission, provider delay, duplicate delivery, stale deep link, and in-app authority;
 - consent, conduct acceptance, Content report, Safety block, Moderation case, Technical pause, Service pause, underage suspension, support, export, global sign-out, and Account deletion;
+- Wall newest-first week grouping, All/Verified/Strength/Cardio/Class/Sport filters, authorized counts, opaque pagination cursors, progressive loading, late join, return, bidirectional Safety-block suppression, removed/expired/moderation-unavailable states, and beginning of authorized history;
 - operator assignment, MFA, purpose gate, named command, forbidden accountability action, expiry, handoff, failed action, repair witness, and audit lookup; and
 - country hold, distribution failure, dependency outage, queue delay, secret rotation, schema migration, rollback or forward repair, backup, restore, vendor exit, and rehearsal reset.
 
@@ -156,8 +157,9 @@ Required before pilot activation review:
 - environment isolation, least privilege, staff MFA, secret rotation, deployment, rollback/forward fix, migration compatibility, quota, and spend controls pass;
 - five-minute core and supervisory checks work and human alert receipt occurs within 15 minutes;
 - every rare operator workflow, failure recovery, staff handoff, Service pause, Technical pause, moderation, deletion, export, research withdrawal, and authoritative repair witness is rehearsed;
-- clock-controlled retention proves all terminal Proof paths, processor deletion, audit pseudonymization, diagnostic expiry, retries, escalation, and backup expiry;
+- clock-controlled retention proves eligible Verified pairs, descriptions, caches, and derivatives expire exactly 90 days after verification; every earlier withdrawal, Unsupported/Rejected outcome, moderation removal, author departure/removal, Account deletion, service termination, Group closure, consent withdrawal, and author-removal trigger revokes access synchronously and deletes active-system and processor copies within seven days; backup expiry, retries, and escalation also pass;
 - isolated point-in-time restore measures structured-data RPO of at most 15 minutes and core RTO of at most four hours, reconciles all invariants, and proves deleted Proof and deleted identity do not reappear;
+- Wall authorization tests prove current-member-only and cross-Group denial, active-review evidence versus blocked historical suppression, and that authorized counts, filters, dates, week boundaries, no-result states, and cursors disclose no inaccessible item;
 - vendor-exit rehearsal proves an encrypted, short-lived, secret-free export plus import and reconciliation using synthetic data;
 - push, email OTP, activity sync, safety screening, monitoring, and provider-outage fallbacks pass without inventing outcomes;
 - all end-to-end pilot measures reconcile exactly to authoritative PostgreSQL facts and meet the separate usable-event completeness rule; and
@@ -199,11 +201,13 @@ Maintain a threat model covering Group isolation, membership-era visibility, ope
 
 Perform automated dependency and secret checks, static review, negative authorization tests, abuse-case review, mobile build inspection, transport and storage verification, signed-capability tests, log/telemetry inspection, and adversarial API testing. Developer owns remediation; Codex performs a separate adversarial review. Paid external audit is not mandatory for the private pilot. If the threat model exposes an unresolved High-risk area requiring expertise unavailable to the developer and Codex, qualified independent review becomes a pilot-activation blocker and requires separate spend approval if paid.
 
+Analytics and diagnostics may contain only privacy-minimized media lifecycle transitions needed for operations and Validation-pilot measures. Inspection must prove they contain no image content, descriptions, signed URLs, raw object keys, or stable identifiers, counts, filter values, or cursor data capable of reconstructing media or hidden Wall history.
+
 ### Retention and deletion
 
 Use a controllable authoritative clock plus object and processor inventories. Prove every lifecycle trigger: draft deletion, cutoff, membership end, terminal report state, expiry, quarantine, withdrawal, rejection, Unsupported outcome, Account deletion, processor deletion, audit pseudonymization, diagnostic expiry, backup expiry, failed deletion, retry, escalation, and restore.
 
-Evidence must show immediate loss of access, active-system and processor deletion within seven days, direct-identity pseudonymization within seven days for restricted audit evidence, backup expiry within 30 days, restricted-audit expiry within 90 days, object absence after provider/CDN windows, raw-digest removal, and no reappearance after restore. An API success response without inventory reconciliation is insufficient.
+Evidence must show that ordinarily retained Verified Proof remains accessible only to authorized current Group members until its exact 90-day verification deadline, then becomes inaccessible and deletes. Every earlier lifecycle trigger must show synchronous loss of access, active-system and processor deletion within seven days, and backup expiry within 30 days. Evidence must also show direct-identity pseudonymization within seven days for restricted audit records, restricted-audit expiry within 90 days, parent and derivative absence after provider/CDN windows, raw-digest removal, tombstone replay, and no reappearance after restore. An API success response without inventory reconciliation is insufficient.
 
 ### Recovery and authoritative repair
 
@@ -229,7 +233,7 @@ First run production-shaped hosted technical rehearsals using synthetic scenario
 
 After Gate 5, run the product-required guided non-scoring rehearsal week with real recruited participant Accounts in the live pilot environment. It confirms onboarding, ordinary core journeys, support, accessibility, notifications, and participant understanding; it does not manufacture rare events or count toward Validation-pilot measures. Reset it through the controlled Gate 6 procedure before scored weeks.
 
-Across the two rehearsals, include representative multi-member Groups, setup and activation, midweek join, Workout reporting and two-photo Proof, report review and dispute, Exception, missed target, Consequence cycle, Safety block, Content report, Season/Crown outcomes, activity-source gaps, accessibility modes, support, pause, departure, export, deletion, incident, repair witness, alert handoff, backup/restore, and reset. Rare, destructive, safety, moderation, recovery, and failure-injection scenarios stay in synthetic hosted rehearsal; they are never induced among recruited participants. Natural participant behavior is not required to manufacture rare live-pilot evidence; separate consented rehearsal scenarios remain distinct from live Validation-pilot results.
+Across the two rehearsals, include representative multi-member Groups, setup and activation, midweek join and return, Workout reporting and two-photo Proof, report review and dispute, consented Wall retention and accessible chronological comparison, Exception, missed target, Consequence cycle, Safety block, Content report, Season/Crown outcomes, activity-source gaps, accessibility modes, support, pause, departure, export, deletion, incident, repair witness, alert handoff, backup/restore, and reset. Synthetic fixtures prove the exact 90-day ceiling, every early deletion trigger, processor/cache/derivative cleanup, authorized Wall counts/filters/cursors, and restore non-reappearance. Rare, destructive, safety, moderation, recovery, and failure-injection scenarios stay in synthetic hosted rehearsal; they are never induced among recruited participants. Natural participant behavior is not required to manufacture rare live-pilot evidence; separate consented rehearsal scenarios remain distinct from live Validation-pilot results.
 
 ## Evidence freshness and invalidation
 

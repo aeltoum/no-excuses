@@ -1,0 +1,41 @@
+requirement_id,status,milestone,evidence,notes
+GOV-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated identity consent and admission evidence; device and operator rehearsal pending
+GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated invitation capacity activation and authorization evidence; device evidence pending
+GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md,Automated membership cutoff return and departure evidence; later-flow cleanup pending
+GOV-04,planned,8,,Account lifecycle evidence
+TIME-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated Group-zone DST activation and boundary evidence; device evidence pending
+TIME-02,in-progress,2,evidence/m2-identity-group-calendar.md,Schema and cutoff foundation; finalization arrives in milestone 4
+TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated activation-week target lock evidence; client target flow pending
+TARGET-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated partial-week target and departure evidence; streak transitions pending
+EXC-01,planned,4,,Exception evidence
+WORK-01,planned,3,,Workout session evidence
+WORK-02,planned,3,,Workout report evidence
+WORK-03,planned,3,,Draft and offline evidence
+VERIFY-01,planned,4,,Review decision evidence
+VERIFY-02,planned,4,,Finalization evidence
+MISS-01,planned,4,,Missed-target evidence
+CARD-01,planned,5,,Card catalog and unlock evidence
+CARD-02,planned,5,,Card offer and backlog evidence
+CARD-03,planned,5,,Consequence completion evidence
+SAFE-01,planned,8,,Safety and moderation evidence
+MEDIA-01,planned,3,,Proof capture and visibility evidence
+MEDIA-02,planned,3,,Proof retention and deletion evidence
+COMP-01,planned,6,,Activity source and eligibility evidence
+COMP-02,planned,6,,Crown calculation evidence
+COMP-03,planned,6,,Crown finalization evidence
+SEASON-01,in-progress,6,evidence/m2-identity-group-calendar.md,First shortened four-active-week Season boundary evidence; rollover and standings arrive in milestone 6
+SEASON-02,planned,6,,Season summary evidence
+SOCIAL-01,planned,7,,Social interaction evidence
+NOTIFY-01,planned,7,,Action notification evidence
+NOTIFY-02,planned,7,,Social delivery evidence
+ACCESS-01,in-progress,9,evidence/m1-shared-kernel.md,Navigation and semantic shell evidence only
+ACCESS-02,planned,9,,Responsive and input evidence
+ACCESS-03,planned,9,,Permission and degraded-path evidence
+ACCESS-04,planned,9,,Privacy presentation evidence
+OPS-01,in-progress,8,evidence/m1-shared-kernel.md,Operator shell separation evidence only
+PILOT-01,planned,10,,Environment and operational evidence
+PILOT-02,planned,10,,Recovery and deletion evidence
+PILOT-03,planned,11,,Participant rehearsal evidence
+PILOT-04,planned,12,,Reset and activation evidence
+PILOT-05,planned,10,,Validation-measure reconciliation evidence
+DIST-01,planned,11,,Distribution and country evidence

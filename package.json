@@ -1,0 +1,39 @@
+{
+  "name": "no-excuses",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": "24.19.0"
+  },
+  "scripts": {
+    "audit:dependencies": "pnpm audit --audit-level high",
+    "build": "pnpm contracts:generate && tsc --noEmit",
+    "check": "pnpm format:check && pnpm contracts:check && pnpm typecheck && pnpm test && pnpm check:secrets && pnpm check:dependencies",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "contracts:check": "node scripts/check-generated-contracts.mjs",
+    "contracts:generate": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts",
+    "db:reset": "supabase db reset --local",
+    "db:test:postgres": "bash scripts/test-real-postgres.sh",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "format": "biome check --write .",
+    "format:check": "biome check .",
+    "mobile:android": "pnpm --filter @no-excuses/mobile android",
+    "mobile:ios": "pnpm --filter @no-excuses/mobile ios",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "@electric-sql/pglite": "0.5.8",
+    "@types/node": "24.10.1",
+    "image-size-next": "2.1.1",
+    "openapi-typescript": "7.13.0",
+    "supabase": "2.117.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.0"
+  }
+}
