@@ -89,12 +89,15 @@ git push -u origin <branch-name>
 
 ## Current phase
 
-Milestone 1 shared kernel and delivery skeleton. Product behavior remains governed by
-`CONTEXT.md` and the implementation contracts; these primitives and shells add no domain
-business rules.
+True-MVP rescope after the identity, Group, and accountability-calendar foundation. The
+active product boundary is [`docs/product/true-mvp-scope.md`](docs/product/true-mvp-scope.md).
+Previously accepted features remain documented as deferred target-product behavior; they
+have not been rejected or erased.
 
 ## Product and design context
 
+- [`docs/product/true-mvp-scope.md`](docs/product/true-mvp-scope.md) selects what ships now,
+  what is deferred, and where every deferred decision remains recorded.
 - [`CONTEXT.md`](CONTEXT.md) defines the product's canonical language.
 - [`docs/implementation/screen-state-accessibility-contracts.md`](docs/implementation/screen-state-accessibility-contracts.md) defines app navigation, states, and accessible interaction.
 - [`docs/design/no-excuses-visual-system.md`](docs/design/no-excuses-visual-system.md) defines the approved charcoal and Safety-yellow visual language for the website and member app.
