@@ -1,12 +1,12 @@
 requirement_id,status,milestone,evidence,notes
-GOV-01,planned,2,,Authoritative identity and membership evidence
-GOV-02,planned,2,,Invitation and capacity evidence
-GOV-03,planned,2,,Administration and departure evidence
+GOV-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated identity consent and admission evidence; device and operator rehearsal pending
+GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated invitation capacity activation and authorization evidence; device evidence pending
+GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md,Automated membership cutoff return and departure evidence; later-flow cleanup pending
 GOV-04,planned,8,,Account lifecycle evidence
-TIME-01,planned,2,,Accountability calendar evidence
-TIME-02,planned,2,,Pause and cutoff evidence
-TARGET-01,planned,2,,Target-setting evidence
-TARGET-02,planned,2,,Activation-week target evidence
+TIME-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated Group-zone DST activation and boundary evidence; device evidence pending
+TIME-02,in-progress,2,evidence/m2-identity-group-calendar.md,Schema and cutoff foundation; finalization arrives in milestone 4
+TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated activation-week target lock evidence; client target flow pending
+TARGET-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated partial-week target and departure evidence; streak transitions pending
 EXC-01,planned,4,,Exception evidence
 WORK-01,planned,3,,Workout session evidence
 WORK-02,planned,3,,Workout report evidence
@@ -23,7 +23,7 @@ MEDIA-02,planned,3,,Proof retention and deletion evidence
 COMP-01,planned,6,,Activity source and eligibility evidence
 COMP-02,planned,6,,Crown calculation evidence
 COMP-03,planned,6,,Crown finalization evidence
-SEASON-01,planned,6,,Season standings evidence
+SEASON-01,in-progress,6,evidence/m2-identity-group-calendar.md,First shortened four-active-week Season boundary evidence; rollover and standings arrive in milestone 6
 SEASON-02,planned,6,,Season summary evidence
 SOCIAL-01,planned,7,,Social interaction evidence
 NOTIFY-01,planned,7,,Action notification evidence

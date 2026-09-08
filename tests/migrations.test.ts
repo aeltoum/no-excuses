@@ -22,7 +22,11 @@ describe("migrations", () => {
     const result = await db.query<{ version: number }>(
       "select version from app_private.schema_versions order by version",
     );
-    expect(result.rows).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(result.rows).toEqual([
+      { version: 1 },
+      { version: 2 },
+      { version: 3 },
+    ]);
     await db.close();
   });
 
