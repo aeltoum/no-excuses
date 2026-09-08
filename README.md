@@ -92,3 +92,9 @@ git push -u origin <branch-name>
 Milestone 1 shared kernel and delivery skeleton. Product behavior remains governed by
 `CONTEXT.md` and the implementation contracts; these primitives and shells add no domain
 business rules.
+
+## Product and design context
+
+- [`CONTEXT.md`](CONTEXT.md) defines the product's canonical language.
+- [`docs/implementation/screen-state-accessibility-contracts.md`](docs/implementation/screen-state-accessibility-contracts.md) defines app navigation, states, and accessible interaction.
+- [`docs/design/no-excuses-visual-system.md`](docs/design/no-excuses-visual-system.md) defines the approved charcoal and Safety-yellow visual language for the website and member app.

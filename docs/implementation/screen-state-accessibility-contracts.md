@@ -1,6 +1,6 @@
 # Screen, state, and accessibility contracts
 
-This document is the implementation contract resolved by [Define screen, state, and accessibility contracts](https://github.com/aeltoum/no-excuses/issues/48). It translates the product glossary, accepted architecture decisions, and implementation requirements into a complete low-fidelity surface model for the iOS and Android private pilot. It does not specify final visual design, production components, or copy.
+This document is the implementation contract resolved by [Define screen, state, and accessibility contracts](https://github.com/aeltoum/no-excuses/issues/48). It translates the product glossary, accepted architecture decisions, and implementation requirements into a complete low-fidelity surface model for the iOS and Android private pilot. It does not specify final visual design, production components, or copy. The complementary [No Excuses visual system](../design/no-excuses-visual-system.md) governs presentation without overriding these interaction, state, and accessibility requirements.
 
 ## Decision summary
 
