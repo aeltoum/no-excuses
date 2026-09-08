@@ -16,6 +16,7 @@
     "contracts:check": "node scripts/check-generated-contracts.mjs",
     "contracts:generate": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts",
     "db:reset": "supabase db reset --local",
+    "db:test:postgres": "bash scripts/test-real-postgres.sh",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "format": "biome check --write .",
