@@ -28,11 +28,11 @@ SEASON-02,planned,6,,Season summary evidence
 SOCIAL-01,planned,7,,Social interaction evidence
 NOTIFY-01,planned,7,,Action notification evidence
 NOTIFY-02,planned,7,,Social delivery evidence
-ACCESS-01,planned,9,,Navigation and semantic evidence
+ACCESS-01,in-progress,9,evidence/m1-shared-kernel.md,Navigation and semantic shell evidence only
 ACCESS-02,planned,9,,Responsive and input evidence
 ACCESS-03,planned,9,,Permission and degraded-path evidence
 ACCESS-04,planned,9,,Privacy presentation evidence
-OPS-01,planned,8,,Operator authority and audit evidence
+OPS-01,in-progress,8,evidence/m1-shared-kernel.md,Operator shell separation evidence only
 PILOT-01,planned,10,,Environment and operational evidence
 PILOT-02,planned,10,,Recovery and deletion evidence
 PILOT-03,planned,11,,Participant rehearsal evidence

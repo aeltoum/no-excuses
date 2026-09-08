@@ -13,6 +13,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /v1/health:
+    get:
+      operationId: getV1Health
+      responses:
+        "200":
+          description: Versioned local service health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
 components:
   schemas:
     HealthResponse:

@@ -31,12 +31,18 @@ privileged keys in client-readable variables.
 
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and
-`pnpm db:reset` are the integration path for the complete local Supabase stack.
+`pnpm db:reset` are the integration path for the complete local Supabase stack. To run the
+M1 atomicity and idempotency smoke against real PostgreSQL, point `DATABASE_URL` at an empty,
+disposable database with `psql` available and run `pnpm db:test:postgres`. The command creates
+the local test roles and applies every migration, so never point it at a database containing
+data.
 
 ## Repository layout
 
 - `apps/mobile`: Expo Router development-build shell
 - `packages/contracts`: versioned OpenAPI source, generated TypeScript, and runtime schemas
+- `packages/shared-kernel`: domain-neutral identity, time, request, result, event, and transaction primitives
+- `packages/delivery`: thin API, queue/Cron worker, and environment-config boundaries
 - `supabase`: local stack configuration and forward-only migrations
 - `fixtures`: synthetic-only persona and scenario vocabulary
 - `tests`: contract, fixture, and migration evidence
@@ -83,5 +89,6 @@ git push -u origin <branch-name>
 
 ## Current phase
 
-Milestone 0 execution baseline. Product behavior remains governed by `CONTEXT.md` and the
-implementation contracts; this scaffold adds no product behavior.
+Milestone 1 shared kernel and delivery skeleton. Product behavior remains governed by
+`CONTEXT.md` and the implementation contracts; these primitives and shells add no domain
+business rules.
