@@ -12,6 +12,8 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 const uuidSchema = z.uuid();
 const utcInstantSchema = z.iso.datetime({ offset: false });
 const positiveIntegerSchema = z.number().int().positive();
+const boundedTextSchema = (maximum: number) =>
+  z.string().trim().min(1).max(maximum);
 
 export const workoutActivityTypeSchema = z.enum([
   "strength",
@@ -43,6 +45,69 @@ export const submitWorkoutCheckinRequestSchema = z
   .strict();
 
 export const groupRequestSchema = z.object({ groupId: uuidSchema }).strict();
+
+export const createGroupRequestSchema = z
+  .object({
+    groupId: uuidSchema,
+    membershipId: uuidSchema,
+    name: boundedTextSchema(80),
+    timeZone: boundedTextSchema(64),
+    weeklyTarget: positiveIntegerSchema,
+  })
+  .strict();
+
+export const issueGroupInvitationRequestSchema = z
+  .object({ invitationId: uuidSchema, email: z.email().max(254) })
+  .strict();
+
+export const revokeGroupInvitationRequestSchema = z
+  .object({ invitationId: uuidSchema })
+  .strict();
+
+export const acceptGroupInvitationRequestSchema = z
+  .object({
+    token: boundedTextSchema(256),
+    membershipId: uuidSchema,
+    recurringTarget: positiveIntegerSchema,
+    currentTarget: positiveIntegerSchema,
+  })
+  .strict()
+  .refine((value) => value.currentTarget <= value.recurringTarget);
+
+export const leaveGroupRequestSchema = z.object({}).strict();
+
+export const removeGroupMemberRequestSchema = z
+  .object({ groupId: uuidSchema, membershipId: uuidSchema })
+  .strict();
+
+export const groupMembershipResultSchema = z
+  .object({ membershipId: uuidSchema })
+  .strict();
+
+export const groupInvitationResultSchema = z
+  .object({
+    invitationId: uuidSchema,
+    token: boundedTextSchema(256),
+    expiresAt: utcInstantSchema,
+  })
+  .strict();
+
+export const revokedGroupInvitationResultSchema = z
+  .object({ invitationId: uuidSchema, status: z.literal("revoked") })
+  .strict();
+
+const commandResponse = <Schema extends z.ZodType>(schema: Schema) =>
+  z.object({ contractVersion: z.literal(1), data: schema }).strict();
+
+export const groupMembershipResponseSchema = commandResponse(
+  groupMembershipResultSchema,
+);
+export const groupInvitationResponseSchema = commandResponse(
+  groupInvitationResultSchema,
+);
+export const revokedGroupInvitationResponseSchema = commandResponse(
+  revokedGroupInvitationResultSchema,
+);
 
 export const workoutCheckinResultSchema = z
   .object({
@@ -104,6 +169,25 @@ export type SubmitWorkoutCheckinRequest = z.infer<
   typeof submitWorkoutCheckinRequestSchema
 >;
 export type GroupRequest = z.infer<typeof groupRequestSchema>;
+export type CreateGroupRequest = z.infer<typeof createGroupRequestSchema>;
+export type IssueGroupInvitationRequest = z.infer<
+  typeof issueGroupInvitationRequestSchema
+>;
+export type RevokeGroupInvitationRequest = z.infer<
+  typeof revokeGroupInvitationRequestSchema
+>;
+export type AcceptGroupInvitationRequest = z.infer<
+  typeof acceptGroupInvitationRequestSchema
+>;
+export type LeaveGroupRequest = z.infer<typeof leaveGroupRequestSchema>;
+export type RemoveGroupMemberRequest = z.infer<
+  typeof removeGroupMemberRequestSchema
+>;
+export type GroupMembershipResult = z.infer<typeof groupMembershipResultSchema>;
+export type GroupInvitationResult = z.infer<typeof groupInvitationResultSchema>;
+export type RevokedGroupInvitationResult = z.infer<
+  typeof revokedGroupInvitationResultSchema
+>;
 export type WorkoutCheckinResult = z.infer<typeof workoutCheckinResultSchema>;
 export type CurrentWeekProgressItem = z.infer<
   typeof currentWeekProgressItemSchema

@@ -128,9 +128,11 @@ describe("True-MVP weekly settlement", () => {
 
   it("keeps departed member unfinished weeks ended without result", async () => {
     const db = await database();
+    await auth(db, "30000000-0000-4000-8000-000000000002");
     await db.exec("set role service_role");
-    await db.query(`select app_private.end_membership(
-      '40000000-0000-4000-8000-000000000002', 'left', '2026-03-08Z')`);
+    await db.query(`select app_private.leave_group_command(
+      '80000000-0000-4000-8000-000000000001', '${"a".repeat(64)}',
+      '80000000-0000-4000-8000-000000000002', '2026-03-08Z')`);
     expect(
       (
         await db.query(

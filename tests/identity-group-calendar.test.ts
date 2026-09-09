@@ -108,13 +108,24 @@ describe("M2 identity, Group authority, and accountability calendar", () => {
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'app_private' and c.relname = 'memberships'`);
     expect(enabled.rows).toEqual([{ relrowsecurity: true }]);
-    const serviceGrant = await db.query<{ allowed: boolean }>(`
-      select has_function_privilege(
+    const serviceGrant = await db.query<{
+      command_allowed: boolean;
+      primitive_allowed: boolean;
+    }>(`
+      select
+      has_function_privilege(
+        'service_role',
+        'app_private.accept_group_invitation_command(uuid,text,uuid,text,uuid,integer,integer,timestamptz)',
+        'execute'
+      ) as command_allowed,
+      has_function_privilege(
         'service_role',
         'app_private.accept_group_invitation(text,uuid,integer,integer,timestamptz)',
         'execute'
-      ) as allowed`);
-    expect(serviceGrant.rows).toEqual([{ allowed: true }]);
+      ) as primitive_allowed`);
+    expect(serviceGrant.rows).toEqual([
+      { command_allowed: true, primitive_allowed: false },
+    ]);
     await db.exec("set role authenticated");
     await expect(
       db.query("select * from app_private.memberships"),

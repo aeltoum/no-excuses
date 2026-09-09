@@ -1,7 +1,7 @@
 requirement_id,status,milestone,evidence,notes
-GOV-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated identity consent and admission evidence; device and operator rehearsal pending
-GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated invitation capacity activation and authorization evidence; device evidence pending
-GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md,Automated membership cutoff return and departure evidence; later-flow cleanup pending
+GOV-01,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated identity consent admission and authenticated Group-create contract evidence; device and operator rehearsal pending
+GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated invitation issue revoke capacity activation authorization and API contract evidence; device evidence pending
+GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated caller-safe leave admin removal cutoff return departure and API contract evidence; later-flow cleanup pending
 GOV-04,planned,8,,Account lifecycle evidence
 TIME-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated Group-zone DST activation and boundary evidence; device evidence pending
 TIME-02,in-progress,4,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-weekly-settlement.md,Schema cutoff foundation plus automated ended-week settlement evidence; broader target-product deadline flows deferred
