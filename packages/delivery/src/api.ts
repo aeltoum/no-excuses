@@ -1,11 +1,13 @@
 import {
   acceptGroupInvitationRequestSchema,
   createGroupRequestSchema,
+  groupRequestSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
   removeGroupMemberRequestSchema,
   revokeGroupInvitationRequestSchema,
   setWeeklyTargetRequestSchema,
+  submitWorkoutCheckinRequestSchema,
 } from "../../contracts/src/runtime.js";
 import type {
   ActorEnvelope,
@@ -152,6 +154,11 @@ type CommandDependencies<Input, Output, Code extends string> = Omit<
   "validate"
 >;
 
+type ReadDependencies<Input, Output, Code extends string> = Omit<
+  ReadApiDependencies<Input, Output, Code>,
+  "validate"
+>;
+
 interface RuntimeSchema<Input> {
   safeParse(
     value: unknown,
@@ -188,6 +195,27 @@ function groupCommandHandler<Input, Output, Code extends string>(
       validate: validateWith(schema),
     });
 }
+
+function groupReadHandler<Input, Output, Code extends string>(
+  schema: RuntimeSchema<Input>,
+) {
+  return (
+    request: ApiRequest,
+    dependencies: ReadDependencies<Input, Output, Code>,
+  ) =>
+    handleV1ReadRequest(request, {
+      ...dependencies,
+      validate: validateWith(schema),
+    });
+}
+
+export const handleSubmitWorkoutCheckin = groupCommandHandler(
+  "submit_workout_checkin",
+  submitWorkoutCheckinRequestSchema,
+);
+export const handleCurrentWeekProgress = groupReadHandler(groupRequestSchema);
+export const handleFinalizedWeeklyHistory =
+  groupReadHandler(groupRequestSchema);
 
 export const handleCreateGroup = groupCommandHandler(
   "create_group",
