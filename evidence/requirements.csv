@@ -4,7 +4,7 @@ GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated invitation
 GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md,Automated membership cutoff return and departure evidence; later-flow cleanup pending
 GOV-04,planned,8,,Account lifecycle evidence
 TIME-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated Group-zone DST activation and boundary evidence; device evidence pending
-TIME-02,in-progress,2,evidence/m2-identity-group-calendar.md,Schema and cutoff foundation; finalization arrives in milestone 4
+TIME-02,in-progress,4,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-weekly-settlement.md,Schema cutoff foundation plus automated ended-week settlement evidence; broader target-product deadline flows deferred
 TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated activation-week target lock evidence; client target flow pending
 TARGET-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated partial-week target and departure evidence; streak transitions pending
 EXC-01,planned,4,,Exception evidence
@@ -12,8 +12,8 @@ WORK-01,in-progress,3,evidence/m3-workout-session.md; evidence/m3-true-mvp-worko
 WORK-02,in-progress,3,evidence/m3-true-mvp-workout-checkins.md,Immediate idempotent self-reported completion count and Group-current progress evidence
 WORK-03,planned,3,,Draft and offline evidence
 VERIFY-01,planned,4,,Review decision evidence
-VERIFY-02,planned,4,,Finalization evidence
-MISS-01,planned,4,,Missed-target evidence
+VERIFY-02,in-progress,4,evidence/m4-true-mvp-weekly-settlement.md,True-MVP self-report settlement and exactly-once terminal outcome evidence; peer-review behavior deferred
+MISS-01,in-progress,4,evidence/m4-true-mvp-weekly-settlement.md,Automatic True-MVP missed-target settlement and Group-visible finalized history evidence; consequences deferred
 CARD-01,planned,5,,Card catalog and unlock evidence
 CARD-02,planned,5,,Card offer and backlog evidence
 CARD-03,planned,5,,Consequence completion evidence
