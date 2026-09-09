@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/group-memberships/weekly-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setWeeklyTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/members/{membershipId}/remove": {
         parameters: {
             query?: never;
@@ -237,6 +253,19 @@ export interface components {
             membershipId: string;
             recurringTarget: number;
             currentTarget: number;
+        };
+        SetWeeklyTargetRequest: {
+            weeklyTarget: number;
+        };
+        WeeklyTargetResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["WeeklyTargetResult"];
+        };
+        WeeklyTargetResult: {
+            /** Format: uuid */
+            membershipId: string;
+            weeklyTarget: number;
         };
         GroupMembershipResponse: {
             /** @constant */
@@ -542,6 +571,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupMembershipResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    setWeeklyTarget: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetWeeklyTargetRequest"];
+            };
+        };
+        responses: {
+            /** @description Weekly target scheduled or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyTargetResponse"];
                 };
             };
             400: components["responses"]["ApiError"];

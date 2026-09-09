@@ -23,7 +23,7 @@
     "format:check": "biome check .",
     "mobile:android": "pnpm --filter @no-excuses/mobile android",
     "mobile:ios": "pnpm --filter @no-excuses/mobile ios",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=1",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

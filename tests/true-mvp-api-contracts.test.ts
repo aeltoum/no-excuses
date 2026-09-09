@@ -14,8 +14,10 @@ import {
   removeGroupMemberRequestSchema,
   revokedGroupInvitationResponseSchema,
   revokeGroupInvitationRequestSchema,
+  setWeeklyTargetRequestSchema,
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
+  weeklyTargetResponseSchema,
 } from "../packages/contracts/src/runtime.js";
 import {
   handleV1ReadRequest,
@@ -116,6 +118,7 @@ describe("True-MVP API runtime contracts", () => {
       "/v1/group-invitations/{invitationId}/revoke:",
       "/v1/group-invitations/accept:",
       "/v1/group-memberships/leave:",
+      "/v1/group-memberships/weekly-target:",
       "/v1/groups/{groupId}/members/{membershipId}/remove:",
     ]) {
       const start = source.indexOf(`  ${path}`);
@@ -159,6 +162,18 @@ describe("True-MVP API runtime contracts", () => {
     expect(
       removeGroupMemberRequestSchema.parse({ groupId, membershipId }),
     ).toBeTruthy();
+    expect(setWeeklyTargetRequestSchema.parse({ weeklyTarget: 4 })).toEqual({
+      weeklyTarget: 4,
+    });
+    expect(
+      setWeeklyTargetRequestSchema.safeParse({ weeklyTarget: 0 }).success,
+    ).toBe(false);
+    expect(
+      setWeeklyTargetRequestSchema.safeParse({
+        weeklyTarget: 4,
+        membershipId,
+      }).success,
+    ).toBe(false);
     expect(
       acceptGroupInvitationRequestSchema.safeParse({
         token: "opaque-token",
@@ -190,6 +205,12 @@ describe("True-MVP API runtime contracts", () => {
       revokedGroupInvitationResponseSchema.parse({
         contractVersion: 1,
         data: { invitationId: checkinId, status: "revoked" },
+      }),
+    ).toBeTruthy();
+    expect(
+      weeklyTargetResponseSchema.parse({
+        contractVersion: 1,
+        data: { membershipId, weeklyTarget: 4 },
       }),
     ).toBeTruthy();
   });

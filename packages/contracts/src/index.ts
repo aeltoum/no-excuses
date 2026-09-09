@@ -13,7 +13,9 @@ export type {
   RemoveGroupMemberRequest,
   RevokedGroupInvitationResult,
   RevokeGroupInvitationRequest,
+  SetWeeklyTargetRequest,
   SubmitWorkoutCheckinRequest,
+  WeeklyTargetResult,
   WorkoutCheckinResult,
 } from "./runtime.js";
 export {
@@ -38,9 +40,12 @@ export {
   revokedGroupInvitationResponseSchema,
   revokedGroupInvitationResultSchema,
   revokeGroupInvitationRequestSchema,
+  setWeeklyTargetRequestSchema,
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyOutcomeSchema,
+  weeklyTargetResponseSchema,
+  weeklyTargetResultSchema,
   workoutActivityTypeSchema,
   workoutCheckinResultSchema,
 } from "./runtime.js";

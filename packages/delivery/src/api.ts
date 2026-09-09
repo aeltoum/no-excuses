@@ -5,6 +5,7 @@ import {
   leaveGroupRequestSchema,
   removeGroupMemberRequestSchema,
   revokeGroupInvitationRequestSchema,
+  setWeeklyTargetRequestSchema,
 } from "../../contracts/src/runtime.js";
 import type {
   ActorEnvelope,
@@ -211,4 +212,8 @@ export const handleLeaveGroup = groupCommandHandler(
 export const handleRemoveGroupMember = groupCommandHandler(
   "remove_group_member",
   removeGroupMemberRequestSchema,
+);
+export const handleSetWeeklyTarget = groupCommandHandler(
+  "set_weekly_target",
+  setWeeklyTargetRequestSchema,
 );
