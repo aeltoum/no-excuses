@@ -13,6 +13,13 @@ This repository is in project-setup phase. Product scope and technology stack re
 5. Keep secrets out of Git. Store local secrets in ignored files and commit sanitized examples only when needed.
 6. Verify relevant checks before handing off changes. If no checks exist, state that plainly.
 
+## Communication
+
+Apply the `caveman` skill at ultra intensity to every response in this repository. Keep all
+technical substance; remove filler, articles, and pleasantries. Remain in this mode until the
+user says `stop caveman` or `normal mode`. Use full clarity for security warnings,
+irreversible-action confirmations, or sequences where terse fragments risk misinterpretation.
+
 ## Git workflow
 
 - Work on a feature branch.
