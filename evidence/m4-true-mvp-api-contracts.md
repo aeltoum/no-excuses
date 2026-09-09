@@ -12,6 +12,9 @@ Gate 1 automated evidence:
   error responses, authentication, command-only idempotency, stable duplicate results,
   stateful same-key replay without another logical write, changed-payload conflict, neutral
   failure mapping, both authenticated reads without idempotency, and denied Group reads.
+- `tests/workout-loop-delivery.test.ts`: named reusable delivery entrypoints bind existing
+  authentication, strict schemas, command-scoped check-in idempotency, reads without
+  idempotency, execution, and bounded status envelopes; issue #119.
 - `tests/contracts.test.ts`: current and previous health endpoints and wire versions remain
   compatible.
 - `packages/contracts/openapi.yaml` and generated `packages/contracts/src/generated.ts`:
