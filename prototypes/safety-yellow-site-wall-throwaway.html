@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Throwaway No Excuses website and member Wall visual prototype.">
+  <title>No Excuses — Throwaway site and Wall prototype</title>
+  <style>
+    :root {
+      --ground: #0a0a0a;
+      --ink: #e8e8e8;
+      --muted: #9a9a9a;
+      --dim: #686868;
+      --line: #2b2b2b;
+      --panel: #111;
+      --yellow: #ffd400;
+      --on-yellow: #0a0a0a;
+      --display: "Anton", "Impact", "Arial Narrow", sans-serif;
+      --body: "Archivo", "Arial", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--ground); color-scheme: dark; scroll-behavior: smooth; }
+    body { margin: 0; overflow-x: hidden; background: var(--ground); color: var(--ink); font: 16px/1.5 var(--body); }
+    h1, h2, h3, .display { margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: .01em; line-height: .9; text-transform: uppercase; }
+    h1 { font-size: clamp(4.5rem, 13vw, 12.5rem); }
+    h2 { font-size: clamp(3.2rem, 7vw, 7rem); }
+    h3 { font-size: clamp(1.55rem, 3vw, 2.5rem); }
+    p { max-width: 52ch; }
+    a { color: inherit; text-decoration: none; }
+    button, .button { min-height: 48px; border: 1px solid var(--line); border-radius: 0; padding: 13px 20px; background: transparent; color: inherit; font: 700 .75rem/1 var(--body); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+    button:hover, .button:hover { border-color: var(--ink); }
+    :focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
+    .skip { position: fixed; z-index: 100; top: 8px; left: 8px; padding: 12px 16px; transform: translateY(-150%); background: var(--yellow); color: var(--on-yellow); font-weight: 700; }
+    .skip:focus { transform: none; }
+    .shell { width: min(100% - 80px, 1400px); margin-inline: auto; }
+    .prototype-flag { border-bottom: 1px solid var(--line); padding: 8px 0; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .15em; text-align: center; text-transform: uppercase; }
+    .site-nav { min-height: 72px; display: flex; align-items: center; gap: 32px; border-bottom: 1px solid var(--line); }
+    .brand { font-family: var(--display); font-size: 1.65rem; line-height: 1; text-transform: uppercase; }
+    .route-nav { display: flex; align-items: stretch; gap: 6px; margin-left: auto; }
+    .route-nav a { min-width: 90px; min-height: 48px; display: grid; place-items: center; border-bottom: 2px solid transparent; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .route-nav a[aria-current="page"] { border-color: var(--yellow); color: var(--ink); }
+    .invite { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+    main:focus { outline: 0; }
+    .hero { padding: 68px 0 50px; border-bottom: 1px solid var(--line); }
+    .headline-line { display: block; overflow: hidden; }
+    .headline-line > span { display: block; animation: rise .75s cubic-bezier(.2,.8,.2,1) both; }
+    .headline-line:nth-child(2) > span { animation-delay: .1s; color: transparent; -webkit-text-stroke: 1.5px var(--yellow); }
+    .hero-bottom, .wall-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: end; margin-top: 34px; }
+    .hero-bottom p, .wall-intro p { margin: 0; color: var(--muted); font-size: 1.12rem; }
+    .hero-bottom strong, .wall-intro strong { color: var(--ink); }
+    .hero-actions { display: flex; justify-content: flex-end; gap: 12px; }
+    .button { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; }
+    .button.primary { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+    .ticker { overflow: hidden; border-bottom: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+    .ticker-track { display: flex; width: max-content; padding: 10px 0; animation: ticker 28s linear infinite; font: 1.75rem/1 var(--display); text-transform: uppercase; }
+    .ticker span { padding: 0 28px; white-space: nowrap; }
+    .ticker .mark { color: var(--yellow); }
+    .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .section { padding: 80px 0; border-bottom: 1px solid var(--line); }
+    .steps { display: grid; grid-template-columns: .85fr 1.15fr; gap: 64px; }
+    .steps > h2 { position: sticky; top: 24px; align-self: start; }
+    .step-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+    .step-list li { display: grid; grid-template-columns: 56px minmax(150px, .7fr) 1fr; gap: 22px; align-items: baseline; padding: 24px 0; border-bottom: 1px solid var(--line); }
+    .step-number { color: var(--yellow); font: 2rem/1 var(--display); }
+    .step-list p { margin: 0; color: var(--muted); font-size: .9rem; }
+    .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .status { display: inline-flex; align-items: center; gap: 7px; font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .status::before { width: 12px; height: 12px; display: inline-grid; place-items: center; flex: 0 0 auto; border: 1px solid currentColor; content: ""; }
+    .status.verified { color: var(--yellow); }
+    .status.verified::before { background: var(--yellow); }
+    .status.pending::before { background: repeating-linear-gradient(45deg, var(--muted) 0 2px, transparent 2px 5px); }
+    .status.record::before { border-style: dashed; }
+    .proof-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; padding: 6px; }
+    .proof-card { min-width: 0; }
+    .photo { min-height: 180px; position: relative; overflow: hidden; background: #333; filter: grayscale(1); }
+    .activity-photo { min-height: 360px; background: linear-gradient(152deg, transparent 35%, #8b8b8b 36% 46%, transparent 47%), linear-gradient(25deg, #161616, #777); }
+    .activity-photo::before, .activity-photo::after { position: absolute; left: 8%; right: 8%; height: 14px; background: #151515; content: ""; transform: rotate(-8deg); }
+    .activity-photo::before { top: 34%; }
+    .activity-photo::after { top: 60%; transform: rotate(9deg); }
+    .presence-photo { background: radial-gradient(circle at 50% 20%, #aaa 0 12%, transparent 13%), linear-gradient(72deg, transparent 28%, #888 29% 65%, transparent 66%), linear-gradient(145deg, #171717, #595959); }
+    .photo-label { position: absolute; left: 10px; bottom: 10px; padding: 5px 7px; background: rgba(10,10,10,.88); color: white; font-size: .62rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .board { display: grid; grid-template-columns: 1fr 1.4fr; gap: 64px; align-items: center; }
+    .board-copy p { color: var(--muted); font-size: 1.05rem; }
+    .score-wrap { min-width: 0; overflow-x: auto; }
+    table { width: 100%; min-width: 620px; border: 1px solid var(--line); border-collapse: collapse; font-weight: 600; }
+    th, td { padding: 11px 8px; border-bottom: 1px solid var(--line); text-align: center; }
+    th { color: var(--muted); font-size: .68rem; letter-spacing: .13em; text-transform: uppercase; }
+    th:first-child, td:first-child { padding-left: 16px; text-align: left; }
+    td:last-child { padding-right: 16px; font: 1.35rem/1 var(--display); text-align: right; }
+    .score { width: 30px; height: 30px; display: inline-grid; place-items: center; border: 2px solid var(--line); font-style: normal; }
+    .score.ok { border-color: var(--yellow); background: var(--yellow); color: var(--on-yellow); }
+    .score.wait { border-color: var(--muted); background: repeating-linear-gradient(45deg,var(--muted) 0 3px,transparent 3px 7px); }
+    .score-key { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 14px; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .score-key span { display: flex; align-items: center; gap: 8px; }
+    .score-key .score { width: 16px; height: 16px; }
+    .site-wall-preview .preview-head { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; margin-bottom: 36px; }
+    .site-wall-preview .preview-head p { color: var(--muted); font-size: 1.05rem; }
+    .preview-tiles { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 6px; }
+    .preview-tile .preview-image { aspect-ratio: 1; position: relative; background: linear-gradient(145deg,#707070,#171717); filter: grayscale(1); }
+    .preview-tile:nth-child(3n) .preview-image { background: linear-gradient(30deg,#292929,#858585); }
+    .preview-tile .preview-image::after { content: ""; position: absolute; right: 6px; bottom: 6px; width: 13px; height: 13px; background: var(--yellow); }
+    .preview-tile span { display: block; overflow: hidden; margin-top: 5px; color: var(--muted); font-size: .55rem; font-weight: 700; letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .preview-tile.m .preview-image { border: 1px dashed var(--yellow); background: repeating-linear-gradient(45deg,rgba(255,212,0,.15) 0 3px,rgba(255,212,0,.035) 3px 8px); filter: none; }
+    .preview-tile.m .preview-image::after { content: none; }
+    .preview-tile.m span { color: var(--yellow); }
+    .rules-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 40px; border-top: 1px solid var(--line); }
+    .rule { min-height: 190px; padding: 28px 24px 28px 0; border-bottom: 1px solid var(--line); }
+    .rule p { color: var(--muted); }
+    .end-cap { padding: 100px 0; text-align: center; }
+    .end-cap .button { margin-top: 34px; }
+    footer { min-height: 72px; display: flex; justify-content: space-between; align-items: center; gap: 30px; color: var(--muted); font-size: .78rem; }
+
+    /* Wall */
+    .wall-header { padding: 64px 0 34px; }
+    .wall-intro { margin-top: 0; }
+    .wall-intro > * { min-width: 0; }
+    .wall-title .outline { display: block; color: transparent; -webkit-text-stroke: 1.5px var(--yellow); }
+    .boundary { margin-top: 30px; padding: 16px 18px; border-left: 5px solid var(--yellow); background: var(--panel); color: var(--muted); }
+    .boundary strong { color: var(--ink); }
+    .wall-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); }
+    .wall-stats div { padding: 20px 24px; border-right: 1px solid var(--line); }
+    .wall-stats div:first-child { padding-left: 0; }
+    .wall-stats div:last-child { border-right: 0; }
+    .wall-stats strong { display: block; font: 2.2rem/1 var(--display); }
+    .wall-stats span { color: var(--dim); font-size: .65rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    .filter-bar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 18px 0; border-bottom: 1px solid var(--line); background: rgba(10,10,10,.96); }
+    .filter-bar button[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+    .result-count { margin-left: auto; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .week { padding: 38px 0 0; }
+    .week-heading { display: flex; gap: 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .week-heading h2 { font-size: 2.25rem; }
+    .week-heading p { margin: 0; color: var(--dim); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .week-heading .week-result { margin-left: auto; color: var(--muted); }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill,minmax(132px,1fr)); gap: 7px; padding-top: 14px; }
+    .wall-card { min-width: 0; }
+    .wall-card summary { list-style: none; cursor: pointer; }
+    .wall-card summary::-webkit-details-marker { display: none; }
+    .tile-face { position: relative; aspect-ratio: 1; background: linear-gradient(145deg,#777,#171717); filter: grayscale(1); }
+    .wall-card:nth-child(3n) .tile-face { background: linear-gradient(32deg,#252525,#8b8b8b); }
+    .tile-face::after { content: ""; position: absolute; right: 7px; bottom: 7px; width: 13px; height: 13px; background: var(--yellow); }
+    .tile-caption { display: flex; justify-content: space-between; gap: 6px; padding-top: 6px; color: var(--muted); font-size: .58rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .wall-card[open] { grid-column: span 3; padding: 6px; border: 1px solid var(--yellow); background: var(--panel); }
+    .wall-card[open] .tile-face { display: none; }
+    .wall-card[open] .proof-pair { grid-template-columns: 2fr 1fr; }
+    .wall-card[open] .activity-photo, .wall-card[open] .presence-photo { min-height: 260px; }
+    .expanded-copy { padding: 12px 8px 8px; }
+    .expanded-copy p { margin: 8px 0 0; color: var(--muted); font-size: .75rem; }
+    .record-card { min-height: 180px; display: flex; flex-direction: column; justify-content: space-between; padding: 14px; border: 1px dashed #484848; background: transparent; }
+    .record-card h3 { margin: 8px 0; font-size: 1.8rem; }
+    .record-card p { color: var(--muted); font-size: .8rem; }
+    .record-fields { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: .72rem; }
+    .record-fields dt { color: var(--dim); }
+    .record-fields dd { margin: 0; text-align: right; }
+    .empty-results { grid-column: 1/-1; padding: 48px 20px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
+    .load-region { padding: 50px 0 82px; text-align: center; }
+    .load-region p { margin: 0 auto 16px; color: var(--muted); font-size: .82rem; }
+    .history-end { max-width: 620px; margin: 26px auto 0; padding-top: 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .history-end strong { display: block; margin-bottom: 8px; color: var(--ink); font: 2.1rem/1 var(--display); letter-spacing: .01em; }
+    .retention-note { max-width: 850px; margin: 38px auto 0; padding: 22px; border-block: 1px solid var(--line); color: var(--muted); text-align: left; }
+    .retention-note strong { color: var(--ink); }
+    .motion-ready .loop .step-list li { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; transition-delay: calc(var(--i,0) * 80ms); }
+    .motion-ready .loop.in .step-list li { opacity: 1; transform: none; }
+    .motion-ready .board .score.ok, .motion-ready .board .score.wait { opacity: 0; transform: scale(1.8); }
+    .motion-ready .board.in .score.ok, .motion-ready .board.in .score.wait { animation: stamp .35s cubic-bezier(.3,1.6,.5,1) both; animation-delay: calc(var(--i,0) * 70ms + .2s); }
+    .motion-ready .site-wall-preview .preview-tile, .motion-ready .wk .wall-card, .motion-ready .wk .record-card { opacity: 0; transform: translateY(10px) scale(.97); transition: opacity .45s ease, transform .45s ease; transition-delay: calc(var(--i,0) * 32ms); }
+    .motion-ready .site-wall-preview.in .preview-tile, .motion-ready .wk.in .wall-card, .motion-ready .wk.in .record-card { opacity: 1; transform: none; }
+    .motion-ready .board .board-copy, .motion-ready .site-wall-preview .preview-head > *, .motion-ready .rules > h2, .motion-ready .rules .rule { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+    .motion-ready .board.in .board-copy, .motion-ready .site-wall-preview.in .preview-head > *, .motion-ready .rules.in > h2, .motion-ready .rules.in .rule { opacity: 1; transform: none; }
+    .motion-ready .site-wall-preview .preview-head p { transition-delay: 80ms; }
+    .motion-ready .rules .rule { transition-delay: calc(var(--i,0) * 65ms + 100ms); }
+
+    @keyframes rise { from { transform: translateY(110%); } }
+    @keyframes ticker { to { transform: translateX(-50%); } }
+    @keyframes stamp { from { opacity: 0; transform: scale(1.8); } to { opacity: 1; transform: none; } }
+    @media (max-width: 1000px) {
+      .hero-bottom, .wall-intro, .steps, .board { grid-template-columns: 1fr; }
+      .hero-actions { justify-content: flex-start; }
+      .steps > h2 { position: static; }
+      .rules-grid { grid-template-columns: 1fr 1fr; }
+      .preview-tiles { grid-template-columns: repeat(6,minmax(0,1fr)); }
+    }
+    @media (max-width: 680px) {
+      .shell { width: min(100% - 32px, 1400px); }
+      .site-nav { min-height: 0; flex-wrap: wrap; gap: 6px 16px; padding: 16px 0; }
+      .route-nav { order: 3; width: 100%; margin: 4px 0 0; border-top: 1px solid var(--line); }
+      .route-nav a { flex: 1; }
+      .invite { margin-left: auto; }
+      .hero, .wall-header { padding-top: 46px; }
+      h1 { font-size: clamp(4rem, 21vw, 6.5rem); }
+      .hero-actions { display: grid; }
+      .button { width: 100%; }
+      .step-list li { grid-template-columns: 44px 1fr; }
+      .step-list p { grid-column: 2; }
+      .proof-pair { grid-template-columns: 1fr; }
+      .activity-photo, .presence-photo { min-height: 260px; }
+      .rules-grid, .wall-stats { grid-template-columns: 1fr; }
+      .wall-stats div, .wall-stats div:first-child { padding: 17px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .wall-stats div:last-child { border-bottom: 0; }
+      .wall-title { font-size: clamp(3.35rem, 17.5vw, 4.25rem); }
+      .filter-bar { flex-wrap: wrap; padding-bottom: 12px; }
+      .filter-bar button { flex: 1 1 calc(50% - 8px); }
+      .result-count { width: 100%; min-height: 36px; display: flex; align-items: center; margin-left: 0; }
+      .week-heading { flex-wrap: wrap; }
+      .week-heading .week-result { width: 100%; margin-left: 0; }
+      .gallery { grid-template-columns: repeat(auto-fill,minmax(104px,1fr)); }
+      .wall-card[open] { grid-column: 1/-1; }
+      .wall-card[open] .proof-pair { grid-template-columns: 1fr; }
+      .wall-card[open] .activity-photo, .wall-card[open] .presence-photo { min-height: 250px; }
+      .site-wall-preview .preview-head { grid-template-columns: 1fr; }
+      footer { align-items: flex-start; flex-direction: column; padding: 20px 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .headline-line > span { transform: none; }
+      .motion-ready .loop .step-list li, .motion-ready .board .score, .motion-ready .site-wall-preview .preview-tile, .motion-ready .wk .wall-card, .motion-ready .wk .record-card, .motion-ready .board .board-copy, .motion-ready .site-wall-preview .preview-head > *, .motion-ready .rules > h2, .motion-ready .rules .rule { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <!--
+    THROWAWAY PROTOTYPE: no production behavior, services, persistence, or real member data.
+    Run: python3 -m http.server 4173 --directory prototypes
+    Site: http://localhost:4173/safety-yellow-site-wall-throwaway.html?view=site
+    Wall: http://localhost:4173/safety-yellow-site-wall-throwaway.html?view=wall
+  -->
+  <a class="skip" href="#main">Skip to main content</a>
+  <div class="prototype-flag">Throwaway visual prototype · Synthetic content · No data is saved</div>
+  <div class="shell">
+    <header>
+      <nav class="site-nav" aria-label="Primary">
+        <a class="brand" href="?view=site" data-view="site">No Excuses</a>
+        <div class="route-nav">
+          <a href="?view=site" data-view="site">Website</a>
+          <a href="?view=wall" data-view="wall">The Wall</a>
+        </div>
+        <a class="button invite" href="#invite">Invite only</a>
+      </nav>
+    </header>
+  </div>
+  <main id="main" tabindex="-1"></main>
+  <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="site-view">
+    <div class="shell">
+      <section class="hero" aria-labelledby="site-title">
+        <h1 id="site-title"><span class="headline-line"><span>No excuses.</span></span><span class="headline-line"><span>Just proof.</span></span></h1>
+        <div class="hero-bottom">
+          <p>Set your own Weekly target. Train. Capture exactly one Activity photo and one Member-presence photo in the app. <strong>One friend verifies early, or the report auto-verifies after 24 hours if nobody questions it.</strong></p>
+          <div class="hero-actions"><a class="button primary" href="#invite">Start a Group</a><a class="button" href="#how-it-works">See how it works</a></div>
+        </div>
+      </section>
+    </div>
+    <p class="sr-only">Private invitation-only Groups. Your target, your number. One friend can verify. Group-zone weeks. Then go again.</p>
+    <div class="ticker" aria-hidden="true"><div class="ticker-track"><span>Private Groups</span><span class="mark">—</span><span>Your target, your number</span><span class="mark">—</span><span>One friend verifies</span><span class="mark">—</span><span>Group-zone weeks</span><span class="mark">—</span><span>Then go again</span><span class="mark">—</span><span>Private Groups</span><span class="mark">—</span><span>Your target, your number</span><span class="mark">—</span><span>One friend verifies</span><span class="mark">—</span><span>Group-zone weeks</span><span class="mark">—</span><span>Then go again</span><span class="mark">—</span></div></div>
+    <div class="shell">
+      <section class="section loop steps" id="how-it-works" aria-labelledby="steps-title">
+        <h2 id="steps-title">One week.<br>Seven moves.</h2>
+        <ol class="step-list">
+          <li><span class="step-number">01</span><h3>Set target</h3><p>Each member chooses an individual Weekly target. The Group recommends at least two; different goals can sit side by side.</p></li>
+          <li><span class="step-number">02</span><h3>Train</h3><p>Start a Workout session and do the work. The Group's configured start day and time zone define the week.</p></li>
+          <li><span class="step-number">03</span><h3>Capture two</h3><p>In-app capture only: exactly one Activity photo plus one Member-presence photo, each with a factual description.</p></li>
+          <li><span class="step-number">04</span><h3>Submit report</h3><p>Your private Group sees the locked report. Reactions and motivation are social responses; they never verify it.</p></li>
+          <li><span class="step-number">05</span><h3>Friend review</h3><p>One other member may verify early. Unquestioned reports auto-verify after 24 hours; questioned reports follow Group decision rules.</p></li>
+          <li><span class="step-number">06</span><h3>Week closes</h3><p>The week finalizes after its configured Group-zone boundary and settlement window.</p></li>
+          <li><span class="step-number">07</span><h3>Go again</h3><p>The Group rolls forward with new progress, the same friends, and each member's personal target.</p></li>
+        </ol>
+      </section>
+      <section class="section board" aria-labelledby="board-title">
+        <div class="board-copy"><h2 id="board-title">Your friends<br>are the referee.</h2><p>One other member can verify a submitted Workout report early. If nobody questions it, it auto-verifies after 24 hours. <strong>Reactions and motivation never verify.</strong></p></div>
+        <div class="score-wrap"><table><thead><tr><th>Momentum Club</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th><th>Target</th></tr></thead><tbody>
+          <tr><td>Maya</td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td>4/4</td></tr>
+          <tr><td>Ahmed</td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score wait" aria-label="Pending review"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score" aria-label="Still to do"></i></td><td>2/4</td></tr>
+          <tr><td>Priya</td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score" aria-label="Still to do"></i></td><td>3/3</td></tr>
+          <tr><td>Sena</td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score ok" aria-label="Verified"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score" aria-label="Still to do"></i></td><td><i class="score" aria-label="Still to do"></i></td><td>2/3</td></tr>
+        </tbody></table><div class="score-key"><span><i class="score ok" aria-hidden="true"></i>Verified</span><span><i class="score wait" aria-hidden="true"></i>Pending review</span><span><i class="score" aria-hidden="true"></i>Still to do</span></div></div>
+      </section>
+      <section class="section site-wall-preview" aria-labelledby="preview-title"><div class="preview-head"><h2 id="preview-title">The Wall<br>remembers.</h2><p>Eligible Verified Proof pairs stay visible to current members for <strong>exactly 90 days</strong>, newest first. After media expires, authorized structured outcomes can still show how a week landed.</p></div><div class="preview-tiles" aria-label="Recent verified Workout report previews">
+        <div class="preview-tile"><div class="preview-image"></div><span>W14 Maya · Strength · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W14 Ahmed · Cardio · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W14 Priya · Class · Verified</span></div><div class="preview-tile m"><div class="preview-image" role="img" aria-label="No Proof photo; Missed target outcome"></div><span>W14 Sena · Missed target</span></div><div class="preview-tile"><div class="preview-image"></div><span>W13 Maya · Strength · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W13 Ahmed · Cardio · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W13 Priya · Class · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W13 Sena · Sport · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W12 Maya · Strength · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W12 Ahmed · Cardio · Verified</span></div><div class="preview-tile"><div class="preview-image"></div><span>W12 Priya · Class · Verified</span></div><div class="preview-tile m"><div class="preview-image" role="img" aria-label="No Proof photo; Missed target outcome"></div><span>W12 Sena · Missed target</span></div>
+      </div></section>
+      <section class="section rules" aria-labelledby="rules-title"><h2 id="rules-title">The rules<br>stay human.</h2><div class="rules-grid">
+        <article class="rule"><h3>Private. Invite only.</h3><p>A Group is 2–10 friends. It is not a public feed, follower network, or discovery surface.</p></article>
+        <article class="rule"><h3>Your target.</h3><p>Every person sets a configurable individual goal. Target size is never a social worth score.</p></article>
+        <article class="rule"><h3>Group-zone time.</h3><p>Each Group configures one start day and time zone. The product does not assume Sunday.</p></article>
+        <article class="rule"><h3>Exactly two photos.</h3><p>One Activity photo and one Member-presence photo are selected from in-app session captures.</p></article>
+        <article class="rule"><h3>Verify, don't react.</h3><p>One other member verifies. Reactions and motivational messages remain separate actions.</p></article>
+        <article class="rule"><h3>History with limits.</h3><p>Eligible Verified Proof pairs stay on the Group Wall for 90 days. Authorized structured outcomes can remain after media expires.</p></article>
+      </div></section>
+      <section class="end-cap" id="invite" aria-labelledby="end-title"><h2 id="end-title">Same friends.<br>Next week.</h2><a class="button primary" href="?view=wall" data-view="wall">See the Wall</a></section>
+      <footer><span class="brand">No Excuses</span><span>Private Groups · Individual targets · Weekly accountability</span></footer>
+    </div>
+  </template>
+
+  <template id="wall-view">
+    <div class="shell">
+      <section class="wall-header" aria-labelledby="wall-title">
+        <div class="wall-intro"><h1 class="wall-title" id="wall-title">The Wall<span class="outline">remembers.</span></h1><p>Eligible Verified Proof pairs from Momentum Club, newest first. Photos stay on the Wall for <strong>exactly 90 days after verification</strong>; older authorized outcomes remain as records without recreated media.</p></div>
+        <aside class="boundary" aria-label="Member view boundary"><strong>Your member-view boundary:</strong> as a current member, you can see eligible Wall items within the 90-day window, including items from before a late join or rejoin. Leaving, removal, Safety blocks, and moderation can end or suppress access sooner.</aside>
+      </section>
+      <section class="wall-stats" aria-label="Wall summary"><div><strong id="wall-total">8</strong><span>Authorized items loaded</span></div><div><strong>4</strong><span>Proof pairs in window</span></div><div><strong>90</strong><span>Days photos remain</span></div><div><strong>5</strong><span>Current members</span></div></section>
+      <section aria-labelledby="filter-title"><h2 class="sr-only" id="filter-title">Filter the Wall</h2><div class="filter-bar" role="group" aria-label="Filter reports by status or activity type">
+        <button type="button" data-filter="all" aria-pressed="true">All</button><button type="button" data-filter="Verified" aria-pressed="false">Verified</button><button type="button" data-filter="Strength" aria-pressed="false">Strength</button><button type="button" data-filter="Cardio" aria-pressed="false">Cardio</button><button type="button" data-filter="Class" aria-pressed="false">Class</button><button type="button" data-filter="Sport" aria-pressed="false">Sport</button><span class="result-count" id="result-count">8 results</span>
+      </div><div id="wall-results"></div></section>
+      <div class="load-region"><p>Older authorized weeks load only when you ask. Focus stays on this button and the added result count is announced.</p><button type="button" id="load-older">Load older weeks</button><div class="history-end" id="history-end" hidden><strong>Start of authorized history</strong>Nothing earlier is available in this member view. Eligible Proof pairs remain visible only during their 90-day window.</div><p class="retention-note"><strong>Why some cards have no photo:</strong> eligible Verified Proof pairs remain for exactly 90 days after verification. Photos can disappear sooner after withdrawal, an Unsupported or Rejected outcome, membership access loss, moderation, or a Safety block. An authorized structured outcome may remain, but the Wall never substitutes a thumbnail, blur, crop, or derivative.</p></div>
+      <footer><span class="brand">No Excuses</span><span>Momentum Club · Member-authorized history only</span></footer>
+    </div>
+  </template>
+
+  <script>
+    (function () {
+      "use strict";
+      var main = document.getElementById("main");
+      var announcer = document.getElementById("announcer");
+      var motionEnabled = "IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (motionEnabled) document.documentElement.classList.add("motion-ready");
+      var filter = "all";
+      var olderLoaded = false;
+      var weeks = [
+        { label: "Week 14", range: "31 Aug–6 Sep · America/Chicago", items: [
+          { member: "Maya", kind: "Strength", state: "Verified", media: true, activity: "Squat rack and loaded bar after five working sets.", presence: "My hand and bottle beside the rack." },
+          { member: "Ahmed", kind: "Cardio", state: "Verified", media: true, activity: "Track lanes after six interval repeats.", presence: "My shoes and lower legs at the finish." },
+          { member: "Priya", kind: "Class", state: "Verified", media: true, activity: "Mat and blocks after a 45-minute class.", presence: "My forearm resting beside the mat." },
+          { member: "Jonas", kind: "Sport", state: "Verified", media: true, activity: "Climbing wall after six completed routes.", presence: "My chalked hand beside the final hold." }
+        ]},
+        { label: "Week 13", range: "24–30 Aug · America/Chicago", items: [
+          { member: "Maya", kind: "Strength", state: "Verified", media: false, activity: "Target attained · 4 of 4 Verified completions." },
+          { member: "Sena", kind: "Cardio", state: "Moderation unavailable", media: false, activity: "Media is unavailable following moderation; no substitute is shown." },
+          { member: "Ahmed", kind: "Sport", state: "Safety block suppressed", media: false, activity: "This item is suppressed by your Safety block." },
+          { member: "Priya", kind: "Class", state: "Verified", media: false, activity: "Target attained · Proof pair expired after 90 days." }
+        ]}
+      ];
+      var olderWeek = { label: "Week 12", range: "17–23 Aug · America/Chicago", items: [
+        { member: "Maya", kind: "Strength", state: "Verified", media: false, activity: "Target attained · 4 of 4 Verified completions." },
+        { member: "Jonas", kind: "Sport", state: "Verified", media: false, activity: "Target not attained · 2 of 3 Verified completions." },
+        { member: "Sena", kind: "Cardio", state: "Moderation unavailable", media: false, activity: "Media unavailable; authorized outcome retained." }
+      ]};
+
+      function selectedView() {
+        return new URLSearchParams(location.search).get("view") === "wall" ? "wall" : "site";
+      }
+      function announce(message) {
+        announcer.textContent = "";
+        window.setTimeout(function () { announcer.textContent = message; }, 20);
+      }
+      function go(view, push) {
+        if (push) history.pushState({ view: view }, "", "?view=" + view);
+        render(view);
+      }
+      function observeReveal(element, children, threshold) {
+        if (!motionEnabled || !element) return;
+        children.forEach(function (child, index) { child.style.setProperty("--i", index); });
+        new IntersectionObserver(function (entries, observer) {
+          if (entries[0].isIntersecting) {
+            element.classList.add("in");
+            observer.disconnect();
+          }
+        }, { threshold: threshold }).observe(element);
+      }
+      function wireMotion(root) {
+        observeReveal(root.querySelector(".loop"), Array.from(root.querySelectorAll(".loop .step-list li")), .2);
+        observeReveal(root.querySelector(".board"), Array.from(root.querySelectorAll(".board .score.ok, .board .score.wait")), .25);
+        observeReveal(root.querySelector(".site-wall-preview"), Array.from(root.querySelectorAll(".site-wall-preview .preview-tile")), .15);
+        observeReveal(root.querySelector(".rules"), Array.from(root.querySelectorAll(".rules .rule")), .15);
+        root.querySelectorAll(".wk").forEach(function (week) {
+          observeReveal(week, Array.from(week.querySelectorAll(".wall-card, .record-card")), .08);
+        });
+      }
+      function render(view) {
+        var template = document.getElementById(view + "-view");
+        main.replaceChildren(template.content.cloneNode(true));
+        document.title = (view === "wall" ? "The Wall" : "No Excuses") + " — Throwaway prototype";
+        document.querySelectorAll("[data-view]").forEach(function (link) {
+          if (link.closest(".route-nav")) {
+            if (link.dataset.view === view) link.setAttribute("aria-current", "page");
+            else link.removeAttribute("aria-current");
+          }
+        });
+        if (view === "wall") setupWall();
+        else wireMotion(main);
+      }
+      function statusMarkup(state) {
+        var klass = state === "Verified" ? "verified" : "record";
+        return '<span class="status ' + klass + '">' + state + '</span>';
+      }
+      function cardMarkup(item) {
+        if (item.media && item.state === "Verified") {
+          return '<details class="wall-card" data-state="' + item.state + '" data-kind="' + item.kind + '"><summary aria-label="Open ' + item.member + ' ' + item.kind + ' Verified Proof pair"><div class="tile-face"></div><div class="tile-caption"><b>' + item.member + '</b><span>' + item.kind + ' · Verified</span></div></summary><div class="proof-pair"><div class="proof-card"><div class="photo activity-photo" role="img" aria-label="Illustrative retained Activity photo surface for ' + item.member + '"><span class="photo-label">Activity · Dominant</span></div></div><div class="proof-card"><div class="photo presence-photo" role="img" aria-label="Illustrative retained Member-presence photo surface for ' + item.member + '"><span class="photo-label">Member presence · Secondary</span></div></div></div><div class="expanded-copy">' + statusMarkup(item.state) + '<p><strong>Activity:</strong> ' + item.activity + '<br><strong>Member presence:</strong> ' + item.presence + '</p></div></details>';
+        }
+        return '<article class="record-card" data-state="' + item.state + '" data-kind="' + item.kind + '"><div><p class="eyebrow">Structured outcome · No media</p><h3>' + item.member + ' · ' + item.kind + '</h3>' + statusMarkup(item.state) + '<p>' + item.activity + '</p></div><dl class="record-fields"><dt>Photo state</dt><dd>Not displayed</dd><dt>Record type</dt><dd>Member-week outcome</dd></dl></article>';
+      }
+      function drawWall(shouldAnnounce) {
+        var target = document.getElementById("wall-results");
+        var visibleCount = 0;
+        var activeWeeks = olderLoaded ? weeks.concat([olderWeek]) : weeks;
+        target.innerHTML = activeWeeks.map(function (week) {
+          var items = week.items.filter(function (item) { return filter === "all" || (filter === "Verified" ? item.state === "Verified" : item.kind === filter); });
+          visibleCount += items.length;
+          return '<section class="week wk" aria-labelledby="' + week.label.replace(" ", "-").toLowerCase() + '"><div class="week-heading"><h2 id="' + week.label.replace(" ", "-").toLowerCase() + '">' + week.label + '</h2><p>' + week.range + '</p><p class="week-result">' + items.length + ' matching outcomes</p></div><div class="gallery">' + (items.length ? items.map(cardMarkup).join("") : '<p class="empty-results">No ' + filter + ' outcomes in this visible week.</p>') + '</div></section>';
+        }).join("");
+        var count = document.getElementById("result-count");
+        count.textContent = visibleCount + (visibleCount === 1 ? " result" : " results");
+        document.getElementById("wall-total").textContent = activeWeeks.reduce(function (sum, week) { return sum + week.items.length; }, 0);
+        wireMotion(target);
+        if (shouldAnnounce) announce(count.textContent + " shown. Focus unchanged.");
+      }
+      function setupWall() {
+        filter = "all";
+        olderLoaded = false;
+        drawWall(false);
+        document.querySelectorAll("[data-filter]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            filter = button.dataset.filter;
+            document.querySelectorAll("[data-filter]").forEach(function (item) { item.setAttribute("aria-pressed", String(item === button)); });
+            drawWall(true);
+          });
+        });
+        document.getElementById("load-older").addEventListener("click", function () {
+          if (olderLoaded) return;
+          var before = Number(document.getElementById("result-count").textContent.split(" ")[0]);
+          olderLoaded = true;
+          drawWall(false);
+          this.setAttribute("aria-disabled", "true");
+          this.textContent = "Older weeks loaded";
+          document.getElementById("history-end").hidden = false;
+          var after = Number(document.getElementById("result-count").textContent.split(" ")[0]);
+          announce("Week 12 added. " + (after - before) + " matching older outcomes loaded. Start of authorized history reached. Focus remains on Load older weeks.");
+        });
+      }
+      document.addEventListener("click", function (event) {
+        var link = event.target.closest("a[data-view]");
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        go(link.dataset.view, true);
+        main.focus({ preventScroll: false });
+      });
+      window.addEventListener("popstate", function () { render(selectedView()); });
+      render(selectedView());
+    }());
+  </script>
+</body>
+</html>
