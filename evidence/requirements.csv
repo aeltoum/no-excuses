@@ -8,8 +8,8 @@ TIME-02,in-progress,2,evidence/m2-identity-group-calendar.md,Schema and cutoff f
 TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated activation-week target lock evidence; client target flow pending
 TARGET-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated partial-week target and departure evidence; streak transitions pending
 EXC-01,planned,4,,Exception evidence
-WORK-01,in-progress,3,evidence/m3-workout-session.md,Automated authoritative Workout-session lifecycle evidence; device and report flows pending
-WORK-02,planned,3,,Workout report evidence
+WORK-01,in-progress,3,evidence/m3-workout-session.md; evidence/m3-true-mvp-workout-checkins.md,Authoritative Workout-session lifecycle plus membership- and week-bounded True-MVP check-in evidence
+WORK-02,in-progress,3,evidence/m3-true-mvp-workout-checkins.md,Immediate idempotent self-reported completion count and Group-current progress evidence
 WORK-03,planned,3,,Draft and offline evidence
 VERIFY-01,planned,4,,Review decision evidence
 VERIFY-02,planned,4,,Finalization evidence
