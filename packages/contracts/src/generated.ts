@@ -36,6 +36,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workout-check-ins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submitWorkoutCheckin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{groupId}/current-week-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentWeekProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{groupId}/finalized-weekly-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFinalizedWeeklyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -49,9 +97,83 @@ export interface components {
             /** @enum {string} */
             status: "ok";
         };
+        ApiErrorResponse: {
+            /** @constant */
+            contractVersion: 1;
+            error: components["schemas"]["ApiError"];
+        };
+        ApiError: {
+            /** @enum {string} */
+            code: "unauthorized" | "invalid_request" | "denied" | "idempotency_required" | "idempotency_conflict" | "domain_failure";
+            message: string;
+            retryable: boolean;
+        };
+        SubmitWorkoutCheckinRequest: {
+            /** Format: uuid */
+            workoutCheckinId: string;
+            /** @enum {string} */
+            activityType: "strength" | "cardio" | "class" | "sport" | "mixed";
+            completedAt: components["schemas"]["UtcInstant"];
+            durationMinutes: number;
+            /** @enum {string} */
+            perceivedIntensity: "low" | "moderate" | "high";
+            /** @constant */
+            selfReportAttested: true;
+        };
+        SubmitWorkoutCheckinResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["WorkoutCheckinResult"];
+        };
+        WorkoutCheckinResult: {
+            /** Format: uuid */
+            workoutCheckinId: string;
+            currentWeekCount: number;
+        };
+        CurrentWeekProgressResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["CurrentWeekProgressItem"][];
+        };
+        CurrentWeekProgressItem: {
+            /** Format: uuid */
+            membershipId: string;
+            lockedTarget: number;
+            completedWorkoutCount: number;
+        };
+        FinalizedWeeklyHistoryResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["FinalizedWeeklyHistoryItem"][];
+        };
+        FinalizedWeeklyHistoryItem: {
+            /** Format: uuid */
+            membershipId: string;
+            startsAt: components["schemas"]["UtcInstant"];
+            endsAt: components["schemas"]["UtcInstant"];
+            lockedTarget: number;
+            completedWorkoutCount: number;
+            /** @enum {string} */
+            outcome: "attained" | "missed";
+        };
+        /** Format: date-time */
+        UtcInstant: string;
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Request, authorization, conflict, or domain failure */
+        ApiError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ApiErrorResponse"];
+            };
+        };
+    };
+    parameters: {
+        IdempotencyKey: string;
+        GroupId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -96,6 +218,89 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+        };
+    };
+    submitWorkoutCheckin: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitWorkoutCheckinRequest"];
+            };
+        };
+        responses: {
+            /** @description Check-in accepted or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitWorkoutCheckinResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getCurrentWeekProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Group member targets and check-in counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentWeekProgressResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getFinalizedWeeklyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Group history visible under authoritative membership rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinalizedWeeklyHistoryResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
         };
     };
 }
