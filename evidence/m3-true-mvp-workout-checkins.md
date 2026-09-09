@@ -11,7 +11,7 @@ Gate 1 automated evidence:
   idempotent replay; no media, free-text, verification, competition, or consequence columns;
   future, pre-membership, pre-activation, cross-week, and post-departure rejection; current
   Group member progress visibility; and nonmember/cross-Group denial.
-- `tests/migrations.test.ts`: schema version 4 applies forward while the previous public
+- `tests/migrations.test.ts`: schema version 5 applies forward while the previous public
   surface remains compatible.
 
 The PostgreSQL function owns membership, assigned-week, time-boundary, attestation, insert,

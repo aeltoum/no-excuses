@@ -189,4 +189,4 @@ grant execute on function app_private.current_week_progress(uuid, timestamptz)
   to authenticated, service_role;
 grant select, insert on table app_private.workout_checkins to service_role;
 
-insert into app_private.schema_versions (version) values (4);
+insert into app_private.schema_versions (version) values (5);
