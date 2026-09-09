@@ -9,6 +9,7 @@ import {
   handleLeaveGroup,
   handleRemoveGroupMember,
   handleRevokeGroupInvitation,
+  handleSetWeeklyTarget,
 } from "../packages/delivery/src/api.js";
 import {
   failure,
@@ -171,6 +172,12 @@ describe("Group command delivery entrypoints", () => {
         groupId: "10000000-0000-4000-8000-000000000001",
         membershipId: "40000000-0000-4000-8000-000000000003",
       },
+    );
+    commandName = "set_weekly_target";
+    await exerciseCommand(
+      handleSetWeeklyTarget,
+      { weeklyTarget: 4 },
+      { weeklyTarget: 5 },
     );
   });
 });

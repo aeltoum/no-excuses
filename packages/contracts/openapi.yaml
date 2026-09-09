@@ -125,6 +125,23 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/group-memberships/weekly-target:
+    put:
+      operationId: setWeeklyTarget
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetWeeklyTargetRequest" }
+      responses:
+        "200": { description: Weekly target scheduled or idempotently replayed, content: { application/json: { schema: { $ref: "#/components/schemas/WeeklyTargetResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/members/{membershipId}/remove:
     post:
       operationId: removeGroupMember
@@ -284,6 +301,26 @@ components:
         membershipId: { type: string, format: uuid }
         recurringTarget: { type: integer, minimum: 1 }
         currentTarget: { type: integer, minimum: 1 }
+    SetWeeklyTargetRequest:
+      type: object
+      additionalProperties: false
+      required: [weeklyTarget]
+      properties:
+        weeklyTarget: { type: integer, minimum: 1 }
+    WeeklyTargetResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/WeeklyTargetResult" }
+    WeeklyTargetResult:
+      type: object
+      additionalProperties: false
+      required: [membershipId, weeklyTarget]
+      properties:
+        membershipId: { type: string, format: uuid }
+        weeklyTarget: { type: integer, minimum: 1 }
     GroupMembershipResponse:
       type: object
       additionalProperties: false
