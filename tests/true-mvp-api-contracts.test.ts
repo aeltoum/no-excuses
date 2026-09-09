@@ -1,9 +1,19 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
+  acceptGroupInvitationRequestSchema,
   apiErrorResponseSchema,
+  createGroupRequestSchema,
   currentWeekProgressResponseSchema,
   finalizedWeeklyHistoryResponseSchema,
+  groupInvitationResponseSchema,
+  groupMembershipResponseSchema,
   groupRequestSchema,
+  issueGroupInvitationRequestSchema,
+  leaveGroupRequestSchema,
+  removeGroupMemberRequestSchema,
+  revokedGroupInvitationResponseSchema,
+  revokeGroupInvitationRequestSchema,
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
 } from "../packages/contracts/src/runtime.js";
@@ -95,6 +105,95 @@ function commandRequest(body: unknown = commandBody) {
 }
 
 describe("True-MVP API runtime contracts", () => {
+  it("publishes every authenticated Group command with idempotency", async () => {
+    const source = await readFile(
+      new URL("../packages/contracts/openapi.yaml", import.meta.url),
+      "utf8",
+    );
+    for (const path of [
+      "/v1/groups:",
+      "/v1/group-invitations:",
+      "/v1/group-invitations/{invitationId}/revoke:",
+      "/v1/group-invitations/accept:",
+      "/v1/group-memberships/leave:",
+      "/v1/groups/{groupId}/members/{membershipId}/remove:",
+    ]) {
+      const start = source.indexOf(`  ${path}`);
+      const end = source.indexOf("\n  /", start + 1);
+      const operation = source.slice(start, end === -1 ? undefined : end);
+      expect(start).toBeGreaterThan(-1);
+      expect(operation).toContain("security:");
+      expect(operation).toContain("#/components/parameters/IdempotencyKey");
+      expect(operation).toContain('"409":');
+    }
+  });
+
+  it("strictly validates every Group command request and bounded result", () => {
+    expect(
+      createGroupRequestSchema.parse({
+        groupId,
+        membershipId,
+        name: "Friends",
+        timeZone: "America/Chicago",
+        weeklyTarget: 3,
+      }),
+    ).toBeTruthy();
+    expect(
+      issueGroupInvitationRequestSchema.parse({
+        invitationId: checkinId,
+        email: "friend@example.test",
+      }),
+    ).toBeTruthy();
+    expect(
+      acceptGroupInvitationRequestSchema.parse({
+        token: "opaque-token",
+        membershipId,
+        recurringTarget: 3,
+        currentTarget: 2,
+      }),
+    ).toBeTruthy();
+    expect(
+      revokeGroupInvitationRequestSchema.parse({ invitationId: checkinId }),
+    ).toBeTruthy();
+    expect(leaveGroupRequestSchema.parse({})).toEqual({});
+    expect(
+      removeGroupMemberRequestSchema.parse({ groupId, membershipId }),
+    ).toBeTruthy();
+    expect(
+      acceptGroupInvitationRequestSchema.safeParse({
+        token: "opaque-token",
+        membershipId,
+        recurringTarget: 2,
+        currentTarget: 3,
+      }).success,
+    ).toBe(false);
+    expect(leaveGroupRequestSchema.safeParse({ membershipId }).success).toBe(
+      false,
+    );
+    expect(
+      groupMembershipResponseSchema.parse({
+        contractVersion: 1,
+        data: { membershipId },
+      }),
+    ).toBeTruthy();
+    expect(
+      groupInvitationResponseSchema.parse({
+        contractVersion: 1,
+        data: {
+          invitationId: checkinId,
+          token: "opaque-token",
+          expiresAt: "2026-03-12T10:00:00.000Z",
+        },
+      }),
+    ).toBeTruthy();
+    expect(
+      revokedGroupInvitationResponseSchema.parse({
+        contractVersion: 1,
+        data: { invitationId: checkinId, status: "revoked" },
+      }),
+    ).toBeTruthy();
+  });
+
   it("strictly validates structured check-ins", () => {
     expect(submitWorkoutCheckinRequestSchema.parse(commandBody)).toEqual(
       commandBody,

@@ -1,3 +1,11 @@
+import {
+  acceptGroupInvitationRequestSchema,
+  createGroupRequestSchema,
+  issueGroupInvitationRequestSchema,
+  leaveGroupRequestSchema,
+  removeGroupMemberRequestSchema,
+  revokeGroupInvitationRequestSchema,
+} from "../../contracts/src/runtime.js";
 import type {
   ActorEnvelope,
   RequestEnvelope,
@@ -137,3 +145,70 @@ export async function handleV1ReadRequest<Input, Output, Code extends string>(
         body: { contractVersion: 1, error: result.error },
       };
 }
+
+type CommandDependencies<Input, Output, Code extends string> = Omit<
+  ApiDependencies<Input, Output, Code>,
+  "validate"
+>;
+
+interface RuntimeSchema<Input> {
+  safeParse(
+    value: unknown,
+  ): { success: true; data: Input } | { success: false };
+}
+
+function validateWith<Input>(schema: RuntimeSchema<Input>) {
+  return (body: unknown): Result<Input, "invalid_request"> => {
+    const parsed = schema.safeParse(body);
+    return parsed.success
+      ? { ok: true, value: parsed.data }
+      : {
+          ok: false,
+          error: {
+            code: "invalid_request",
+            message: "Invalid request",
+            retryable: false,
+          },
+        };
+  };
+}
+
+function groupCommandHandler<Input, Output, Code extends string>(
+  command: string,
+  schema: RuntimeSchema<Input>,
+) {
+  return (
+    request: ApiRequest,
+    dependencies: CommandDependencies<Input, Output, Code>,
+  ) =>
+    handleV1Request(request, {
+      ...dependencies,
+      hash: (body) => dependencies.hash({ command, body }),
+      validate: validateWith(schema),
+    });
+}
+
+export const handleCreateGroup = groupCommandHandler(
+  "create_group",
+  createGroupRequestSchema,
+);
+export const handleIssueGroupInvitation = groupCommandHandler(
+  "issue_group_invitation",
+  issueGroupInvitationRequestSchema,
+);
+export const handleRevokeGroupInvitation = groupCommandHandler(
+  "revoke_group_invitation",
+  revokeGroupInvitationRequestSchema,
+);
+export const handleAcceptGroupInvitation = groupCommandHandler(
+  "accept_group_invitation",
+  acceptGroupInvitationRequestSchema,
+);
+export const handleLeaveGroup = groupCommandHandler(
+  "leave_group",
+  leaveGroupRequestSchema,
+);
+export const handleRemoveGroupMember = groupCommandHandler(
+  "remove_group_member",
+  removeGroupMemberRequestSchema,
+);

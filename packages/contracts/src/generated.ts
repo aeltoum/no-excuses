@@ -52,6 +52,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/group-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["issueGroupInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/group-invitations/{invitationId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revokeGroupInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/group-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["acceptGroupInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/group-memberships/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["leaveGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{groupId}/members/{membershipId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["removeGroupMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/current-week-progress": {
         parameters: {
             query?: never;
@@ -120,6 +216,59 @@ export interface components {
             /** @constant */
             selfReportAttested: true;
         };
+        CreateGroupRequest: {
+            /** Format: uuid */
+            groupId: string;
+            /** Format: uuid */
+            membershipId: string;
+            name: string;
+            timeZone: string;
+            weeklyTarget: number;
+        };
+        IssueGroupInvitationRequest: {
+            /** Format: uuid */
+            invitationId: string;
+            /** Format: email */
+            email: string;
+        };
+        AcceptGroupInvitationRequest: {
+            token: string;
+            /** Format: uuid */
+            membershipId: string;
+            recurringTarget: number;
+            currentTarget: number;
+        };
+        GroupMembershipResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["GroupMembershipResult"];
+        };
+        GroupMembershipResult: {
+            /** Format: uuid */
+            membershipId: string;
+        };
+        GroupInvitationResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["GroupInvitationResult"];
+        };
+        GroupInvitationResult: {
+            /** Format: uuid */
+            invitationId: string;
+            token: string;
+            expiresAt: components["schemas"]["UtcInstant"];
+        };
+        RevokedGroupInvitationResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["RevokedGroupInvitationResult"];
+        };
+        RevokedGroupInvitationResult: {
+            /** Format: uuid */
+            invitationId: string;
+            /** @constant */
+            status: "revoked";
+        };
         SubmitWorkoutCheckinResponse: {
             /** @constant */
             contractVersion: 1;
@@ -173,6 +322,8 @@ export interface components {
     parameters: {
         IdempotencyKey: string;
         GroupId: string;
+        InvitationId: string;
+        MembershipId: string;
     };
     requestBodies: never;
     headers: never;
@@ -242,6 +393,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubmitWorkoutCheckinResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    createGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Group created or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMembershipResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    issueGroupInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueGroupInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description Invitation issued or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupInvitationResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    revokeGroupInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation revoked or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokedGroupInvitationResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    acceptGroupInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptGroupInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description Invitation accepted or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMembershipResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    leaveGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membership ended voluntarily or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMembershipResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    removeGroupMember: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                groupId: components["parameters"]["GroupId"];
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membership removed or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMembershipResponse"];
                 };
             };
             400: components["responses"]["ApiError"];
