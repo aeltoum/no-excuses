@@ -34,6 +34,15 @@ export interface ApiDependencies<Input, Output, Code extends string> {
   ): number;
 }
 
+export interface ReadApiDependencies<Input, Output, Code extends string> {
+  authenticate(
+    authorization: string | undefined,
+  ): Promise<Result<ActorEnvelope, "unauthorized">>;
+  validate(body: unknown): Result<Input, "invalid_request">;
+  execute(input: Input, actor: ActorEnvelope): Promise<Result<Output, Code>>;
+  statusFor(code: Code | "invalid_request" | "unauthorized"): number;
+}
+
 export async function handleV1Request<Input, Output, Code extends string>(
   request: ApiRequest,
   dependencies: ApiDependencies<Input, Output, Code>,
@@ -67,6 +76,20 @@ export async function handleV1Request<Input, Output, Code extends string>(
     };
   }
 
+  try {
+    opaqueId("idempotency", idempotencyKey);
+  } catch {
+    const error = {
+      code: "invalid_request" as const,
+      message: "Idempotency-Key must be a UUID",
+      retryable: false,
+    };
+    return {
+      status: dependencies.statusFor(error.code),
+      body: { contractVersion: 1, error },
+    };
+  }
+
   const context = {
     requestId: opaqueId("request", dependencies.createId()),
     receivedAt: utcInstant(dependencies.now()),
@@ -78,6 +101,35 @@ export async function handleV1Request<Input, Output, Code extends string>(
   } satisfies RequestEnvelope;
 
   const result = await dependencies.execute(input.value, context);
+  return result.ok
+    ? { status: 200, body: { contractVersion: 1, data: result.value } }
+    : {
+        status: dependencies.statusFor(result.error.code),
+        body: { contractVersion: 1, error: result.error },
+      };
+}
+
+export async function handleV1ReadRequest<Input, Output, Code extends string>(
+  request: ApiRequest,
+  dependencies: ReadApiDependencies<Input, Output, Code>,
+): Promise<ApiResponse> {
+  const actor = await dependencies.authenticate(request.authorization);
+  if (!actor.ok) {
+    return {
+      status: dependencies.statusFor(actor.error.code),
+      body: { contractVersion: 1, error: actor.error },
+    };
+  }
+
+  const input = dependencies.validate(request.body);
+  if (!input.ok) {
+    return {
+      status: dependencies.statusFor(input.error.code),
+      body: { contractVersion: 1, error: input.error },
+    };
+  }
+
+  const result = await dependencies.execute(input.value, actor.value);
   return result.ok
     ? { status: 200, body: { contractVersion: 1, data: result.value } }
     : {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: No Excuses local baseline
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /health:
     get:
@@ -23,7 +23,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /v1/workout-check-ins:
+    post:
+      operationId: submitWorkoutCheckin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitWorkoutCheckinRequest"
+      responses:
+        "200":
+          description: Check-in accepted or idempotently replayed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitWorkoutCheckinResponse"
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
+  /v1/groups/{groupId}/current-week-progress:
+    get:
+      operationId: getCurrentWeekProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: Current Group member targets and check-in counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentWeekProgressResponse"
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
+  /v1/groups/{groupId}/finalized-weekly-history:
+    get:
+      operationId: getFinalizedWeeklyHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: Group history visible under authoritative membership rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizedWeeklyHistoryResponse"
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ApiError:
+      description: Request, authorization, conflict, or domain failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
   schemas:
     HealthResponse:
       type: object
@@ -37,3 +124,92 @@ components:
         status:
           type: string
           enum: [ok]
+    ApiErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, error]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        error: { $ref: "#/components/schemas/ApiError" }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+          enum: [unauthorized, invalid_request, denied, idempotency_required, idempotency_conflict, domain_failure]
+        message: { type: string, minLength: 1, maxLength: 240 }
+        retryable: { type: boolean }
+    SubmitWorkoutCheckinRequest:
+      type: object
+      additionalProperties: false
+      required: [workoutCheckinId, activityType, completedAt, durationMinutes, perceivedIntensity, selfReportAttested]
+      properties:
+        workoutCheckinId: { type: string, format: uuid }
+        activityType:
+          type: string
+          enum: [strength, cardio, class, sport, mixed]
+        completedAt: { $ref: "#/components/schemas/UtcInstant" }
+        durationMinutes: { type: integer, minimum: 1 }
+        perceivedIntensity:
+          type: string
+          enum: [low, moderate, high]
+        selfReportAttested: { type: boolean, const: true }
+    SubmitWorkoutCheckinResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/WorkoutCheckinResult" }
+    WorkoutCheckinResult:
+      type: object
+      additionalProperties: false
+      required: [workoutCheckinId, currentWeekCount]
+      properties:
+        workoutCheckinId: { type: string, format: uuid }
+        currentWeekCount: { type: integer, minimum: 1 }
+    CurrentWeekProgressResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/CurrentWeekProgressItem" }
+    CurrentWeekProgressItem:
+      type: object
+      additionalProperties: false
+      required: [membershipId, lockedTarget, completedWorkoutCount]
+      properties:
+        membershipId: { type: string, format: uuid }
+        lockedTarget: { type: integer, minimum: 1 }
+        completedWorkoutCount: { type: integer, minimum: 0 }
+    FinalizedWeeklyHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FinalizedWeeklyHistoryItem" }
+    FinalizedWeeklyHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [membershipId, startsAt, endsAt, lockedTarget, completedWorkoutCount, outcome]
+      properties:
+        membershipId: { type: string, format: uuid }
+        startsAt: { $ref: "#/components/schemas/UtcInstant" }
+        endsAt: { $ref: "#/components/schemas/UtcInstant" }
+        lockedTarget: { type: integer, minimum: 1 }
+        completedWorkoutCount: { type: integer, minimum: 0 }
+        outcome:
+          type: string
+          enum: [attained, missed]
+    UtcInstant:
+      type: string
+      format: date-time
+      pattern: "Z$"
