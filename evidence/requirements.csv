@@ -20,11 +20,11 @@ CARD-03,pass,5,evidence/m5-consequence-system.md,PostgreSQL-backed media-free cl
 SAFE-01,planned,8,,Safety and moderation evidence
 MEDIA-01,planned,3,,Proof capture and visibility evidence
 MEDIA-02,planned,3,,Proof retention and deletion evidence
-COMP-01,planned,6,,Activity source and eligibility evidence
-COMP-02,planned,6,,Crown calculation evidence
-COMP-03,planned,6,,Crown finalization evidence
-SEASON-01,in-progress,6,evidence/m2-identity-group-calendar.md,First shortened four-active-week Season boundary evidence; rollover and standings arrive in milestone 6
-SEASON-02,planned,6,,Season summary evidence
+COMP-01,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed aggregate-interface snapshot permission source sync interval and eligibility tests; physical-device source E2E and real PostgreSQL smoke pending
+COMP-02,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed hand-calculated Top Steps Load Progression Cardio Leap baseline comparability rounding and tie tests; physical-device source contract and real PostgreSQL smoke pending
+COMP-03,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed contested tie multi-award Exception departure late-data exactly-once Crown and Season-assignment job-order tests; physical-device E2E and real PostgreSQL smoke pending
+SEASON-01,in-progress,6,evidence/m2-identity-group-calendar.md; evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed shortened activation below-capacity pause four-active-week boundary rollover delayed execution settlement overlap and tied-standing tests; real PostgreSQL smoke pending
+SEASON-02,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed post-Crown idempotent summary complete totals audience departure and return-isolation tests; UI read model remains milestone 7 and real PostgreSQL smoke pending
 SOCIAL-01,planned,7,,Social interaction evidence
 NOTIFY-01,planned,7,,Action notification evidence
 NOTIFY-02,planned,7,,Social delivery evidence
