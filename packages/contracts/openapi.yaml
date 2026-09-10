@@ -23,6 +23,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /v1/account:
+    delete:
+      operationId: deleteAccount
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteAccountRequest" }
+      responses:
+        "200": { description: Account deleted or idempotently replayed, content: { application/json: { schema: { $ref: "#/components/schemas/DeletedAccountResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/workout-check-ins:
     post:
       operationId: submitWorkoutCheckin
@@ -307,6 +324,25 @@ components:
       required: [weeklyTarget]
       properties:
         weeklyTarget: { type: integer, minimum: 1 }
+    DeleteAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmation]
+      properties:
+        confirmation: { type: boolean, const: true }
+    DeletedAccountResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/DeletedAccountResult" }
+    DeletedAccountResult:
+      type: object
+      additionalProperties: false
+      required: [accountId]
+      properties:
+        accountId: { type: string, format: uuid }
     WeeklyTargetResponse:
       type: object
       additionalProperties: false

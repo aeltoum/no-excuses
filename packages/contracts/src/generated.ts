@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteAccount"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workout-check-ins": {
         parameters: {
             query?: never;
@@ -257,6 +273,19 @@ export interface components {
         SetWeeklyTargetRequest: {
             weeklyTarget: number;
         };
+        DeleteAccountRequest: {
+            /** @constant */
+            confirmation: true;
+        };
+        DeletedAccountResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["DeletedAccountResult"];
+        };
+        DeletedAccountResult: {
+            /** Format: uuid */
+            accountId: string;
+        };
         WeeklyTargetResponse: {
             /** @constant */
             contractVersion: 1;
@@ -398,6 +427,37 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+        };
+    };
+    deleteAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Account deleted or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedAccountResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
         };
     };
     submitWorkoutCheckin: {

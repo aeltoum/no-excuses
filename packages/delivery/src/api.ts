@@ -1,6 +1,7 @@
 import {
   acceptGroupInvitationRequestSchema,
   createGroupRequestSchema,
+  deleteAccountRequestSchema,
   groupRequestSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
@@ -244,4 +245,8 @@ export const handleRemoveGroupMember = groupCommandHandler(
 export const handleSetWeeklyTarget = groupCommandHandler(
   "set_weekly_target",
   setWeeklyTargetRequestSchema,
+);
+export const handleDeleteAccount = groupCommandHandler(
+  "delete_account",
+  deleteAccountRequestSchema,
 );

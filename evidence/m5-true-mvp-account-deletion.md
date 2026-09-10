@@ -15,6 +15,9 @@ Gate 1 automated evidence:
   deterministic admin promotion; empty-Group closure; finalized-history preservation; stable
   replay after deletion; changed-body conflict; least-privilege command and table access.
 - `tests/migrations.test.ts`: forward-only schema version 9 migration applies from empty state.
+- `tests/account-deletion-delivery.test.ts`: version 1 OpenAPI and runtime request/result
+  contracts; authentication, explicit confirmation, UUID idempotency, command-scoped hashing,
+  bounded success envelope, stable replay, and changed-body conflict delegation.
 
 Hosted Auth/provider deletion, media and processor cleanup, backup and audit expiry, UI, and API
-delivery remain outside this DB-only slice.
+router/server remain outside this slice.
