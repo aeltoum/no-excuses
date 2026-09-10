@@ -20,5 +20,13 @@ Gate 1 automated evidence:
 Settlement and history use existing member-week, membership, accountability-week, and
 check-in records. No peer review, Exception, Proof/media, streak, consequence, notification,
 or new product abstraction enters this slice. PGlite supplies deterministic
-PostgreSQL-compatible evidence. Real PostgreSQL smoke remains available through
-`pnpm db:test:postgres` with an empty disposable `DATABASE_URL`.
+PostgreSQL-compatible evidence.
+
+Real PostgreSQL evidence:
+
+- 2026-09-10: `pnpm db:test:postgres` passed on PostgreSQL 17.11 against an empty,
+  disposable local database after applying every migration through
+  `20260910000000_current_group_membership.sql`. Direct SQL assertions covered
+  pre-boundary rejection, correct `attained`/`missed` outcomes at cutoff, zero-change
+  replay, terminal immutability, and current-membership history privacy with
+  overlapping-week inclusion and fully pre-membership exclusion.
