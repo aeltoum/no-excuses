@@ -660,6 +660,16 @@ begin
     join app_private.memberships m on m.membership_id = mw.membership_id
     join app_private.accountability_weeks aw using (accountability_week_id)
     where mw.status = 'active' and m.ended_at is null and requested_at >= aw.ends_at
+      and not exists (
+        select 1
+        from app_private.member_weeks earlier_mw
+        join app_private.accountability_weeks earlier_aw using (accountability_week_id)
+        where earlier_mw.membership_id = mw.membership_id
+          and earlier_mw.status = 'active'
+          and earlier_aw.ends_at <= requested_at
+          and (earlier_aw.ends_at, earlier_mw.member_week_id)
+            < (aw.ends_at, mw.member_week_id)
+      )
     order by aw.ends_at, mw.member_week_id
     for update of mw skip locked
   loop
