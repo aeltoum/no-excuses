@@ -51,6 +51,25 @@ export type MobileApiClientOptions = Readonly<{
   fetch?: Fetch;
 }>;
 
+export function readMobileApiBaseUrl(
+  environment: Readonly<Record<string, string | undefined>>,
+): string {
+  const source = environment.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (!source) throw new Error("EXPO_PUBLIC_API_BASE_URL is required");
+  const url = new URL(source);
+  const loopback = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+  if (
+    (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+    url.username !== "" ||
+    url.password !== ""
+  ) {
+    throw new Error(
+      "EXPO_PUBLIC_API_BASE_URL must use public HTTPS or loopback HTTP",
+    );
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
 type Authorized = Readonly<{ authorization: string }>;
 type Command = Authorized & Readonly<{ idempotencyKey: string }>;
 type CommandWithBody<Body> = Command & Readonly<{ body: Body }>;
@@ -167,7 +186,13 @@ export function createMobileApiClient({
 
   return {
     getV1Health: ({ authorization }) =>
-      request("/v1/health", authorization, healthResponseSchema),
+      request<Schema<"HealthResponse">>(
+        "/v1/health",
+        authorization,
+        healthResponseSchema as unknown as ResponseSchema<
+          Schema<"HealthResponse">
+        >,
+      ),
     deleteAccount: ({ authorization, idempotencyKey, body }) =>
       request("/v1/account", authorization, deletedAccountResponseSchema, {
         method: "DELETE",
