@@ -32,8 +32,6 @@ create table app_private.card_unlocks (
 
 alter table app_private.memberships
   add column target_streak integer not null default 0 check (target_streak >= 0);
-alter table app_private.accounts
-  add column highest_target_streak integer not null default 0 check (highest_target_streak >= 0);
 
 create table app_private.consequence_obligations (
   obligation_id uuid primary key,
@@ -129,7 +127,7 @@ create table app_private.consequence_claims (
   attested boolean not null check (attested),
   submitted_at timestamptz not null,
   review_ends_at timestamptz not null,
-  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'timed_out', 'closed_on_departure')),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'timed_out', 'replaced', 'closed_on_departure')),
   finalized_at timestamptz,
   constraint consequence_claims_review_deadline check (review_ends_at = submitted_at + interval '48 hours'),
   constraint consequence_claims_terminal check (
@@ -455,7 +453,8 @@ create or replace function app_private.finalize_consequence_claim(
   requested_claim_id uuid, requested_at timestamptz
 ) returns text language plpgsql security definer set search_path = '' as $$
 declare approvals integer; rejections integer; eligible_count integer; required_count integer;
-  claim_status text; attempt uuid; obligation uuid;
+  claim_status text; attempt uuid; obligation uuid; review_deadline timestamptz;
+  approval_reached_at timestamptz; rejection_reached_at timestamptz;
 begin
   select status, attempt_id into claim_status, attempt
   from app_private.consequence_claims where claim_id = requested_claim_id for update;
@@ -463,15 +462,36 @@ begin
   select count(*) into eligible_count from app_private.consequence_review_audience
     where claim_id = requested_claim_id and eligible;
   required_count := least(2, eligible_count);
+  select review_ends_at into review_deadline from app_private.consequence_claims
+    where claim_id = requested_claim_id;
   select count(*) filter (where response = 'approve'), count(*) filter (where response = 'reject')
     into approvals, rejections from app_private.consequence_review_responses r
     join app_private.consequence_review_audience a using (claim_id, membership_id)
-    where r.claim_id = requested_claim_id and a.eligible;
-  if requested_at >= (select review_ends_at from app_private.consequence_claims where claim_id = requested_claim_id)
-    then claim_status := 'timed_out';
-  elsif approvals >= required_count then claim_status := 'approved';
-  elsif rejections >= required_count then claim_status := 'rejected';
-  else return 'pending'; end if;
+    where r.claim_id = requested_claim_id and a.eligible and r.responded_at < review_deadline;
+  if required_count = 0 then
+    claim_status := 'approved';
+  else
+    if approvals >= required_count then
+      select responded_at into approval_reached_at
+      from app_private.consequence_review_responses
+      where claim_id = requested_claim_id and response = 'approve'
+        and responded_at < review_deadline order by responded_at offset required_count - 1 limit 1;
+    end if;
+    if rejections >= required_count then
+      select responded_at into rejection_reached_at
+      from app_private.consequence_review_responses
+      where claim_id = requested_claim_id and response = 'reject'
+        and responded_at < review_deadline order by responded_at offset required_count - 1 limit 1;
+    end if;
+    if approval_reached_at is not null
+       and (rejection_reached_at is null or approval_reached_at < rejection_reached_at) then
+      claim_status := 'approved';
+    elsif rejection_reached_at is not null then
+      claim_status := 'rejected';
+    elsif requested_at >= review_deadline then
+      claim_status := 'timed_out';
+    else return 'pending'; end if;
+  end if;
   update app_private.consequence_claims set status = claim_status, finalized_at = requested_at
     where claim_id = requested_claim_id;
   select obligation_id into obligation from app_private.consequence_attempts where attempt_id = attempt;
@@ -559,9 +579,14 @@ begin
     where offered.card_id = requested_card_id
       and offer.status in ('initial', 'redrawn', 'selected')
   loop
+    update app_private.consequence_claims set status = 'replaced', finalized_at = requested_at
+      where attempt_id in (
+        select attempt_id from app_private.consequence_attempts
+        where offer_id = affected_offer.offer_id
+      ) and status = 'pending';
     update app_private.consequence_attempts
       set status = 'not_completed', terminal_at = requested_at
-      where offer_id = affected_offer.offer_id and status in ('active', 'safety_paused');
+      where offer_id = affected_offer.offer_id and status in ('active', 'safety_paused', 'review');
     update app_private.card_offers set status = 'replaced'
       where offer_id = affected_offer.offer_id;
     perform app_private.create_card_offer(gen_random_uuid(), affected_offer.obligation_id,
@@ -626,30 +651,25 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare finalized_count integer; missed_item record;
+declare finalized_count integer; missed_item record; completed_count integer;
 begin
   finalized_count := 0;
   for missed_item in
-    select mw.member_week_id, mw.membership_id, m.account_id, mw.target,
-      count(wc.workout_checkin_id)::integer as completed_count
+    select mw.member_week_id, mw.membership_id, m.account_id, mw.target
     from app_private.member_weeks mw
     join app_private.memberships m on m.membership_id = mw.membership_id
     join app_private.accountability_weeks aw using (accountability_week_id)
-    left join app_private.workout_checkins wc on wc.member_week_id = mw.member_week_id
     where mw.status = 'active' and m.ended_at is null and requested_at >= aw.ends_at
-    group by mw.member_week_id, mw.membership_id, m.account_id, mw.target, aw.ends_at
     order by aw.ends_at, mw.member_week_id
+    for update of mw skip locked
   loop
-    if missed_item.completed_count >= missed_item.target then
+    select count(*)::integer into completed_count from app_private.workout_checkins
+      where member_week_id = missed_item.member_week_id;
+    if completed_count >= missed_item.target then
       update app_private.member_weeks set status = 'attained'
         where member_week_id = missed_item.member_week_id and status = 'active';
       update app_private.memberships set target_streak = target_streak + 1
         where membership_id = missed_item.membership_id;
-      update app_private.accounts account set highest_target_streak = greatest(
-        account.highest_target_streak,
-        (select target_streak from app_private.memberships
-         where membership_id = missed_item.membership_id)
-      ) where account_id = missed_item.account_id;
       if (select target_streak from app_private.memberships
           where membership_id = missed_item.membership_id) in (1, 2, 4, 8) then
         perform app_private.award_card_unlock(
