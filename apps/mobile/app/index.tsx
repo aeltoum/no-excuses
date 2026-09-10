@@ -3,7 +3,6 @@ import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useEffect, useReducer, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -23,38 +22,8 @@ import {
   MAX_EMAIL_INPUT_LENGTH,
   MAX_OTP_INPUT_LENGTH,
 } from "../src/auth-entry-state";
+import { FormAction } from "../src/FormAction";
 import { createLocalMobileSupabaseClient } from "../src/native-supabase";
-
-function Action({
-  label,
-  disabled,
-  onPress,
-  secondary = false,
-}: Readonly<{
-  label: string;
-  disabled?: boolean;
-  onPress(): void;
-  secondary?: boolean;
-}>) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        secondary && styles.secondary,
-        disabled && styles.disabled,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.actionText, secondary && styles.secondaryText]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 export default function Index() {
   const router = useRouter();
@@ -149,7 +118,7 @@ export default function Index() {
             size="large"
           />
         ) : (
-          <Action
+          <FormAction
             label="Continue to sign in"
             onPress={() => dispatch({ type: "open-request" })}
           />
@@ -171,7 +140,6 @@ export default function Index() {
             ref={errorSummary}
             accessible
             accessibilityRole="alert"
-            tabIndex={-1}
             style={styles.error}
           >
             There is a problem. {state.error}
@@ -192,7 +160,7 @@ export default function Index() {
         {state.error ? (
           <Text style={styles.inlineError}>Email address: {state.error}</Text>
         ) : null}
-        <Action
+        <FormAction
           label={state.busy ? "Sending code…" : "Send code"}
           disabled={state.busy}
           onPress={sendCode}
@@ -214,7 +182,6 @@ export default function Index() {
             ref={errorSummary}
             accessible
             accessibilityRole="alert"
-            tabIndex={-1}
             style={styles.error}
           >
             There is a problem. {state.error}
@@ -234,12 +201,12 @@ export default function Index() {
         {state.error ? (
           <Text style={styles.inlineError}>Six-digit code: {state.error}</Text>
         ) : null}
-        <Action
+        <FormAction
           label={state.busy ? "Verifying…" : "Verify code"}
           disabled={state.busy}
           onPress={verifyCode}
         />
-        <Action
+        <FormAction
           label="Use a different email"
           disabled={state.busy}
           onPress={() => dispatch({ type: "back-to-email" })}
@@ -296,22 +263,4 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   inlineError: { color: "#FFB4AB", fontSize: 15, lineHeight: 22 },
-  action: {
-    alignItems: "center",
-    backgroundColor: "#FFD400",
-    justifyContent: "center",
-    minHeight: 48,
-    minWidth: 48,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  actionText: { color: "#0A0A0A", fontSize: 17, fontWeight: "800" },
-  secondary: {
-    backgroundColor: "transparent",
-    borderColor: "#E8E8E8",
-    borderWidth: 1,
-  },
-  secondaryText: { color: "#E8E8E8" },
-  disabled: { opacity: 0.55 },
-  pressed: { opacity: 0.8 },
 });

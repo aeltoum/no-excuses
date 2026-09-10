@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMobileApiClient,
   MobileApiClientError,
+  readMobileApiBaseUrl,
 } from "../apps/mobile/src/api-client.js";
 
 const authorization = "Bearer caller-token";
@@ -17,6 +18,39 @@ function response(body: unknown, status = 200) {
 }
 
 describe("mobile API client", () => {
+  it("reads only a public HTTPS or loopback HTTP mobile API base URL", () => {
+    expect(
+      readMobileApiBaseUrl({
+        EXPO_PUBLIC_API_BASE_URL: " http://127.0.0.1:54321/functions/v1/ ",
+      }),
+    ).toBe("http://127.0.0.1:54321/functions/v1");
+    expect(() => readMobileApiBaseUrl({})).toThrow(
+      "EXPO_PUBLIC_API_BASE_URL is required",
+    );
+    expect(() =>
+      readMobileApiBaseUrl({ EXPO_PUBLIC_API_BASE_URL: "file:///private" }),
+    ).toThrow(
+      "EXPO_PUBLIC_API_BASE_URL must use public HTTPS or loopback HTTP",
+    );
+    expect(() =>
+      readMobileApiBaseUrl({ EXPO_PUBLIC_API_BASE_URL: "http://example.com" }),
+    ).toThrow(
+      "EXPO_PUBLIC_API_BASE_URL must use public HTTPS or loopback HTTP",
+    );
+    expect(() =>
+      readMobileApiBaseUrl({
+        EXPO_PUBLIC_API_BASE_URL: "https://user:secret@example.com",
+      }),
+    ).toThrow(
+      "EXPO_PUBLIC_API_BASE_URL must use public HTTPS or loopback HTTP",
+    );
+    expect(
+      readMobileApiBaseUrl({
+        EXPO_PUBLIC_API_BASE_URL: "https://api.example.test/root/",
+      }),
+    ).toBe("https://api.example.test/root");
+  });
+
   it("exposes a typed method for every version 1 operation", () => {
     const client = createMobileApiClient({
       baseUrl: "https://api.example.test",
