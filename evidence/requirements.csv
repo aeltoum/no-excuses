@@ -25,9 +25,9 @@ COMP-02,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Co
 COMP-03,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed contested tie multi-award Exception departure late-data exactly-once Crown and Season-assignment job-order tests; physical-device E2E and real PostgreSQL smoke pending
 SEASON-01,in-progress,6,evidence/m2-identity-group-calendar.md; evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed shortened activation below-capacity pause four-active-week boundary rollover delayed execution settlement overlap and tied-standing tests; real PostgreSQL smoke pending
 SEASON-02,in-progress,6,evidence/m6-activity-competition-seasons.md,Independent Codex validator iteration 4 passed post-Crown idempotent summary complete totals audience departure and return-isolation tests; UI read model remains milestone 7 and real PostgreSQL smoke pending
-SOCIAL-01,planned,7,,Social interaction evidence
-NOTIFY-01,planned,7,,Action notification evidence
-NOTIFY-02,planned,7,,Social delivery evidence
+SOCIAL-01,in-progress,7,evidence/m7-read-models-notifications.md,Automated same-Group reaction and message authorization idempotency non-interference and canonical in-app notification evidence; UI and physical-device evidence pending
+NOTIFY-01,in-progress,7,evidence/m7-read-models-notifications.md,Automated rebuildable task-first home action count live authorization typed stale-link fallback and optional-push suppression evidence; complete task sources and physical-device evidence pending
+NOTIFY-02,in-progress,7,evidence/m7-read-models-notifications.md,Automated separate social and action civil-date budget bundle cap permission suppression and canonical in-app persistence evidence; provider and physical-device evidence pending
 ACCESS-01,in-progress,9,evidence/m1-shared-kernel.md; evidence/m2-mobile-auth.md,Navigation semantic shell plus automated local email OTP and secure session-state foundation; device and full flow evidence pending
 ACCESS-02,planned,9,,Responsive and input evidence
 ACCESS-03,planned,9,,Permission and degraded-path evidence

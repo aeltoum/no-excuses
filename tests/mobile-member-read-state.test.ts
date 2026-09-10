@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import {
+  type MemberReadState,
+  memberRoute,
+  reduceMemberReadState,
+} from "../apps/mobile/src/member-read-state.js";
+
+describe("M7 mobile member read states", () => {
+  it("exposes every required non-success state without discarding its explanation", () => {
+    let state: MemberReadState<string[]> = { status: "loading" };
+    const events = [
+      { type: "empty", message: "Nothing needs you" },
+      { type: "denied", message: "Current Group membership required" },
+      { type: "failure", message: "Could not refresh", retryable: true },
+      { type: "conflict", message: "Review current state" },
+      { type: "pending", message: "Still working" },
+    ] as const;
+    for (const event of events) {
+      state = reduceMemberReadState(state, event);
+      expect(state.status).toBe(event.type);
+      expect("message" in state && state.message).toBe(event.message);
+    }
+  });
+
+  it("keeps stale data explicit and makes malformed deep links recover safely", () => {
+    const state = reduceMemberReadState<string[]>(
+      { status: "loading" },
+      {
+        type: "loaded",
+        value: ["current week"],
+        staleAt: "2026-09-10T12:00:00Z",
+      },
+    );
+    expect(state).toEqual({
+      status: "ready",
+      value: ["current week"],
+      staleAt: "2026-09-10T12:00:00Z",
+    });
+    expect(memberRoute("task")).toBe("/home?notice=unavailable");
+    expect(memberRoute("task", "a/b")).toBe("/tasks/a%2Fb");
+  });
+});
