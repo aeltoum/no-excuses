@@ -11,10 +11,23 @@ only; no email adapter was added.
   live-authorized typed deep-link recovery.
 - `apps/mobile/src/member-read-state.ts`: explicit loading, empty, denied, failure, conflict,
   pending, ready/stale states plus typed member routes and safe malformed-link fallback.
+- `supabase/migrations/20260910040000_member_home_view.sql`: live-authorized composite Home
+  read over rebuilt personal progress, friend activity, and current active-Season Crown totals;
+  current members with zero Crowns remain visible and tied ranks share rank.
+- `packages/contracts/openapi.yaml`, generated/runtime contract exports,
+  `packages/delivery/src/api.ts`, and `packages/delivery/src/http.ts`: versioned
+  `GET /v1/member-home` contract and existing authenticated read-handler/HTTP seam.
+- `apps/mobile/src/api-client.ts` and `apps/mobile/app/(member)/home.tsx`: typed authorized Home
+  load and compact task-first render order: Needs you, personal weekly progress, friend
+  activity, then Season standings. Charcoal/Safety-yellow treatment follows approved visual
+  conventions. Loading, empty, denied, failure, conflict, prolonged pending, ready/stale, and
+  safe stale-route notice presentations are explicit.
 - `tests/read-models-notifications.test.ts`: authoritative rebuild equivalence, cross-Group
-  denial, departure cleanup, idempotent social writes, outcome non-interference, bundle and
-  separate-cap behavior, denied-push suppression, canonical in-app persistence, and stale-link
-  recovery.
+  denial, departure cleanup, active-Season zero-Crown standings, composite Home-read outcome
+  non-interference, idempotent social writes, bundle and separate-cap behavior, denied-push
+  suppression, canonical in-app persistence, and stale-link recovery.
+- `tests/http-routing.test.ts` and `tests/mobile-api-client.test.ts`: exact Home route dispatch,
+  bearer-only GET behavior, runtime response validation, and typed mobile-client coverage.
 - `tests/mobile-member-read-state.test.ts`: required degraded states and route fallback.
 
 ## Gate 1
@@ -26,15 +39,19 @@ missing permission suppresses only delivery while canonical in-app items remain 
 External copy uses template keys and opaque identifiers; no private content enters delivery
 records. No hosted service, dependency, account, processor, payment, or provisioning added.
 
-Historical Wall projection remains deferred because merged M3 provides no authoritative Proof
-or retained-media source. Adding a surrogate Wall over self-reported check-ins would contradict
-the accepted Wall definition and module boundary. Implement after Proof/Wall source activation.
+Remaining M7 work is explicit: complete authoritative task sources, actual Proof feed and
+historical Wall projection after Proof/retained-media activation, notification-center UI,
+delivery/runtime adapter binding, provider delivery, offline cache/recovery behavior, real
+PostgreSQL verification, and physical-device accessibility/push validation. Hosted services
+remain separately gated. Current Home friend activity is structured weekly progress, not a
+claim that Proof media/feed or Wall exists.
 
 ## Validation status
 
-Independent read-only Codex validator iteration 1 passed: focused migration, read-model,
-notification, route, mobile-state, and forward-migration suites passed 14 of 14 tests;
-TypeScript and `git diff --check` passed. Worker full repository check passed 164 of 164 tests
-plus format, generated-contract, TypeScript, secret, and dependency checks. PGlite is
-PostgreSQL-compatible migration/domain evidence; real PostgreSQL and physical-device push
-delivery remain pending.
+Independent read-only Codex validator iteration 2 passed connected-Home acceptance after
+verifying live authorization, active current-Season standings, task-first semantic order,
+reachable pending state, safe stale-route recovery, read immutability, adjacent failure
+behavior, and scope containment. Worker full repository check passed 166 of 166 tests plus
+format, generated-contract, TypeScript, secret, dependency, and `git diff --check` checks.
+PGlite is PostgreSQL-compatible migration/domain evidence; no physical-device, provider,
+hosted-service, real PostgreSQL, or deployment-adapter result is claimed.

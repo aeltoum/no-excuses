@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/member-home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMemberHome"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/members/{membershipId}/remove": {
         parameters: {
             query?: never;
@@ -334,6 +350,39 @@ export interface components {
                 membershipId: string;
             } | null;
         };
+        MemberHomeResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["MemberHomeResult"];
+        };
+        MemberHomeResult: {
+            /** Format: uuid */
+            membershipId: string;
+            /** Format: uuid */
+            groupId: string;
+            accountabilityWeekId: components["schemas"]["Uuid"] | null;
+            weekStatus: ("active" | "provisional" | "attained" | "missed" | "excepted" | "ended_without_result") | null;
+            lockedTarget: number | null;
+            completedWorkoutCount: number;
+            needsYouCount: number;
+            friendActivity: components["schemas"]["MemberHomeFriendActivity"][];
+            seasonStandings: components["schemas"]["MemberHomeSeasonStanding"][];
+            rebuiltAt: components["schemas"]["UtcInstant"];
+        };
+        MemberHomeFriendActivity: {
+            /** Format: uuid */
+            membershipId: string;
+            lockedTarget: number | null;
+            completedWorkoutCount: number;
+            weekStatus: ("active" | "provisional" | "attained" | "missed" | "excepted" | "ended_without_result") | null;
+        };
+        MemberHomeSeasonStanding: {
+            /** Format: uuid */
+            membershipId: string;
+            crowns: number;
+            rank: number;
+            cochampion: boolean;
+        };
         GroupInvitationResponse: {
             /** @constant */
             contractVersion: 1;
@@ -394,6 +443,8 @@ export interface components {
         };
         /** Format: date-time */
         UtcInstant: string;
+        /** Format: uuid */
+        Uuid: string;
     };
     responses: {
         /** @description Request, authorization, conflict, or domain failure */
@@ -720,6 +771,31 @@ export interface operations {
             };
             400: components["responses"]["ApiError"];
             401: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getMemberHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized task-first member Home read model */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberHomeResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

@@ -219,6 +219,9 @@ export const handleCurrentWeekProgress = groupReadHandler(groupRequestSchema);
 export const handleCurrentGroupMembership = groupReadHandler(
   currentGroupMembershipRequestSchema,
 );
+export const handleMemberHome = groupReadHandler(
+  currentGroupMembershipRequestSchema,
+);
 export const handleFinalizedWeeklyHistory =
   groupReadHandler(groupRequestSchema);
 

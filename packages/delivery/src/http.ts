@@ -13,6 +13,7 @@ export type V1HttpHandlers = Readonly<{
   setWeeklyTarget: HttpHandler;
   removeGroupMember: HttpHandler;
   getCurrentGroupMembership: HttpHandler;
+  getMemberHome: HttpHandler;
   getCurrentWeekProgress: HttpHandler;
   getFinalizedWeeklyHistory: HttpHandler;
 }>;
@@ -78,6 +79,12 @@ const routes: readonly Route[] = [
     pattern: /^\/v1\/group-memberships\/current$/,
     parameters: [],
     handler: "getCurrentGroupMembership",
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/member-home$/,
+    parameters: [],
+    handler: "getMemberHome",
   },
   {
     method: "POST",

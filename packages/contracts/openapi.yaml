@@ -168,6 +168,17 @@ paths:
         "400": { $ref: "#/components/responses/ApiError" }
         "401": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/member-home:
+    get:
+      operationId: getMemberHome
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Authorized task-first member Home read model, content: { application/json: { schema: { $ref: "#/components/schemas/MemberHomeResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/members/{membershipId}/remove:
     post:
       operationId: removeGroupMember
@@ -400,6 +411,50 @@ components:
                 groupId: { type: string, format: uuid }
                 membershipId: { type: string, format: uuid }
             - type: "null"
+    MemberHomeResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/MemberHomeResult" }
+    MemberHomeResult:
+      type: object
+      additionalProperties: false
+      required: [membershipId, groupId, accountabilityWeekId, weekStatus, lockedTarget, completedWorkoutCount, needsYouCount, friendActivity, seasonStandings, rebuiltAt]
+      properties:
+        membershipId: { type: string, format: uuid }
+        groupId: { type: string, format: uuid }
+        accountabilityWeekId: { oneOf: [{ $ref: "#/components/schemas/Uuid" }, { type: "null" }] }
+        weekStatus: { oneOf: [{ type: string, enum: [active, provisional, attained, missed, excepted, ended_without_result] }, { type: "null" }] }
+        lockedTarget: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
+        completedWorkoutCount: { type: integer, minimum: 0 }
+        needsYouCount: { type: integer, minimum: 0 }
+        friendActivity:
+          type: array
+          items: { $ref: "#/components/schemas/MemberHomeFriendActivity" }
+        seasonStandings:
+          type: array
+          items: { $ref: "#/components/schemas/MemberHomeSeasonStanding" }
+        rebuiltAt: { $ref: "#/components/schemas/UtcInstant" }
+    MemberHomeFriendActivity:
+      type: object
+      additionalProperties: false
+      required: [membershipId, lockedTarget, completedWorkoutCount, weekStatus]
+      properties:
+        membershipId: { type: string, format: uuid }
+        lockedTarget: { oneOf: [{ type: integer, minimum: 1 }, { type: "null" }] }
+        completedWorkoutCount: { type: integer, minimum: 0 }
+        weekStatus: { oneOf: [{ type: string, enum: [active, provisional, attained, missed, excepted, ended_without_result] }, { type: "null" }] }
+    MemberHomeSeasonStanding:
+      type: object
+      additionalProperties: false
+      required: [membershipId, crowns, rank, cochampion]
+      properties:
+        membershipId: { type: string, format: uuid }
+        crowns: { type: integer, minimum: 0 }
+        rank: { type: integer, minimum: 1 }
+        cochampion: { type: boolean }
     GroupInvitationResponse:
       type: object
       additionalProperties: false
@@ -486,3 +541,6 @@ components:
       type: string
       format: date-time
       pattern: "Z$"
+    Uuid:
+      type: string
+      format: uuid
