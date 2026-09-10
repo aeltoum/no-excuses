@@ -14,9 +14,9 @@ WORK-03,planned,3,,Draft and offline evidence
 VERIFY-01,planned,4,,Review decision evidence
 VERIFY-02,in-progress,4,evidence/m4-true-mvp-weekly-settlement.md,True-MVP self-report settlement and exactly-once terminal outcome evidence; peer-review behavior deferred
 MISS-01,in-progress,4,evidence/m4-true-mvp-weekly-settlement.md; evidence/m4-true-mvp-api-contracts.md,Automatic True-MVP missed-target settlement and named Group-visible finalized-history delivery evidence; consequences deferred
-CARD-01,planned,5,,Card catalog and unlock evidence
-CARD-02,planned,5,,Card offer and backlog evidence
-CARD-03,planned,5,,Consequence completion evidence
+CARD-01,in-progress,5,evidence/m5-consequence-system.md,Automated catalog unlock persistence contribution provenance and property evidence; independent review pending
+CARD-02,in-progress,5,evidence/m5-consequence-system.md,Automated unique offer redraw snapshot backlog cap Safety pause expiry and departure evidence; independent review pending
+CARD-03,in-progress,5,evidence/m5-consequence-system.md,Automated media-free claim threshold timeout idempotency and exactly-one completion evidence; independent review pending
 SAFE-01,planned,8,,Safety and moderation evidence
 MEDIA-01,planned,3,,Proof capture and visibility evidence
 MEDIA-02,planned,3,,Proof retention and deletion evidence
