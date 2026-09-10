@@ -5,6 +5,7 @@ import {
   type MobileAuthSession,
   observeMobileSession,
   requestEmailOtp,
+  resolveMobileSessionAccess,
   type SessionAccess,
   verifyEmailOtp,
 } from "../apps/mobile/src/auth.js";
@@ -331,5 +332,35 @@ describe("session observer", () => {
     expect(states).toEqual([{ status: "checking" }, { status: "failure" }]);
     expect(JSON.stringify(states)).not.toContain("private-access-token");
     observer.stop();
+  });
+});
+
+describe("session access", () => {
+  it.each([
+    [{ data: { user: session.user }, error: null }, "signed-in"],
+    [{ data: { user: null }, error: { status: 401 } }, "revoked"],
+    [{ data: { user: null }, error: { status: 503 } }, "service-unavailable"],
+  ] as const)(
+    "maps live user lookup to %s access",
+    async (result, expected) => {
+      const getUser = vi.fn(async () => result);
+      await expect(
+        resolveMobileSessionAccess(authClient({ getUser }), session),
+      ).resolves.toBe(expected);
+      expect(getUser).toHaveBeenCalledWith(session.access_token);
+    },
+  );
+
+  it("treats transport failure as service unavailable", async () => {
+    await expect(
+      resolveMobileSessionAccess(
+        authClient({
+          getUser: vi.fn(async () => {
+            throw new Error("private credential");
+          }),
+        }),
+        session,
+      ),
+    ).resolves.toBe("service-unavailable");
   });
 });
