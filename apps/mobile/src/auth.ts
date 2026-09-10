@@ -20,6 +20,21 @@ export type MobileSessionState =
 
 export type SessionAccess = "signed-in" | "revoked" | "service-unavailable";
 
+export async function resolveMobileSessionAccess(
+  client: MobileAuthClient,
+  session: Session,
+): Promise<SessionAccess> {
+  try {
+    const { data, error } = await client.auth.getUser(session.access_token);
+    if (!error && data.user) return "signed-in";
+    return error?.status === undefined || error.status >= 500
+      ? "service-unavailable"
+      : "revoked";
+  } catch {
+    return "service-unavailable";
+  }
+}
+
 export class MobileAuthError extends Error {
   readonly kind: "invalid-input" | "rejected" | "service-unavailable";
 
