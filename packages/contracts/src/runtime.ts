@@ -75,6 +75,7 @@ export const acceptGroupInvitationRequestSchema = z
   .refine((value) => value.currentTarget <= value.recurringTarget);
 
 export const leaveGroupRequestSchema = z.object({}).strict();
+export const currentGroupMembershipRequestSchema = z.object({}).strict();
 
 export const removeGroupMemberRequestSchema = z
   .object({ groupId: uuidSchema, membershipId: uuidSchema })
@@ -90,6 +91,15 @@ export const deleteAccountRequestSchema = z
 
 export const groupMembershipResultSchema = z
   .object({ membershipId: uuidSchema })
+  .strict();
+
+export const currentGroupMembershipResultSchema = z
+  .object({
+    membership: z
+      .object({ groupId: uuidSchema, membershipId: uuidSchema })
+      .strict()
+      .nullable(),
+  })
   .strict();
 
 export const groupInvitationResultSchema = z
@@ -117,6 +127,9 @@ const commandResponse = <Schema extends z.ZodType>(schema: Schema) =>
 
 export const groupMembershipResponseSchema = commandResponse(
   groupMembershipResultSchema,
+);
+export const currentGroupMembershipResponseSchema = commandResponse(
+  currentGroupMembershipResultSchema,
 );
 export const groupInvitationResponseSchema = commandResponse(
   groupInvitationResultSchema,
@@ -202,6 +215,9 @@ export type AcceptGroupInvitationRequest = z.infer<
   typeof acceptGroupInvitationRequestSchema
 >;
 export type LeaveGroupRequest = z.infer<typeof leaveGroupRequestSchema>;
+export type CurrentGroupMembershipRequest = z.infer<
+  typeof currentGroupMembershipRequestSchema
+>;
 export type RemoveGroupMemberRequest = z.infer<
   typeof removeGroupMemberRequestSchema
 >;
@@ -210,6 +226,9 @@ export type SetWeeklyTargetRequest = z.infer<
 >;
 export type DeleteAccountRequest = z.infer<typeof deleteAccountRequestSchema>;
 export type GroupMembershipResult = z.infer<typeof groupMembershipResultSchema>;
+export type CurrentGroupMembershipResult = z.infer<
+  typeof currentGroupMembershipResultSchema
+>;
 export type GroupInvitationResult = z.infer<typeof groupInvitationResultSchema>;
 export type RevokedGroupInvitationResult = z.infer<
   typeof revokedGroupInvitationResultSchema

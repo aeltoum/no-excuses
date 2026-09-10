@@ -1,6 +1,7 @@
 import {
   apiErrorResponseSchema,
   type components,
+  currentGroupMembershipResponseSchema,
   currentWeekProgressResponseSchema,
   deletedAccountResponseSchema,
   finalizedWeeklyHistoryResponseSchema,
@@ -101,6 +102,9 @@ export type MobileApiClient = Readonly<{
   removeGroupMember(
     input: Command & Readonly<{ groupId: string; membershipId: string }>,
   ): Promise<Schema<"GroupMembershipResponse">>;
+  getCurrentGroupMembership(
+    input: Authorized,
+  ): Promise<Schema<"CurrentGroupMembershipResponse">>;
   getCurrentWeekProgress(
     input: Authorized & Readonly<{ groupId: string }>,
   ): Promise<Schema<"CurrentWeekProgressResponse">>;
@@ -258,6 +262,12 @@ export function createMobileApiClient({
         authorization,
         groupMembershipResponseSchema,
         { method: "POST", idempotencyKey },
+      ),
+    getCurrentGroupMembership: ({ authorization }) =>
+      request(
+        "/v1/group-memberships/current",
+        authorization,
+        currentGroupMembershipResponseSchema,
       ),
     getCurrentWeekProgress: ({ authorization, groupId }) =>
       request(

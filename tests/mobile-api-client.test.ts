@@ -69,6 +69,7 @@ describe("mobile API client", () => {
         "leaveGroup",
         "setWeeklyTarget",
         "removeGroupMember",
+        "getCurrentGroupMembership",
         "getCurrentWeekProgress",
         "getFinalizedWeeklyHistory",
       ].sort(),
@@ -122,6 +123,59 @@ describe("mobile API client", () => {
         body: undefined,
       },
     );
+  });
+
+  it("reads explicit current and empty Group membership results", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({
+          contractVersion: 1,
+          data: { membership: { groupId, membershipId } },
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({ contractVersion: 1, data: { membership: null } }),
+      );
+    const client = createMobileApiClient({
+      baseUrl: "https://api.example.test",
+      fetch,
+    });
+
+    await expect(
+      client.getCurrentGroupMembership({ authorization }),
+    ).resolves.toEqual({
+      contractVersion: 1,
+      data: { membership: { groupId, membershipId } },
+    });
+    await expect(
+      client.getCurrentGroupMembership({ authorization }),
+    ).resolves.toEqual({ contractVersion: 1, data: { membership: null } });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.test/v1/group-memberships/current",
+      {
+        method: "GET",
+        headers: { authorization },
+        body: undefined,
+      },
+    );
+  });
+
+  it("rejects malformed current membership responses", async () => {
+    const client = createMobileApiClient({
+      baseUrl: "https://api.example.test",
+      fetch: vi.fn(async () =>
+        response({ contractVersion: 1, data: { membership: { groupId } } }),
+      ),
+    });
+
+    await expect(
+      client.getCurrentGroupMembership({ authorization }),
+    ).rejects.toMatchObject({
+      name: "MobileApiClientError",
+      kind: "malformed_response",
+      status: 200,
+    });
   });
 
   it("URL-encodes caller-supplied path authority", async () => {

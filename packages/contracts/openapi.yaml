@@ -159,6 +159,15 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/group-memberships/current:
+    get:
+      operationId: getCurrentGroupMembership
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Authoritative current Group membership, content: { application/json: { schema: { $ref: "#/components/schemas/CurrentGroupMembershipResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/members/{membershipId}/remove:
     post:
       operationId: removeGroupMember
@@ -370,6 +379,27 @@ components:
       required: [membershipId]
       properties:
         membershipId: { type: string, format: uuid }
+    CurrentGroupMembershipResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/CurrentGroupMembershipResult" }
+    CurrentGroupMembershipResult:
+      type: object
+      additionalProperties: false
+      required: [membership]
+      properties:
+        membership:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [groupId, membershipId]
+              properties:
+                groupId: { type: string, format: uuid }
+                membershipId: { type: string, format: uuid }
+            - type: "null"
     GroupInvitationResponse:
       type: object
       additionalProperties: false

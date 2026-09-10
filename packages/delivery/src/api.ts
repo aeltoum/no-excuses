@@ -1,6 +1,7 @@
 import {
   acceptGroupInvitationRequestSchema,
   createGroupRequestSchema,
+  currentGroupMembershipRequestSchema,
   deleteAccountRequestSchema,
   groupRequestSchema,
   issueGroupInvitationRequestSchema,
@@ -215,6 +216,9 @@ export const handleSubmitWorkoutCheckin = groupCommandHandler(
   submitWorkoutCheckinRequestSchema,
 );
 export const handleCurrentWeekProgress = groupReadHandler(groupRequestSchema);
+export const handleCurrentGroupMembership = groupReadHandler(
+  currentGroupMembershipRequestSchema,
+);
 export const handleFinalizedWeeklyHistory =
   groupReadHandler(groupRequestSchema);
 
