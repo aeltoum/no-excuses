@@ -24,6 +24,7 @@ function setup(overrides: Partial<V1HttpHandlers> = {}) {
     leaveGroup: operation("leaveGroup"),
     setWeeklyTarget: operation("setWeeklyTarget"),
     removeGroupMember: operation("removeGroupMember"),
+    getCurrentGroupMembership: operation("getCurrentGroupMembership"),
     getCurrentWeekProgress: operation("getCurrentWeekProgress"),
     getFinalizedWeeklyHistory: operation("getFinalizedWeeklyHistory"),
     ...overrides,
@@ -59,6 +60,7 @@ describe("version 1 HTTP routing", () => {
       ["POST", "/v1/group-invitations/accept", "acceptGroupInvitation"],
       ["POST", "/v1/group-memberships/leave", "leaveGroup"],
       ["PUT", "/v1/group-memberships/weekly-target", "setWeeklyTarget"],
+      ["GET", "/v1/group-memberships/current", "getCurrentGroupMembership"],
       [
         "POST",
         `/v1/groups/${groupId}/members/${membershipId}/remove`,

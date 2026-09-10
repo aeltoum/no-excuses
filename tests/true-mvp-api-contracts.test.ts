@@ -4,6 +4,8 @@ import {
   acceptGroupInvitationRequestSchema,
   apiErrorResponseSchema,
   createGroupRequestSchema,
+  currentGroupMembershipRequestSchema,
+  currentGroupMembershipResponseSchema,
   currentWeekProgressResponseSchema,
   finalizedWeeklyHistoryResponseSchema,
   groupInvitationResponseSchema,
@@ -159,6 +161,7 @@ describe("True-MVP API runtime contracts", () => {
       revokeGroupInvitationRequestSchema.parse({ invitationId: checkinId }),
     ).toBeTruthy();
     expect(leaveGroupRequestSchema.parse({})).toEqual({});
+    expect(currentGroupMembershipRequestSchema.parse({})).toEqual({});
     expect(
       removeGroupMemberRequestSchema.parse({ groupId, membershipId }),
     ).toBeTruthy();
@@ -191,6 +194,24 @@ describe("True-MVP API runtime contracts", () => {
         data: { membershipId },
       }),
     ).toBeTruthy();
+    expect(
+      currentGroupMembershipResponseSchema.parse({
+        contractVersion: 1,
+        data: { membership: { groupId, membershipId } },
+      }),
+    ).toBeTruthy();
+    expect(
+      currentGroupMembershipResponseSchema.parse({
+        contractVersion: 1,
+        data: { membership: null },
+      }),
+    ).toBeTruthy();
+    expect(
+      currentGroupMembershipResponseSchema.safeParse({
+        contractVersion: 1,
+        data: { membership: { groupId } },
+      }).success,
+    ).toBe(false);
     expect(
       groupInvitationResponseSchema.parse({
         contractVersion: 1,

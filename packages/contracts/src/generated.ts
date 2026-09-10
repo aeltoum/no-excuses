@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/group-memberships/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentGroupMembership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/members/{membershipId}/remove": {
         parameters: {
             query?: never;
@@ -304,6 +320,19 @@ export interface components {
         GroupMembershipResult: {
             /** Format: uuid */
             membershipId: string;
+        };
+        CurrentGroupMembershipResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["CurrentGroupMembershipResult"];
+        };
+        CurrentGroupMembershipResult: {
+            membership: {
+                /** Format: uuid */
+                groupId: string;
+                /** Format: uuid */
+                membershipId: string;
+            } | null;
         };
         GroupInvitationResponse: {
             /** @constant */
@@ -668,6 +697,29 @@ export interface operations {
             401: components["responses"]["ApiError"];
             403: components["responses"]["ApiError"];
             409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getCurrentGroupMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative current Group membership */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentGroupMembershipResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

@@ -2,6 +2,8 @@ export type { components, paths } from "./generated.js";
 export type {
   AcceptGroupInvitationRequest,
   CreateGroupRequest,
+  CurrentGroupMembershipRequest,
+  CurrentGroupMembershipResult,
   CurrentWeekProgressItem,
   DeleteAccountRequest,
   DeletedAccountResult,
@@ -25,6 +27,9 @@ export {
   apiErrorCodeSchema,
   apiErrorResponseSchema,
   createGroupRequestSchema,
+  currentGroupMembershipRequestSchema,
+  currentGroupMembershipResponseSchema,
+  currentGroupMembershipResultSchema,
   currentWeekProgressItemSchema,
   currentWeekProgressResponseSchema,
   deleteAccountRequestSchema,
