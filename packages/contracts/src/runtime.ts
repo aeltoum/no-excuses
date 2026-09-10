@@ -84,6 +84,10 @@ export const setWeeklyTargetRequestSchema = z
   .object({ weeklyTarget: positiveIntegerSchema })
   .strict();
 
+export const deleteAccountRequestSchema = z
+  .object({ confirmation: z.literal(true) })
+  .strict();
+
 export const groupMembershipResultSchema = z
   .object({ membershipId: uuidSchema })
   .strict();
@@ -104,6 +108,10 @@ export const weeklyTargetResultSchema = z
   .object({ membershipId: uuidSchema, weeklyTarget: positiveIntegerSchema })
   .strict();
 
+export const deletedAccountResultSchema = z
+  .object({ accountId: uuidSchema })
+  .strict();
+
 const commandResponse = <Schema extends z.ZodType>(schema: Schema) =>
   z.object({ contractVersion: z.literal(1), data: schema }).strict();
 
@@ -118,6 +126,9 @@ export const revokedGroupInvitationResponseSchema = commandResponse(
 );
 export const weeklyTargetResponseSchema = commandResponse(
   weeklyTargetResultSchema,
+);
+export const deletedAccountResponseSchema = commandResponse(
+  deletedAccountResultSchema,
 );
 
 export const workoutCheckinResultSchema = z
@@ -197,12 +208,14 @@ export type RemoveGroupMemberRequest = z.infer<
 export type SetWeeklyTargetRequest = z.infer<
   typeof setWeeklyTargetRequestSchema
 >;
+export type DeleteAccountRequest = z.infer<typeof deleteAccountRequestSchema>;
 export type GroupMembershipResult = z.infer<typeof groupMembershipResultSchema>;
 export type GroupInvitationResult = z.infer<typeof groupInvitationResultSchema>;
 export type RevokedGroupInvitationResult = z.infer<
   typeof revokedGroupInvitationResultSchema
 >;
 export type WeeklyTargetResult = z.infer<typeof weeklyTargetResultSchema>;
+export type DeletedAccountResult = z.infer<typeof deletedAccountResultSchema>;
 export type WorkoutCheckinResult = z.infer<typeof workoutCheckinResultSchema>;
 export type CurrentWeekProgressItem = z.infer<
   typeof currentWeekProgressItemSchema
