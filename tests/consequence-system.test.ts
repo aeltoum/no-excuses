@@ -108,6 +108,33 @@ describe("M5 Consequence system", () => {
         where obligation_id = '${obligationId}';`);
     }
     expect(contributorRows).toEqual([{ membership_id: memberships[1] }]);
+
+    for (const milestone of [2, 4, 8]) {
+      await db.query(
+        "select app_private.award_card_unlock($1, $2, $3, $4, '2026-03-10Z')",
+        [randomUUID(), accounts[1], milestone, `milestone-${milestone}`],
+      );
+    }
+    let redrawContributors: unknown[] = [];
+    for (let n = 0; n < 20 && redrawContributors.length === 0; n += 1) {
+      const { obligationId } = await addObligation(db);
+      const offerId = await offer(db, obligationId, `redraw-source-${n}`);
+      await db.query("select app_private.redraw_card_offer($1, $2)", [
+        offerId,
+        `redraw-${n}`,
+      ]);
+      redrawContributors = (
+        await db.query(`select membership_id
+          from app_private.offered_card_contributors
+          where offer_id = '${offerId}' and phase = 'redraw'`)
+      ).rows;
+      await db.exec(`update app_private.card_offers set status = 'replaced' where offer_id = '${offerId}';
+        update app_private.consequence_obligations set status = 'completed', closed_at = '2026-03-10Z'
+        where obligation_id = '${obligationId}';`);
+    }
+    expect(redrawContributors).toContainEqual({
+      membership_id: memberships[1],
+    });
   });
 
   it("draws fair distinct snapshots and permits one disjoint redraw", async () => {
@@ -144,6 +171,26 @@ describe("M5 Consequence system", () => {
     await expect(
       db.query("select app_private.redraw_card_offer($1, 'again')", [offerId]),
     ).rejects.toThrow("initial Card offer required");
+    const retiredCard = (
+      await db.query<{
+        card_id: string;
+      }>(`select card_id from app_private.offered_cards
+        where offer_id = '${offerId}' and phase = 'redraw' order by position limit 1`)
+    ).rows[0]?.card_id;
+    expect(
+      (
+        await db.query(
+          "select app_private.retire_consequence_card($1, '2026-03-11Z')",
+          [retiredCard],
+        )
+      ).rows,
+    ).toEqual([{ retire_consequence_card: 1 }]);
+    expect(
+      (
+        await db.query(`select count(*)::integer as count from app_private.card_offers
+          where obligation_id = '${obligationId}' and status = 'initial'`)
+      ).rows,
+    ).toEqual([{ count: 1 }]);
   });
 
   it("caps and deduplicates backlog, pauses safely, expires once, and reoffers original obligation", async () => {
@@ -165,9 +212,12 @@ describe("M5 Consequence system", () => {
       ).rows,
     ).toEqual([{ add_consequence_obligation: obligations[0]?.obligationId }]);
 
+    const offerId = await offer(db, obligations[0]?.obligationId ?? "");
+    await expect(offer(db, obligations[1]?.obligationId ?? "")).rejects.toThrow(
+      "duplicate key",
+    );
     await db.exec(`update app_private.consequence_obligations set status = 'completed', closed_at = '2026-03-10Z'
       where obligation_id <> '${obligations[0]?.obligationId}'`);
-    const offerId = await offer(db, obligations[0]?.obligationId ?? "");
     const selected = (
       await db.query<{
         card_id: string;
@@ -195,10 +245,12 @@ describe("M5 Consequence system", () => {
       "select app_private.resume_consequence_from_safety($1, '2026-03-20Z')",
       [attemptId],
     );
-    const replacementOffer = await offer(
-      db,
-      obligations[0]?.obligationId ?? "",
-    );
+    const replacementOffer = (
+      await db.query<{
+        offer_id: string;
+      }>(`select offer_id from app_private.card_offers
+        where obligation_id = '${obligations[0]?.obligationId}' and status = 'initial'`)
+    ).rows[0]?.offer_id;
     const replacementCard = (
       await db.query<{
         card_id: string;
@@ -304,6 +356,18 @@ describe("M5 Consequence system", () => {
         )
       ).rows,
     ).toEqual([{ finalize_consequence_claim: "timed_out" }]);
+    await expect(
+      db.query(
+        "select app_private.respond_to_consequence_claim($1, $2, $3, 'approve', '2026-03-12T03:00Z')",
+        [randomUUID(), nextClaim, memberships[1]],
+      ),
+    ).rejects.toThrow("eligible Consequence reviewer required");
+    expect(
+      (
+        await db.query(`select count(*)::integer as count from app_private.card_offers
+          where obligation_id = '${next.obligationId}' and status = 'initial'`)
+      ).rows,
+    ).toEqual([{ count: 1 }]);
     expect(
       (
         await db.query(`select count(*)::integer as count from app_private.consequence_obligations
@@ -318,6 +382,38 @@ describe("M5 Consequence system", () => {
         where obligation_id = '${next.obligationId}'`)
       ).rows,
     ).toEqual([{ status: "closed_on_departure" }]);
+  });
+
+  it("uses every remaining peer threshold, including a zero-peer claim", async () => {
+    const db = await database();
+    await db.exec(`update app_private.memberships set ended_at = '2026-03-09Z', end_reason = 'left'
+      where membership_id <> '${memberships[0]}'`);
+    const { obligationId } = await addObligation(db);
+    const offerId = await offer(db, obligationId);
+    const card = (
+      await db.query<{
+        card_id: string;
+      }>(`select card_id from app_private.offered_cards
+        where offer_id = '${offerId}' order by position limit 1`)
+    ).rows[0]?.card_id;
+    const attemptId = randomUUID();
+    const claimId = randomUUID();
+    await db.query(
+      "select app_private.select_consequence_card($1, $2, $3, '2026-03-10Z')",
+      [attemptId, offerId, card],
+    );
+    await db.query(
+      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z')",
+      [claimId, attemptId],
+    );
+    expect(
+      (
+        await db.query(
+          "select app_private.finalize_consequence_claim($1, '2026-03-10T02:00Z')",
+          [claimId],
+        )
+      ).rows,
+    ).toEqual([{ finalize_consequence_claim: "approved" }]);
   });
 
   it("contains no Consequence media, video, description, or free-text column", async () => {

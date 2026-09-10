@@ -30,6 +30,11 @@ create table app_private.card_unlocks (
   unique (account_id, milestone)
 );
 
+alter table app_private.memberships
+  add column target_streak integer not null default 0 check (target_streak >= 0);
+alter table app_private.accounts
+  add column highest_target_streak integer not null default 0 check (highest_target_streak >= 0);
+
 create table app_private.consequence_obligations (
   obligation_id uuid primary key,
   membership_id uuid not null references app_private.memberships(membership_id) on delete restrict,
@@ -48,8 +53,10 @@ create table app_private.consequence_obligations (
 create table app_private.card_offers (
   offer_id uuid primary key,
   obligation_id uuid not null references app_private.consequence_obligations(obligation_id) on delete restrict,
+  membership_id uuid not null references app_private.memberships(membership_id) on delete restrict,
   created_at timestamptz not null,
   entropy text not null,
+  redraw_entropy text,
   status text not null default 'initial' check (
     status in ('initial', 'redrawn', 'selected', 'replaced', 'closed_on_departure')
   )
@@ -57,6 +64,10 @@ create table app_private.card_offers (
 
 create unique index card_offers_one_live_per_obligation
   on app_private.card_offers (obligation_id)
+  where status in ('initial', 'redrawn', 'selected');
+
+create unique index card_offers_one_live_per_membership
+  on app_private.card_offers (membership_id)
   where status in ('initial', 'redrawn', 'selected');
 
 create table app_private.offered_cards (
@@ -246,8 +257,10 @@ begin
     raise exception 'active Card offer already exists' using errcode = '23505';
   end if;
 
-  insert into app_private.card_offers (offer_id, obligation_id, created_at, entropy)
-    values (requested_offer_id, requested_obligation_id, requested_at, requested_entropy);
+  insert into app_private.card_offers
+    (offer_id, obligation_id, membership_id, created_at, entropy)
+    values (requested_offer_id, requested_obligation_id, owner_membership.membership_id,
+      requested_at, requested_entropy);
   with pool as (
     select c.card_id
     from app_private.consequence_cards c
@@ -329,7 +342,16 @@ begin
   if (select count(*) from app_private.offered_cards where offer_id = requested_offer_id and phase = 'redraw') <> 3 then
     raise exception 'redraw requires three replacement cards' using errcode = '23514';
   end if;
-  update app_private.card_offers set status = 'redrawn', entropy = requested_entropy
+  insert into app_private.offered_card_contributors (offer_id, phase, position, membership_id)
+  select oc.offer_id, oc.phase, oc.position, contributor.membership_id
+  from app_private.offered_cards oc
+  join app_private.card_unlocks u on u.card_id = oc.card_id
+  join app_private.memberships contributor on contributor.account_id = u.account_id
+  where oc.offer_id = requested_offer_id and oc.phase = 'redraw'
+    and contributor.group_id = owner_membership.group_id
+    and contributor.ended_at is null
+    and contributor.membership_id <> owner_membership.membership_id;
+  update app_private.card_offers set status = 'redrawn', redraw_entropy = requested_entropy
   where offer_id = requested_offer_id;
   return requested_offer_id;
 end;
@@ -393,6 +415,8 @@ begin
   where attempt_id = requested_attempt_id and ends_at is null;
   update app_private.card_offers set status = 'replaced'
   where offer_id = (select offer_id from app_private.consequence_attempts where attempt_id = requested_attempt_id);
+  perform app_private.create_card_offer(gen_random_uuid(), obligation,
+    gen_random_uuid()::text, requested_at);
   return obligation;
 end;
 $$;
@@ -409,7 +433,10 @@ begin
   join app_private.memberships m on m.membership_id = o.membership_id
   where a.attempt_id = requested_attempt_id and a.status = 'active'
     and requested_at <= a.expires_at for update of a;
-  if not found or not requested_attested or requested_completed_at > requested_at then
+  if not found or not requested_attested or requested_completed_at > requested_at
+     or requested_completed_at < (
+       select selected_at from app_private.consequence_attempts where attempt_id = requested_attempt_id
+     ) then
     raise exception 'timely attested completion claim required' using errcode = '22023';
   end if;
   insert into app_private.consequence_claims (
@@ -440,10 +467,10 @@ begin
     into approvals, rejections from app_private.consequence_review_responses r
     join app_private.consequence_review_audience a using (claim_id, membership_id)
     where r.claim_id = requested_claim_id and a.eligible;
-  if required_count > 0 and approvals >= required_count then claim_status := 'approved';
-  elsif required_count > 0 and rejections >= required_count then claim_status := 'rejected';
-  elsif requested_at >= (select review_ends_at from app_private.consequence_claims where claim_id = requested_claim_id)
+  if requested_at >= (select review_ends_at from app_private.consequence_claims where claim_id = requested_claim_id)
     then claim_status := 'timed_out';
+  elsif approvals >= required_count then claim_status := 'approved';
+  elsif rejections >= required_count then claim_status := 'rejected';
   else return 'pending'; end if;
   update app_private.consequence_claims set status = claim_status, finalized_at = requested_at
     where claim_id = requested_claim_id;
@@ -457,6 +484,23 @@ begin
     update app_private.consequence_obligations set status = 'completed', closed_at = requested_at
       where obligation_id = obligation and status = 'open';
   end if;
+  if claim_status <> 'approved' then
+    perform app_private.create_card_offer(gen_random_uuid(), obligation,
+      gen_random_uuid()::text, requested_at);
+  else
+    select o.obligation_id into obligation
+    from app_private.consequence_obligations o
+    join app_private.memberships m using (membership_id)
+    where o.membership_id = (
+      select membership_id from app_private.consequence_obligations
+      where obligation_id = obligation
+    ) and o.status = 'open' and m.ended_at is null
+    order by o.created_at, o.obligation_id limit 1;
+    if obligation is not null then
+      perform app_private.create_card_offer(gen_random_uuid(), obligation,
+        gen_random_uuid()::text, requested_at);
+    end if;
+  end if;
   return claim_status;
 end;
 $$;
@@ -466,8 +510,11 @@ create or replace function app_private.respond_to_consequence_claim(
   requested_response text, requested_at timestamptz
 ) returns text language plpgsql security definer set search_path = '' as $$
 begin
-  if not exists (select 1 from app_private.consequence_review_audience
-    where claim_id = requested_claim_id and membership_id = requested_membership_id and eligible)
+  if not exists (select 1 from app_private.consequence_review_audience audience
+    join app_private.consequence_claims claim using (claim_id)
+    where audience.claim_id = requested_claim_id
+      and audience.membership_id = requested_membership_id and audience.eligible
+      and claim.status = 'pending' and requested_at < claim.review_ends_at)
   then raise exception 'eligible Consequence reviewer required' using errcode = '42501'; end if;
   insert into app_private.consequence_review_responses
     (response_id, claim_id, membership_id, response, responded_at)
@@ -491,7 +538,37 @@ begin
   perform app_private.add_consequence_obligation(
     requested_expiry_obligation_id, owner, 'card_expiry', requested_attempt_id, requested_at
   );
+  perform app_private.create_card_offer(gen_random_uuid(), obligation,
+    gen_random_uuid()::text, requested_at);
   return obligation;
+end;
+$$;
+
+create or replace function app_private.retire_consequence_card(
+  requested_card_id uuid, requested_at timestamptz
+) returns integer language plpgsql security definer set search_path = '' as $$
+declare affected_offer record; replacement_count integer := 0;
+begin
+  update app_private.consequence_cards set retired_at = requested_at
+  where card_id = requested_card_id and retired_at is null;
+  if not found then return 0; end if;
+  for affected_offer in
+    select distinct offer.offer_id, offer.obligation_id
+    from app_private.card_offers offer
+    join app_private.offered_cards offered using (offer_id)
+    where offered.card_id = requested_card_id
+      and offer.status in ('initial', 'redrawn', 'selected')
+  loop
+    update app_private.consequence_attempts
+      set status = 'not_completed', terminal_at = requested_at
+      where offer_id = affected_offer.offer_id and status in ('active', 'safety_paused');
+    update app_private.card_offers set status = 'replaced'
+      where offer_id = affected_offer.offer_id;
+    perform app_private.create_card_offer(gen_random_uuid(), affected_offer.obligation_id,
+      gen_random_uuid()::text, requested_at);
+    replacement_count := replacement_count + 1;
+  end loop;
+  return replacement_count;
 end;
 $$;
 
@@ -551,31 +628,48 @@ set search_path = ''
 as $$
 declare finalized_count integer; missed_item record;
 begin
-  with completed_counts as (
-    select mw.member_week_id, count(wc.workout_checkin_id)::integer as completed_count
+  finalized_count := 0;
+  for missed_item in
+    select mw.member_week_id, mw.membership_id, m.account_id, mw.target,
+      count(wc.workout_checkin_id)::integer as completed_count
     from app_private.member_weeks mw
     join app_private.memberships m on m.membership_id = mw.membership_id
-    join app_private.accountability_weeks aw
-      on aw.accountability_week_id = mw.accountability_week_id
+    join app_private.accountability_weeks aw using (accountability_week_id)
     left join app_private.workout_checkins wc on wc.member_week_id = mw.member_week_id
     where mw.status = 'active' and m.ended_at is null and requested_at >= aw.ends_at
-    group by mw.member_week_id
-  )
-  update app_private.member_weeks mw
-  set status = case when completed_counts.completed_count >= mw.target
-    then 'attained'::app_private.member_week_status
-    else 'missed'::app_private.member_week_status end
-  from completed_counts
-  where mw.member_week_id = completed_counts.member_week_id and mw.status = 'active';
-  get diagnostics finalized_count = row_count;
-
-  for missed_item in
-    select member_week_id, membership_id from app_private.member_weeks where status = 'missed'
+    group by mw.member_week_id, mw.membership_id, m.account_id, mw.target, aw.ends_at
+    order by aw.ends_at, mw.member_week_id
   loop
-    perform app_private.add_consequence_obligation(
-      md5('missed_target:' || missed_item.member_week_id::text)::uuid,
-      missed_item.membership_id, 'missed_target', missed_item.member_week_id, requested_at
-    );
+    if missed_item.completed_count >= missed_item.target then
+      update app_private.member_weeks set status = 'attained'
+        where member_week_id = missed_item.member_week_id and status = 'active';
+      update app_private.memberships set target_streak = target_streak + 1
+        where membership_id = missed_item.membership_id;
+      update app_private.accounts account set highest_target_streak = greatest(
+        account.highest_target_streak,
+        (select target_streak from app_private.memberships
+         where membership_id = missed_item.membership_id)
+      ) where account_id = missed_item.account_id;
+      if (select target_streak from app_private.memberships
+          where membership_id = missed_item.membership_id) in (1, 2, 4, 8) then
+        perform app_private.award_card_unlock(
+          gen_random_uuid(), missed_item.account_id,
+          (select target_streak from app_private.memberships
+           where membership_id = missed_item.membership_id),
+          missed_item.member_week_id::text, requested_at
+        );
+      end if;
+    else
+      update app_private.member_weeks set status = 'missed'
+        where member_week_id = missed_item.member_week_id and status = 'active';
+      update app_private.memberships set target_streak = 0
+        where membership_id = missed_item.membership_id;
+      perform app_private.add_consequence_obligation(
+        md5('missed_target:' || missed_item.member_week_id::text)::uuid,
+        missed_item.membership_id, 'missed_target', missed_item.member_week_id, requested_at
+      );
+    end if;
+    finalized_count := finalized_count + 1;
   end loop;
   return finalized_count;
 end;
@@ -622,6 +716,7 @@ revoke all on function app_private.award_card_unlock(uuid, uuid, integer, text, 
   app_private.finalize_consequence_claim(uuid, timestamptz),
   app_private.respond_to_consequence_claim(uuid, uuid, uuid, text, timestamptz),
   app_private.expire_consequence_attempt(uuid, uuid, timestamptz),
+  app_private.retire_consequence_card(uuid, timestamptz),
   app_private.close_departed_consequences(uuid, timestamptz)
   from public, anon, authenticated;
 grant select, insert, update on table app_private.card_catalog_releases,
@@ -642,6 +737,7 @@ grant execute on function app_private.award_card_unlock(uuid, uuid, integer, tex
   app_private.finalize_consequence_claim(uuid, timestamptz),
   app_private.respond_to_consequence_claim(uuid, uuid, uuid, text, timestamptz),
   app_private.expire_consequence_attempt(uuid, uuid, timestamptz),
+  app_private.retire_consequence_card(uuid, timestamptz),
   app_private.close_departed_consequences(uuid, timestamptz)
   to service_role;
 
