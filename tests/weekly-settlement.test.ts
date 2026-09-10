@@ -79,6 +79,30 @@ describe("True-MVP weekly settlement", () => {
     await db.exec("reset role");
     expect(
       (
+        await db.query(`select m.membership_id, m.target_streak,
+          count(u.card_unlock_id)::integer as unlocks
+          from app_private.memberships m
+          join app_private.accounts a using (account_id)
+          left join app_private.card_unlocks u using (account_id)
+          where m.membership_id in (
+            '40000000-0000-4000-8000-000000000001',
+            '40000000-0000-4000-8000-000000000002'
+          ) group by m.membership_id, m.target_streak order by m.membership_id`)
+      ).rows,
+    ).toEqual([
+      {
+        membership_id: "40000000-0000-4000-8000-000000000001",
+        target_streak: 1,
+        unlocks: 1,
+      },
+      {
+        membership_id: "40000000-0000-4000-8000-000000000002",
+        target_streak: 0,
+        unlocks: 0,
+      },
+    ]);
+    expect(
+      (
         await db.query(`select member_week_id, status from app_private.member_weeks
           order by member_week_id`)
       ).rows,

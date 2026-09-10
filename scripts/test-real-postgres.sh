@@ -39,6 +39,75 @@ values
 SQL
 
 psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'SQL'
+insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at)
+values
+  ('85000000-0000-4000-8000-000000000001', '86000000-0000-4000-8000-000000000001', 'm5-owner@example.test', now()),
+  ('85000000-0000-4000-8000-000000000002', '86000000-0000-4000-8000-000000000002', 'm5-peer@example.test', now());
+insert into app_private.groups (group_id, name, time_zone, status, activation_at)
+values ('87000000-0000-4000-8000-000000000001', 'M5 Group', 'UTC', 'active', '2026-03-01Z');
+insert into app_private.memberships
+  (membership_id, account_id, group_id, joined_at, recurring_target)
+values
+  ('88000000-0000-4000-8000-000000000001', '85000000-0000-4000-8000-000000000001', '87000000-0000-4000-8000-000000000001', '2026-03-01Z', 2),
+  ('88000000-0000-4000-8000-000000000002', '85000000-0000-4000-8000-000000000002', '87000000-0000-4000-8000-000000000001', '2026-03-01Z', 2);
+do $$
+declare
+  obligation uuid := 'a1000000-0000-4000-8000-000000000001';
+  offer uuid := 'a2000000-0000-4000-8000-000000000001';
+  attempt uuid := 'a3000000-0000-4000-8000-000000000001';
+  claim uuid := 'a4000000-0000-4000-8000-000000000001';
+  chosen_card uuid;
+begin
+  if (select count(*) from app_private.consequence_cards) <> 14
+     or (select count(*) from app_private.consequence_cards where not progression) <> 6
+     or (select count(*) from app_private.consequence_cards where progression) <> 8 then
+    raise exception 'M5 catalog seed does not contain six starters and eight progression Cards';
+  end if;
+  if app_private.add_consequence_obligation(
+      obligation, '88000000-0000-4000-8000-000000000001', 'missed_target',
+      'a5000000-0000-4000-8000-000000000001', '2026-03-10Z') <> obligation then
+    raise exception 'M5 obligation was not created';
+  end if;
+  if app_private.add_consequence_obligation(
+      'a1000000-0000-4000-8000-000000000002',
+      '88000000-0000-4000-8000-000000000001', 'missed_target',
+      'a5000000-0000-4000-8000-000000000001', '2026-03-10Z') <> obligation then
+    raise exception 'M5 source replay was not idempotent';
+  end if;
+  perform app_private.create_card_offer(offer, obligation, 'postgres-smoke', '2026-03-10Z');
+  if (select count(distinct card_id) from app_private.offered_cards
+      where offer_id = offer and phase = 'initial') <> 3 then
+    raise exception 'M5 offer did not contain three distinct Cards';
+  end if;
+  select card_id into chosen_card from app_private.offered_cards
+    where offer_id = offer and phase = 'initial' order by position limit 1;
+  perform app_private.select_consequence_card(attempt, offer, chosen_card, '2026-03-10Z');
+  perform app_private.submit_consequence_claim(
+    claim, attempt, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z');
+  perform app_private.respond_to_consequence_claim(
+    'a6000000-0000-4000-8000-000000000001', claim,
+    '88000000-0000-4000-8000-000000000002', 'approve', '2026-03-10T03:00Z');
+  if (select status from app_private.consequence_obligations
+      where obligation_id = obligation) <> 'completed' then
+    raise exception 'M5 small-Group threshold did not close exactly one obligation';
+  end if;
+  if app_private.finalize_consequence_claim(claim, '2026-03-20Z') <> 'approved'
+     or (select count(*) from app_private.consequence_obligations
+         where obligation_id = obligation) <> 1 then
+    raise exception 'M5 completion replay was not stable';
+  end if;
+  if exists (
+    select from information_schema.columns where table_schema = 'app_private'
+      and table_name like '%consequence%'
+      and (column_name like '%video%' or column_name like '%media%'
+        or column_name like '%description%' or column_name like '%text%')
+  ) then
+    raise exception 'M5 Consequence schema contains forbidden media or free-text field';
+  end if;
+end $$;
+SQL
+
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'SQL'
 insert into app_private.accounts
   (account_id, auth_user_id, email, adult_attested_at)
 values
