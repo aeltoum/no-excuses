@@ -14,6 +14,19 @@ Scope: deferred `Consequence system` slice explicitly scheduled by owner on 2026
   state/property tests. Real PostgreSQL validation uses `pnpm db:test:postgres` against an empty,
   disposable database before merge.
 
+## Independent Codex validation
+
+Iteration 4 reviewed commit `f7d2c42` independently. Focused PGlite validation passed 17 tests;
+full `pnpm check` passed 26 test files and 144 tests plus formatting, generated-contract,
+type, secret, and dependency checks. No actionable M5 code defect remained. Verdict stays
+`BLOCKED`, not `PASS`: validator had neither an empty disposable `DATABASE_URL` nor Docker, so
+real-PostgreSQL row-lock behavior and smoke coverage remain unexecuted.
+
+Current accepted M4 uses immediate self-reported Workout check-ins and contains no
+Verified-report or Rejected-report aggregate. M5 consumes that accepted settlement source and
+provides unique `rejected_report` obligation intake; automatic Verified/Rejected integration
+must be revalidated when deferred peer-review M4 behavior is separately activated.
+
 Gate 1 boundaries: no hosted service, new dependency, client route, Proof-video route, field,
 processor, stored media, or user-authored Card content. Card copy remains app-authored,
 equipment-free, adaptable, low/medium effort, and no more than five minutes.
