@@ -16,11 +16,14 @@ Scope: deferred `Consequence system` slice explicitly scheduled by owner on 2026
 
 ## Independent Codex validation
 
-Iteration 4 reviewed commit `f7d2c42` independently. Focused PGlite validation passed 17 tests;
-full `pnpm check` passed 26 test files and 144 tests plus formatting, generated-contract,
-type, secret, and dependency checks. No actionable M5 code defect remained. Verdict stays
-`BLOCKED`, not `PASS`: validator had neither an empty disposable `DATABASE_URL` nor Docker, so
-real-PostgreSQL row-lock behavior and smoke coverage remain unexecuted.
+Iteration 5 reviewed commit `f7d2c42` independently from bookkeeping commit `e366ced`.
+`DATABASE_URL=postgresql://127.0.0.1:55432/no_excuses_m5_validation pnpm db:test:postgres`
+passed against an empty local PostgreSQL 18 database, including every migration, M5 catalog,
+offer, claim, threshold, exactly-once, idempotency, and forbidden-schema smoke assertions.
+`pnpm exec vitest run tests/consequence-system.test.ts` passed 1 file and 6 tests. Full
+`pnpm check` passed formatting across 66 files, generated-contract and type checks, 26 test
+files and 144 tests, secret checks, and dependency checks. Independent verdict: `PASS` with
+no defects or blocked condition.
 
 Current accepted M4 uses immediate self-reported Workout check-ins and contains no
 Verified-report or Rejected-report aggregate. M5 consumes that accepted settlement source and
