@@ -72,6 +72,24 @@ function dependencies() {
 }
 
 describe("Account deletion API contract", () => {
+  it("exposes review, pending, retry-safe failure, and bounded receipt in You", async () => {
+    const source = await readFile(
+      new URL("../apps/mobile/app/(member)/you.tsx", import.meta.url),
+      "utf8",
+    );
+    for (const text of [
+      "Review Account deletion",
+      "Confirm Account deletion",
+      "Deletion still pending",
+      "safely retry same request",
+      "idempotencyKey.current ??=",
+      "Deletion completed.",
+    ])
+      expect(source).toContain(text);
+    expect(source).not.toContain("result.data.accountId");
+    expect(source).not.toContain("Receipt:");
+  });
+
   it("publishes authenticated idempotent version 1 deletion", async () => {
     const source = await readFile(
       new URL("../packages/contracts/openapi.yaml", import.meta.url),

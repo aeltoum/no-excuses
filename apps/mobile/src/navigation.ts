@@ -1,8 +1,6 @@
 export const memberDestinations = [
   { label: "Home", route: "/home" },
-  { label: "Wall", route: "/wall" },
   { label: "Group", route: "/group" },
-  { label: "Season", route: "/season" },
   { label: "You", route: "/you" },
 ] as const;
 

@@ -8,9 +8,7 @@ describe("navigation shells", () => {
   it("keeps the member and operator routes separate", () => {
     expect(memberDestinations.map(({ label }) => label)).toEqual([
       "Home",
-      "Wall",
       "Group",
-      "Season",
       "You",
     ]);
     expect(operatorDestinations.map(({ label }) => label)).toEqual([

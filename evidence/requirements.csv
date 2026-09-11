@@ -2,13 +2,13 @@ requirement_id,status,milestone,evidence,notes
 GOV-01,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated identity consent admission and authenticated Group-create contract evidence; device and operator rehearsal pending
 GOV-02,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated invitation issue revoke capacity activation authorization and API contract evidence; device evidence pending
 GOV-03,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-group-commands.md,Automated caller-safe leave admin removal cutoff return departure and API contract evidence; later-flow cleanup pending
-GOV-04,in-progress,8,evidence/m5-true-mvp-account-deletion.md,Automated authoritative DB deletion transition cleanup governance idempotency API contract and named delivery evidence; hosted Auth retention UI and router/server pending
+GOV-04,in-progress,8,evidence/m5-true-mvp-account-deletion.md; evidence/true-mvp-stabilization.md,Automated authoritative DB deletion transition cleanup governance idempotency API contract and mobile review pending retry-safe failure receipt evidence; hosted Auth retention and physical-device evidence pending
 TIME-01,in-progress,2,evidence/m2-identity-group-calendar.md,Automated Group-zone DST activation and boundary evidence; device evidence pending
 TIME-02,in-progress,4,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-weekly-settlement.md,Schema cutoff foundation plus automated ended-week settlement evidence; broader target-product deadline flows deferred
-TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-weekly-target.md,Automated activation-week target lock and authenticated next-target command evidence; client flow pending
+TARGET-01,in-progress,2,evidence/m2-identity-group-calendar.md; evidence/m4-true-mvp-weekly-target.md; evidence/true-mvp-stabilization.md,Automated activation-week target lock authenticated next-target command and connected mobile client flow evidence; physical-device evidence pending
 TARGET-02,in-progress,2,evidence/m2-identity-group-calendar.md,Automated partial-week target and departure evidence; streak transitions pending
 EXC-01,planned,4,,Exception evidence
-WORK-01,in-progress,3,evidence/m3-workout-session.md; evidence/m3-true-mvp-workout-checkins.md; evidence/m4-true-mvp-api-contracts.md,Authoritative Workout-session lifecycle plus membership- and week-bounded True-MVP check-in and named delivery-entrypoint evidence
+WORK-01,in-progress,3,evidence/m3-workout-session.md; evidence/m3-true-mvp-workout-checkins.md; evidence/m4-true-mvp-api-contracts.md; evidence/true-mvp-stabilization.md,Authoritative Workout-session lifecycle plus membership- and week-bounded True-MVP check-in named delivery entrypoint and connected structured mobile submit evidence
 WORK-02,in-progress,3,evidence/m3-true-mvp-workout-checkins.md; evidence/m4-true-mvp-api-contracts.md,Immediate idempotent self-reported completion count and named Group-current-progress delivery evidence
 WORK-03,planned,3,,Draft and offline evidence
 VERIFY-01,planned,4,,Review decision evidence

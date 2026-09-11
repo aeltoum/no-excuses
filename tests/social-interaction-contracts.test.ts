@@ -77,21 +77,13 @@ describe("social interaction contracts", () => {
     ).toBe(false);
   });
 
-  it("keeps Home social controls labeled and private-copy safe", async () => {
+  it("keeps deferred social contracts while removing member-facing reachability", async () => {
     const source = await readFile(
       new URL("../apps/mobile/app/(member)/home.tsx", import.meta.url),
       "utf8",
     );
-    expect(source).toContain("Send strong reaction");
-    expect(source).toContain("Send motivation");
-    expect(source).toContain('accessibilityLiveRegion="polite"');
-    expect(source).toContain("commandIdentities.current[kind]");
-    expect(source).toContain("idempotencyKey: identity.idempotencyKey");
-    expect(source).toContain("interactionId: identity.interactionId");
-    expect(source).toContain(
-      "if (definitive) delete commandIdentities.current[kind]",
-    );
-    expect(source).not.toContain("interactionId}</Text>");
-    expect(source).not.toContain("membershipId}</Text>");
+    expect(source).not.toContain("Send strong reaction");
+    expect(source).not.toContain("Send motivation");
+    expect(source).not.toContain("createSocialInteraction");
   });
 });

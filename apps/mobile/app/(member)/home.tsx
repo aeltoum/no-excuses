@@ -1,4 +1,8 @@
-import type { MemberHomeResult } from "@no-excuses/contracts";
+import type {
+  CurrentWeekProgressItem,
+  FinalizedWeeklyHistoryItem,
+  MemberHomeResult,
+} from "@no-excuses/contracts";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams } from "expo-router";
 import {
@@ -15,6 +19,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import {
@@ -67,129 +72,89 @@ function Section({
   );
 }
 
-type SocialKind = "reaction" | "message";
-type SocialActionState = Readonly<{
-  kind: SocialKind;
-  status: "loading" | "pending" | "success" | "error" | "conflict" | "denied";
-}>;
-type SocialCommandIdentity = Readonly<{
-  interactionId: string;
+type CommandIdentity = Readonly<{
   idempotencyKey: string;
+  resourceId?: string;
+  occurredAt?: string;
 }>;
 
-function SocialActions({
-  recipientMembershipId,
-}: Readonly<{ recipientMembershipId: string }>) {
-  const [state, setState] = useState<SocialActionState>();
-  const commandIdentities = useRef<
-    Partial<Record<SocialKind, SocialCommandIdentity>>
-  >({});
+function MemberHome({
+  value,
+  progress,
+  history,
+  onRefresh,
+}: Readonly<{
+  value: MemberHomeResult;
+  progress: readonly CurrentWeekProgressItem[];
+  history: readonly FinalizedWeeklyHistoryItem[];
+  onRefresh(): Promise<void>;
+}>) {
+  const [target, setTarget] = useState(String(value.lockedTarget ?? ""));
+  const [activityType, setActivityType] = useState("strength");
+  const [duration, setDuration] = useState("30");
+  const [intensity, setIntensity] = useState("moderate");
+  const [status, setStatus] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const targetIdentity = useRef<CommandIdentity>();
+  const workoutIdentity = useRef<CommandIdentity>();
 
-  const send = useCallback(
-    async (kind: SocialKind) => {
-      setState({ kind, status: "loading" });
-      const pendingTimer = setTimeout(
-        () => setState({ kind, status: "pending" }),
-        5_000,
+  async function authorization() {
+    const { data, error } =
+      await createLocalMobileSupabaseClient().auth.getSession();
+    if (error || !data.session) throw new Error("Session unavailable");
+    return `Bearer ${data.session.access_token}`;
+  }
+
+  async function runCommand(
+    kind: "target" | "workout",
+    execute: (
+      authorization: string,
+      identity: CommandIdentity,
+    ) => Promise<void>,
+  ) {
+    if (busy) return;
+    setBusy(true);
+    setStatus("Submitting…");
+    const timer = setTimeout(
+      () => setStatus("Still submitting. Retry is safe if result is unclear."),
+      5_000,
+    );
+    const identityRef = kind === "target" ? targetIdentity : workoutIdentity;
+    try {
+      if (!globalThis.crypto?.randomUUID) throw new Error("UUID unavailable");
+      identityRef.current ??= {
+        idempotencyKey: globalThis.crypto.randomUUID(),
+        resourceId:
+          kind === "workout" ? globalThis.crypto.randomUUID() : undefined,
+        occurredAt: kind === "workout" ? new Date().toISOString() : undefined,
+      };
+      await execute(await authorization(), identityRef.current);
+      identityRef.current = undefined;
+      setStatus(
+        kind === "target" ? "Weekly target saved." : "Workout counted.",
       );
-      try {
-        const auth = createLocalMobileSupabaseClient();
-        const { data, error } = await auth.auth.getSession();
-        if (error || !data.session) {
-          delete commandIdentities.current[kind];
-          setState({ kind, status: "denied" });
-          return;
-        }
-        if (!globalThis.crypto?.randomUUID) throw new Error("UUID unavailable");
-        let identity = commandIdentities.current[kind];
-        if (!identity) {
-          identity = {
-            interactionId: globalThis.crypto.randomUUID(),
-            idempotencyKey: globalThis.crypto.randomUUID(),
-          };
-          commandIdentities.current[kind] = identity;
-        }
-        const api = createMobileApiClient({
-          baseUrl: readMobileApiBaseUrl(process.env),
-        });
-        await api.createSocialInteraction({
-          authorization: `Bearer ${data.session.access_token}`,
-          idempotencyKey: identity.idempotencyKey,
-          body: {
-            interactionId: identity.interactionId,
-            recipientMembershipId,
-            kind,
-            body: kind === "reaction" ? "strong" : "You've got this.",
-          },
-        });
-        delete commandIdentities.current[kind];
-        setState({ kind, status: "success" });
-      } catch (error) {
-        const definitive =
-          error instanceof MobileApiClientError &&
-          (error.status === 401 ||
-            error.status === 403 ||
-            error.status === 409);
-        if (definitive) delete commandIdentities.current[kind];
-        setState({
-          kind,
-          status:
-            error instanceof MobileApiClientError &&
-            (error.status === 401 || error.status === 403)
-              ? "denied"
-              : error instanceof MobileApiClientError && error.status === 409
-                ? "conflict"
-                : "error",
-        });
-      } finally {
-        clearTimeout(pendingTimer);
-      }
-    },
-    [recipientMembershipId],
-  );
+      void onRefresh().catch(() => undefined);
+    } catch (error) {
+      const definitive =
+        error instanceof MobileApiClientError &&
+        (error.status === 400 ||
+          error.status === 401 ||
+          error.status === 403 ||
+          error.status === 409);
+      if (definitive) identityRef.current = undefined;
+      setStatus(
+        definitive
+          ? "Request was not accepted. Review current values."
+          : "Could not confirm result. Try again to safely retry same command.",
+      );
+    } finally {
+      clearTimeout(timer);
+      setBusy(false);
+    }
+  }
 
-  const busy = state?.status === "loading" || state?.status === "pending";
-  const message =
-    state?.status === "loading"
-      ? "Sending…"
-      : state?.status === "pending"
-        ? "Still sending. You can safely leave Home."
-        : state?.status === "success"
-          ? state.kind === "reaction"
-            ? "Reaction sent."
-            : "Motivation sent."
-          : state?.status === "denied"
-            ? "Current Group membership required."
-            : state?.status === "conflict"
-              ? "Action changed. Review and try again."
-              : state?.status === "error"
-                ? "Could not send. Try again."
-                : undefined;
-
-  return (
-    <View style={styles.socialActions}>
-      <FormAction
-        disabled={busy}
-        label="Send strong reaction"
-        onPress={() => void send("reaction")}
-        secondary
-      />
-      <FormAction
-        disabled={busy}
-        label="Send motivation"
-        onPress={() => void send("message")}
-        secondary
-      />
-      {message ? (
-        <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>
-          {message}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function MemberHome({ value }: Readonly<{ value: MemberHomeResult }>) {
+  const api = () =>
+    createMobileApiClient({ baseUrl: readMobileApiBaseUrl(process.env) });
   const remaining = Math.max(
     0,
     (value.lockedTarget ?? 0) - value.completedWorkoutCount,
@@ -210,37 +175,144 @@ function MemberHome({ value }: Readonly<{ value: MemberHomeResult }>) {
         <Text style={styles.detail}>
           {value.weekStatus ?? "No active accountability week"}
         </Text>
+        <TextInput
+          accessibilityLabel="Weekly target"
+          editable={!busy}
+          keyboardType="number-pad"
+          onChangeText={(next) => {
+            targetIdentity.current = undefined;
+            setTarget(next);
+          }}
+          style={styles.input}
+          value={target}
+        />
+        <FormAction
+          disabled={
+            busy || !Number.isInteger(Number(target)) || Number(target) < 1
+          }
+          label="Save Weekly target"
+          onPress={() =>
+            void runCommand("target", async (auth, identity) => {
+              await api().setWeeklyTarget({
+                authorization: auth,
+                idempotencyKey: identity.idempotencyKey,
+                body: { weeklyTarget: Number(target) },
+              });
+            })
+          }
+        />
       </Section>
-      <Section title="Friend activity">
-        {value.friendActivity.length === 0 ? (
-          <Text style={styles.detail}>No friend activity yet.</Text>
+      <Section title="Log workout">
+        <Text style={styles.detail}>
+          Self-reported workouts count immediately.
+        </Text>
+        <TextInput
+          accessibilityLabel="Activity type"
+          editable={!busy}
+          onChangeText={(v) => {
+            workoutIdentity.current = undefined;
+            setActivityType(v);
+          }}
+          style={styles.input}
+          value={activityType}
+        />
+        <TextInput
+          accessibilityLabel="Duration in minutes"
+          editable={!busy}
+          keyboardType="number-pad"
+          onChangeText={(v) => {
+            workoutIdentity.current = undefined;
+            setDuration(v);
+          }}
+          style={styles.input}
+          value={duration}
+        />
+        <TextInput
+          accessibilityLabel="Perceived intensity"
+          editable={!busy}
+          onChangeText={(v) => {
+            workoutIdentity.current = undefined;
+            setIntensity(v);
+          }}
+          style={styles.input}
+          value={intensity}
+        />
+        <FormAction
+          disabled={
+            busy ||
+            !["strength", "cardio", "class", "sport", "mixed"].includes(
+              activityType,
+            ) ||
+            !["low", "moderate", "high"].includes(intensity) ||
+            !Number.isInteger(Number(duration)) ||
+            Number(duration) < 1
+          }
+          label="Attest and count workout"
+          onPress={() =>
+            void runCommand("workout", async (auth, identity) => {
+              await api().submitWorkoutCheckin({
+                authorization: auth,
+                idempotencyKey: identity.idempotencyKey,
+                body: {
+                  workoutCheckinId: identity.resourceId as string,
+                  activityType: activityType as
+                    | "strength"
+                    | "cardio"
+                    | "class"
+                    | "sport"
+                    | "mixed",
+                  completedAt: identity.occurredAt as string,
+                  durationMinutes: Number(duration),
+                  perceivedIntensity: intensity as "low" | "moderate" | "high",
+                  selfReportAttested: true,
+                },
+              });
+            })
+          }
+        />
+        {status ? (
+          <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>
+            {status}
+          </Text>
+        ) : null}
+      </Section>
+      <Section title="Group progress">
+        {progress.length === 0 ? (
+          <Text style={styles.detail}>No current Group progress yet.</Text>
         ) : (
-          value.friendActivity.map((friend) => (
-            <View key={friend.membershipId} style={styles.friendCard}>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Group member</Text>
-                <Text style={styles.rowValue}>
-                  {friend.completedWorkoutCount} / {friend.lockedTarget ?? "—"}
-                </Text>
-              </View>
-              <SocialActions recipientMembershipId={friend.membershipId} />
+          progress.map((member) => (
+            <View key={member.membershipId} style={styles.row}>
+              <Text style={styles.rowLabel}>
+                {member.membershipId === value.membershipId
+                  ? "You"
+                  : "Group member"}
+              </Text>
+              <Text style={styles.rowValue}>
+                {member.completedWorkoutCount} / {member.lockedTarget}
+              </Text>
             </View>
           ))
         )}
       </Section>
-      <Section title="Season standings">
-        {value.seasonStandings.length === 0 ? (
-          <Text style={styles.detail}>No current standings yet.</Text>
+      <Section title="Weekly history">
+        {history.length === 0 ? (
+          <Text style={styles.detail}>No finalized weeks yet.</Text>
         ) : (
-          value.seasonStandings.map((standing) => (
-            <View key={standing.membershipId} style={styles.row}>
+          history.map((week) => (
+            <View
+              key={`${week.membershipId}-${week.startsAt}`}
+              style={styles.row}
+            >
               <Text style={styles.rowLabel}>
-                {standing.rank}.{" "}
-                {standing.membershipId === value.membershipId
+                {week.membershipId === value.membershipId
                   ? "You"
-                  : "Group member"}
+                  : "Group member"}{" "}
+                · {new Date(week.startsAt).toLocaleDateString()}
               </Text>
-              <Text style={styles.rowValue}>{standing.crowns} Crowns</Text>
+              <Text style={styles.rowValue}>
+                {week.outcome === "attained" ? "Met" : "Missed"} ·{" "}
+                {week.completedWorkoutCount}/{week.lockedTarget}
+              </Text>
             </View>
           ))
         )}
@@ -255,21 +327,27 @@ export default function Home() {
     reduceMemberReadState<MemberHomeResult>,
     initialState,
   );
-  const load = useCallback(async () => {
-    dispatch({ type: "load" });
+  const [progress, setProgress] = useState<readonly CurrentWeekProgressItem[]>(
+    [],
+  );
+  const [history, setHistory] = useState<readonly FinalizedWeeklyHistoryItem[]>(
+    [],
+  );
+  const load = useCallback(async (background = false) => {
+    if (!background) dispatch({ type: "load" });
     let accountId: string | undefined;
-    const pendingTimer = setTimeout(
-      () =>
+    const pendingTimer = setTimeout(() => {
+      if (!background)
         dispatch({
           type: "pending",
           message: "Still working. You can safely leave Home and return later.",
-        }),
-      5_000,
-    );
+        });
+    }, 5_000);
     try {
       const auth = createLocalMobileSupabaseClient();
       const { data, error } = await auth.auth.getSession();
       if (error || !data.session) {
+        if (background) return;
         dispatch({
           type: "denied",
           message: "Sign in with a current Group membership to view Home.",
@@ -285,6 +363,18 @@ export default function Home() {
           authorization: `Bearer ${data.session.access_token}`,
         })
       ).data;
+      const [progressResult, historyResult] = await Promise.all([
+        api.getCurrentWeekProgress({
+          authorization: `Bearer ${data.session.access_token}`,
+          groupId: value.groupId,
+        }),
+        api.getFinalizedWeeklyHistory({
+          authorization: `Bearer ${data.session.access_token}`,
+          groupId: value.groupId,
+        }),
+      ]);
+      setProgress(progressResult.data);
+      setHistory(historyResult.data);
       void writeCachedHome(
         AsyncStorage,
         accountId,
@@ -304,6 +394,7 @@ export default function Home() {
           : { type: "loaded", value },
       );
     } catch (error) {
+      if (background) return;
       if (error instanceof MobileApiClientError && error.kind === "network") {
         const cached = accountId
           ? await readCachedHome(AsyncStorage, accountId)
@@ -352,7 +443,12 @@ export default function Home() {
   else if (state.status === "ready")
     content = (
       <>
-        <MemberHome value={state.value} />
+        <MemberHome
+          value={state.value}
+          progress={progress}
+          history={history}
+          onRefresh={() => load(true)}
+        />
         {state.staleAt ? (
           <StateMessage
             message={`Offline. Showing Home saved ${state.staleAt}. Refresh when online.`}
@@ -428,9 +524,16 @@ const styles = StyleSheet.create({
   },
   rowLabel: { color: "#FAFAF5", flex: 1, fontSize: 16 },
   rowValue: { color: "#E8FF00", fontSize: 16, fontWeight: "700" },
-  friendCard: { gap: 8 },
-  socialActions: { gap: 8 },
   actionStatus: { color: "#C8C8C0", fontSize: 14, lineHeight: 20 },
+  input: {
+    backgroundColor: "#171717",
+    borderColor: "#898989",
+    borderWidth: 1,
+    color: "#FAFAF5",
+    fontSize: 17,
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
   stateCard: {
     backgroundColor: "#2B2B2B",
     borderLeftColor: "#E8FF00",
