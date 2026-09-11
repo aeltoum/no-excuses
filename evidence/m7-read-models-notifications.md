@@ -24,6 +24,11 @@ only; no email adapter was added.
   `GET /v1/member-home`, `GET /v1/notifications`, and
   `GET /v1/notifications/{notificationId}/open` contracts using existing authenticated
   read-handler/HTTP seams.
+- Those contract and delivery surfaces also expose `POST /v1/social-interactions` as an
+  authenticated idempotent command. Its strict discriminated body accepts an opaque UUID,
+  recipient Membership UUID, the three database reaction values, or a canonical motivational
+  message without surrounding whitespace whose length is 1 through 280 characters. Success returns only the opaque
+  interaction UUID.
 - `apps/mobile/src/api-client.ts` and `apps/mobile/app/(member)/home.tsx`: typed authorized Home
   load and compact task-first render order: Needs you, personal weekly progress, friend
   activity, then Season standings. Charcoal/Safety-yellow treatment follows approved visual
@@ -44,6 +49,12 @@ only; no email adapter was added.
   may render cached task-first Home data with explicit offline saved-at status and retry;
   missing session, authorization denial, conflict, malformed response, and server/API failure
   never fall back to cache. Cache persistence is nonblocking and storage failure is nonfatal.
+- Home friend rows now expose text-labeled strong-reaction and fixed motivational-message
+  actions through the typed mobile client. Per-row loading, prolonged-pending, success,
+  retryable failure, conflict, and denied-safe status copy is announced politely; visible copy
+  does not expose Membership or interaction identifiers. Ambiguous failures retain the
+  command's interaction and idempotency UUIDs for safe replay; definitive outcomes clear them.
+  No free-form composer or offline command draft was introduced.
 - `tests/read-models-notifications.test.ts`: authoritative rebuild equivalence, cross-Group
   denial, departure cleanup, active-Season zero-Crown standings, composite Home-read outcome
   non-interference, idempotent social writes, bundle and separate-cap behavior, denied-push
@@ -51,6 +62,10 @@ only; no email adapter was added.
 - `tests/http-routing.test.ts` and `tests/mobile-api-client.test.ts`: exact Home route dispatch,
   bearer-only GET behavior, runtime response validation, and typed mobile-client coverage.
 - `tests/mobile-member-read-state.test.ts`: required degraded states and route fallback.
+- `tests/social-interaction-contracts.test.ts`, `tests/group-command-delivery.test.ts`,
+  `tests/http-routing.test.ts`, and `tests/mobile-api-client.test.ts`: strict reaction/message
+  bodies, bounded response, scoped idempotent replay/conflict, exact HTTP dispatch, typed mobile
+  command transport, and accessible private-copy-safe Home controls.
 - Notification-center migration, routing, contract, and mobile-client tests cover live-only
   deterministic reads, cross-Account denial, read immutability, terminal/malformed route
   recovery, exact HTTP dispatch, bearer-only GETs, and runtime response validation.
@@ -98,4 +113,8 @@ task-first ordering plus network-only fallback. Independent read-only validator 
 passed the original Home cache acceptance and strict canonical UTC ISO saved-timestamp repair:
 29 of 29 focused tests across 4 files and the full 182-of-182-test `pnpm check` passed.
 Physical-device persistence/accessibility, provider, hosted-service, and deployment-adapter
-results remain unclaimed.
+results remain unclaimed. Current social-command worker checks passed 24 of 24 focused tests
+and full `pnpm check` passed 186 of 186 tests plus format, generated-contract, TypeScript,
+secret, and dependency checks. Independent validator iteration 2 passed the same 24 focused
+tests and 186-test full check, verifying OpenAPI/runtime/PostgreSQL message parity and stable
+interaction and idempotency UUID reuse after ambiguous failure.

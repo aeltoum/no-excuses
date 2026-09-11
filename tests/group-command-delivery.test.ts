@@ -5,6 +5,7 @@ import {
   type ApiResponse,
   handleAcceptGroupInvitation,
   handleCreateGroup,
+  handleCreateSocialInteraction,
   handleIssueGroupInvitation,
   handleLeaveGroup,
   handleRemoveGroupMember,
@@ -178,6 +179,22 @@ describe("Group command delivery entrypoints", () => {
       handleSetWeeklyTarget,
       { weeklyTarget: 4 },
       { weeklyTarget: 5 },
+    );
+    commandName = "create_social_interaction";
+    await exerciseCommand(
+      handleCreateSocialInteraction,
+      {
+        interactionId: "50000000-0000-4000-8000-000000000003",
+        recipientMembershipId: "40000000-0000-4000-8000-000000000002",
+        kind: "message" as const,
+        body: "You've got this.",
+      },
+      {
+        interactionId: "50000000-0000-4000-8000-000000000003",
+        recipientMembershipId: "40000000-0000-4000-8000-000000000002",
+        kind: "message" as const,
+        body: "Keep going.",
+      },
     );
   });
 });

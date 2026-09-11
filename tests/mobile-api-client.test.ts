@@ -73,6 +73,7 @@ describe("mobile API client", () => {
         "getMemberHome",
         "getNotifications",
         "openNotification",
+        "createSocialInteraction",
         "getCurrentWeekProgress",
         "getFinalizedWeeklyHistory",
       ].sort(),
@@ -196,6 +197,39 @@ describe("mobile API client", () => {
       "https://api.example.test/v1/notifications",
       `https://api.example.test/v1/notifications/${notificationId}/open`,
     ]);
+  });
+
+  it("sends a social interaction through the typed command seam", async () => {
+    const interactionId = "50000000-0000-4000-8000-000000000003";
+    const body = {
+      interactionId,
+      recipientMembershipId: membershipId,
+      kind: "reaction" as const,
+      body: "strong" as const,
+    };
+    const fetch = vi.fn(async () =>
+      response({ contractVersion: 1, data: { interactionId } }),
+    );
+    const client = createMobileApiClient({
+      baseUrl: "https://api.example.test",
+      fetch,
+    });
+
+    await expect(
+      client.createSocialInteraction({ authorization, idempotencyKey, body }),
+    ).resolves.toEqual({ contractVersion: 1, data: { interactionId } });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.test/v1/social-interactions",
+      {
+        method: "POST",
+        headers: {
+          authorization,
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify(body),
+      },
+    );
   });
 
   it("reads explicit current and empty Group membership results", async () => {

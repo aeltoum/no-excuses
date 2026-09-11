@@ -28,6 +28,7 @@ function setup(overrides: Partial<V1HttpHandlers> = {}) {
     getMemberHome: operation("getMemberHome"),
     getNotifications: operation("getNotifications"),
     openNotification: operation("openNotification"),
+    createSocialInteraction: operation("createSocialInteraction"),
     getCurrentWeekProgress: operation("getCurrentWeekProgress"),
     getFinalizedWeeklyHistory: operation("getFinalizedWeeklyHistory"),
     ...overrides,
@@ -71,6 +72,7 @@ describe("version 1 HTTP routing", () => {
         "/v1/notifications/50000000-0000-4000-8000-000000000002/open",
         "openNotification",
       ],
+      ["POST", "/v1/social-interactions", "createSocialInteraction"],
       [
         "POST",
         `/v1/groups/${groupId}/members/${membershipId}/remove`,
