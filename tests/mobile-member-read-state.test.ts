@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   type MemberReadState,
@@ -38,5 +39,26 @@ describe("M7 mobile member read states", () => {
     });
     expect(memberRoute("task")).toBe("/home?notice=unavailable");
     expect(memberRoute("task", "a/b")).toBe("/tasks/a%2Fb");
+  });
+
+  it("presents notification groups, authority, and every degraded state", async () => {
+    const source = await readFile(
+      new URL("../apps/mobile/app/(member)/notifications.tsx", import.meta.url),
+      "utf8",
+    );
+    for (const text of [
+      "Notifications",
+      'title="Unread"',
+      'title="Read"',
+      "No current notifications.",
+      'type: "denied"',
+      'type: "failure"',
+      'type: "conflict"',
+      'type: "pending"',
+      "In-app status stays available even when device notifications are off.",
+      "/home?notice=unavailable",
+    ]) {
+      expect(source).toContain(text);
+    }
   });
 });

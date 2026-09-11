@@ -14,6 +14,8 @@ export type V1HttpHandlers = Readonly<{
   removeGroupMember: HttpHandler;
   getCurrentGroupMembership: HttpHandler;
   getMemberHome: HttpHandler;
+  getNotifications: HttpHandler;
+  openNotification: HttpHandler;
   getCurrentWeekProgress: HttpHandler;
   getFinalizedWeeklyHistory: HttpHandler;
 }>;
@@ -85,6 +87,18 @@ const routes: readonly Route[] = [
     pattern: /^\/v1\/member-home$/,
     parameters: [],
     handler: "getMemberHome",
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/notifications$/,
+    parameters: [],
+    handler: "getNotifications",
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/notifications\/([^/]+)\/open$/,
+    parameters: ["notificationId"],
+    handler: "openNotification",
   },
   {
     method: "POST",

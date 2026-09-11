@@ -379,4 +379,94 @@ describe("M7 read models, social delivery, and notifications", () => {
       ).rows,
     ).toEqual([{ route: "/home?notice=unavailable" }]);
   });
+
+  it("reads only caller-owned live notifications in deterministic unread/read order", async () => {
+    const db = await database();
+    const ids = [1, 2, 3, 4, 5].map(
+      (n) => `aa000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+    );
+    await db.exec(`
+      insert into app_private.notification_items
+        (notification_id,recipient_account_id,source_identity,class,priority,
+         template_key,route_kind,state,created_at,relevant_until) values
+        ('${ids[0]}','${accounts[0]}','one','action',2,'generic','home','unread','2026-09-10T10:00Z','2026-09-11Z'),
+        ('${ids[1]}','${accounts[0]}','two','social',1,'social_response','home','unread','2026-09-10T09:00Z','2026-09-11Z'),
+        ('${ids[2]}','${accounts[0]}','three','action',1,'generic','home','read','2026-09-10T11:00Z','2026-09-11Z'),
+        ('${ids[3]}','${accounts[0]}','expired','action',1,'generic','home','unread','2026-09-08Z','2026-09-09Z'),
+        ('${ids[4]}','${accounts[1]}','other','action',1,'generic','home','unread','2026-09-10Z','2026-09-11Z');
+    `);
+    await actor(db, auth[0]);
+    const outcomesBefore = (
+      await db.query(
+        "select membership_id,status from app_private.member_weeks order by membership_id",
+      )
+    ).rows;
+    expect(
+      (
+        await db.query(
+          "select notification_id,state from app_private.read_notification_center('2026-09-10T12:00Z')",
+        )
+      ).rows,
+    ).toEqual([
+      { notification_id: ids[1], state: "unread" },
+      { notification_id: ids[0], state: "unread" },
+      { notification_id: ids[2], state: "read" },
+    ]);
+    expect(
+      (
+        await db.query(
+          "select membership_id,status from app_private.member_weeks order by membership_id",
+        )
+      ).rows,
+    ).toEqual(outcomesBefore);
+
+    await actor(db, auth[2]);
+    expect(
+      (
+        await db.query(
+          "select * from app_private.read_notification_center('2026-09-10T12:00Z')",
+        )
+      ).rows,
+    ).toEqual([]);
+  });
+
+  it("recovers safely for cross-account, resolved, and malformed stored routes", async () => {
+    const db = await database();
+    const resolved = randomUUID();
+    const malformed = randomUUID();
+    await db.exec(`
+      insert into app_private.notification_items
+        (notification_id,recipient_account_id,source_identity,class,priority,
+         template_key,route_kind,route_id,state,created_at,relevant_until) values
+        ('${resolved}','${accounts[0]}','resolved','action',1,'generic','home',null,'resolved','2026-09-10Z','2026-09-11Z'),
+        ('${malformed}','${accounts[0]}','malformed','action',1,'generic','task',null,'unread','2026-09-10Z','2026-09-11Z');
+    `);
+    await actor(db, auth[0]);
+    expect(
+      (
+        await db.query(
+          "select app_private.resolve_member_route($1,'2026-09-10T12:00Z') route",
+          [resolved],
+        )
+      ).rows,
+    ).toEqual([{ route: "/notifications?notice=resolved" }]);
+    expect(
+      (
+        await db.query(
+          "select app_private.resolve_member_route($1,'2026-09-10T12:00Z') route",
+          [malformed],
+        )
+      ).rows,
+    ).toEqual([{ route: "/home?notice=unavailable" }]);
+
+    await actor(db, auth[1]);
+    expect(
+      (
+        await db.query(
+          "select app_private.resolve_member_route($1,'2026-09-10T12:00Z') route",
+          [malformed],
+        )
+      ).rows,
+    ).toEqual([{ route: "/home?notice=unavailable" }]);
+  });
 });

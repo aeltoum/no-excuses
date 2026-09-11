@@ -9,6 +9,8 @@ import {
   groupMembershipResponseSchema,
   healthResponseSchema,
   memberHomeResponseSchema,
+  notificationCenterResponseSchema,
+  notificationOpenResponseSchema,
   revokedGroupInvitationResponseSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyTargetResponseSchema,
@@ -107,6 +109,12 @@ export type MobileApiClient = Readonly<{
     input: Authorized,
   ): Promise<Schema<"CurrentGroupMembershipResponse">>;
   getMemberHome(input: Authorized): Promise<Schema<"MemberHomeResponse">>;
+  getNotifications(
+    input: Authorized,
+  ): Promise<Schema<"NotificationCenterResponse">>;
+  openNotification(
+    input: Authorized & Readonly<{ notificationId: string }>,
+  ): Promise<Schema<"NotificationOpenResponse">>;
   getCurrentWeekProgress(
     input: Authorized & Readonly<{ groupId: string }>,
   ): Promise<Schema<"CurrentWeekProgressResponse">>;
@@ -273,6 +281,18 @@ export function createMobileApiClient({
       ),
     getMemberHome: ({ authorization }) =>
       request("/v1/member-home", authorization, memberHomeResponseSchema),
+    getNotifications: ({ authorization }) =>
+      request(
+        "/v1/notifications",
+        authorization,
+        notificationCenterResponseSchema,
+      ),
+    openNotification: ({ authorization, notificationId }) =>
+      request(
+        `/v1/notifications/${encodeURIComponent(notificationId)}/open`,
+        authorization,
+        notificationOpenResponseSchema,
+      ),
     getCurrentWeekProgress: ({ authorization, groupId }) =>
       request(
         `/v1/groups/${encodeURIComponent(groupId)}/current-week-progress`,

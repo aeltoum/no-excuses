@@ -16,6 +16,10 @@ export default function MemberLayout() {
             options={{ title: label }}
           />
         ))}
+        <Tabs.Screen
+          name="notifications"
+          options={{ href: null, title: "Notifications" }}
+        />
       </Tabs>
     </View>
   );

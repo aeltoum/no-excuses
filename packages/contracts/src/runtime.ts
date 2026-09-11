@@ -76,6 +76,9 @@ export const acceptGroupInvitationRequestSchema = z
 
 export const leaveGroupRequestSchema = z.object({}).strict();
 export const currentGroupMembershipRequestSchema = z.object({}).strict();
+export const notificationOpenRequestSchema = z
+  .object({ notificationId: uuidSchema })
+  .strict();
 
 export const removeGroupMemberRequestSchema = z
   .object({ groupId: uuidSchema, membershipId: uuidSchema })
@@ -144,6 +147,29 @@ export const memberHomeResultSchema = z
   })
   .strict();
 
+export const notificationItemSchema = z
+  .object({
+    notificationId: uuidSchema,
+    class: z.enum(["social", "action"]),
+    priority: z.number().int().min(1).max(3),
+    templateKey: boundedTextSchema(80),
+    state: z.enum(["unread", "read"]),
+    createdAt: utcInstantSchema,
+    relevantUntil: utcInstantSchema,
+  })
+  .strict();
+
+export const notificationCenterResultSchema = z
+  .object({
+    unread: z.array(notificationItemSchema),
+    read: z.array(notificationItemSchema),
+  })
+  .strict();
+
+export const notificationOpenResultSchema = z
+  .object({ route: z.string().startsWith("/") })
+  .strict();
+
 export const groupInvitationResultSchema = z
   .object({
     invitationId: uuidSchema,
@@ -174,6 +200,12 @@ export const currentGroupMembershipResponseSchema = commandResponse(
   currentGroupMembershipResultSchema,
 );
 export const memberHomeResponseSchema = commandResponse(memberHomeResultSchema);
+export const notificationCenterResponseSchema = commandResponse(
+  notificationCenterResultSchema,
+);
+export const notificationOpenResponseSchema = commandResponse(
+  notificationOpenResultSchema,
+);
 export const groupInvitationResponseSchema = commandResponse(
   groupInvitationResultSchema,
 );
@@ -245,6 +277,15 @@ export const finalizedWeeklyHistoryResponseSchema = z
 
 export type SubmitWorkoutCheckinRequest = z.infer<
   typeof submitWorkoutCheckinRequestSchema
+>;
+export type NotificationCenterResult = z.infer<
+  typeof notificationCenterResultSchema
+>;
+export type NotificationOpenRequest = z.infer<
+  typeof notificationOpenRequestSchema
+>;
+export type NotificationOpenResult = z.infer<
+  typeof notificationOpenResultSchema
 >;
 export type GroupRequest = z.infer<typeof groupRequestSchema>;
 export type CreateGroupRequest = z.infer<typeof createGroupRequestSchema>;
