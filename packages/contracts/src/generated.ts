@@ -196,6 +196,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/{notificationId}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["openNotification"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/members/{membershipId}/remove": {
         parameters: {
             query?: never;
@@ -382,6 +414,35 @@ export interface components {
             crowns: number;
             rank: number;
             cochampion: boolean;
+        };
+        NotificationCenterResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["NotificationCenterResult"];
+        };
+        NotificationCenterResult: {
+            unread: components["schemas"]["NotificationItem"][];
+            read: components["schemas"]["NotificationItem"][];
+        };
+        NotificationItem: {
+            /** Format: uuid */
+            notificationId: string;
+            /** @enum {string} */
+            class: "social" | "action";
+            priority: number;
+            templateKey: string;
+            /** @enum {string} */
+            state: "unread" | "read";
+            createdAt: components["schemas"]["UtcInstant"];
+            relevantUntil: components["schemas"]["UtcInstant"];
+        };
+        NotificationOpenResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["NotificationOpenResult"];
+        };
+        NotificationOpenResult: {
+            route: string;
         };
         GroupInvitationResponse: {
             /** @constant */
@@ -796,6 +857,56 @@ export interface operations {
             401: components["responses"]["ApiError"];
             403: components["responses"]["ApiError"];
             409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Caller-owned live canonical in-app notifications grouped by read state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationCenterResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    openNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live-authorized notification destination or safe recovery route */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOpenResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

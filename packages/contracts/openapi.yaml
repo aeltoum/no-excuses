@@ -179,6 +179,31 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/notifications:
+    get:
+      operationId: getNotifications
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Caller-owned live canonical in-app notifications grouped by read state, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationCenterResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
+  /v1/notifications/{notificationId}/open:
+    get:
+      operationId: openNotification
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Live-authorized notification destination or safe recovery route, content: { application/json: { schema: { $ref: "#/components/schemas/NotificationOpenResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/members/{membershipId}/remove:
     post:
       operationId: removeGroupMember
@@ -455,6 +480,49 @@ components:
         crowns: { type: integer, minimum: 0 }
         rank: { type: integer, minimum: 1 }
         cochampion: { type: boolean }
+    NotificationCenterResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/NotificationCenterResult" }
+    NotificationCenterResult:
+      type: object
+      additionalProperties: false
+      required: [unread, read]
+      properties:
+        unread:
+          type: array
+          items: { $ref: "#/components/schemas/NotificationItem" }
+        read:
+          type: array
+          items: { $ref: "#/components/schemas/NotificationItem" }
+    NotificationItem:
+      type: object
+      additionalProperties: false
+      required: [notificationId, class, priority, templateKey, state, createdAt, relevantUntil]
+      properties:
+        notificationId: { type: string, format: uuid }
+        class: { type: string, enum: [social, action] }
+        priority: { type: integer, minimum: 1, maximum: 3 }
+        templateKey: { type: string, minLength: 1, maxLength: 80 }
+        state: { type: string, enum: [unread, read] }
+        createdAt: { $ref: "#/components/schemas/UtcInstant" }
+        relevantUntil: { $ref: "#/components/schemas/UtcInstant" }
+    NotificationOpenResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/NotificationOpenResult" }
+    NotificationOpenResult:
+      type: object
+      additionalProperties: false
+      required: [route]
+      properties:
+        route: { type: string, pattern: "^/" }
     GroupInvitationResponse:
       type: object
       additionalProperties: false

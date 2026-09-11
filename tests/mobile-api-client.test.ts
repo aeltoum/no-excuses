@@ -71,6 +71,8 @@ describe("mobile API client", () => {
         "removeGroupMember",
         "getCurrentGroupMembership",
         "getMemberHome",
+        "getNotifications",
+        "openNotification",
         "getCurrentWeekProgress",
         "getFinalizedWeeklyHistory",
       ].sort(),
@@ -157,6 +159,43 @@ describe("mobile API client", () => {
         body: undefined,
       },
     );
+  });
+
+  it("loads and opens canonical notifications through typed read seams", async () => {
+    const notificationId = "50000000-0000-4000-8000-000000000002";
+    const item = {
+      notificationId,
+      class: "action",
+      priority: 1,
+      templateKey: "deadline_due",
+      state: "unread",
+      createdAt: "2026-09-10T12:00:00Z",
+      relevantUntil: "2026-09-11T12:00:00Z",
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({ contractVersion: 1, data: { unread: [item], read: [] } }),
+      )
+      .mockResolvedValueOnce(
+        response({ contractVersion: 1, data: { route: "/home" } }),
+      );
+    const client = createMobileApiClient({
+      baseUrl: "https://api.example.test",
+      fetch,
+    });
+
+    await expect(client.getNotifications({ authorization })).resolves.toEqual({
+      contractVersion: 1,
+      data: { unread: [item], read: [] },
+    });
+    await expect(
+      client.openNotification({ authorization, notificationId }),
+    ).resolves.toEqual({ contractVersion: 1, data: { route: "/home" } });
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      "https://api.example.test/v1/notifications",
+      `https://api.example.test/v1/notifications/${notificationId}/open`,
+    ]);
   });
 
   it("reads explicit current and empty Group membership results", async () => {

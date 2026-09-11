@@ -26,6 +26,8 @@ function setup(overrides: Partial<V1HttpHandlers> = {}) {
     removeGroupMember: operation("removeGroupMember"),
     getCurrentGroupMembership: operation("getCurrentGroupMembership"),
     getMemberHome: operation("getMemberHome"),
+    getNotifications: operation("getNotifications"),
+    openNotification: operation("openNotification"),
     getCurrentWeekProgress: operation("getCurrentWeekProgress"),
     getFinalizedWeeklyHistory: operation("getFinalizedWeeklyHistory"),
     ...overrides,
@@ -63,6 +65,12 @@ describe("version 1 HTTP routing", () => {
       ["PUT", "/v1/group-memberships/weekly-target", "setWeeklyTarget"],
       ["GET", "/v1/group-memberships/current", "getCurrentGroupMembership"],
       ["GET", "/v1/member-home", "getMemberHome"],
+      ["GET", "/v1/notifications", "getNotifications"],
+      [
+        "GET",
+        "/v1/notifications/50000000-0000-4000-8000-000000000002/open",
+        "openNotification",
+      ],
       [
         "POST",
         `/v1/groups/${groupId}/members/${membershipId}/remove`,

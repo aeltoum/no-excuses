@@ -6,6 +6,7 @@ import {
   groupRequestSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
+  notificationOpenRequestSchema,
   removeGroupMemberRequestSchema,
   revokeGroupInvitationRequestSchema,
   setWeeklyTargetRequestSchema,
@@ -221,6 +222,12 @@ export const handleCurrentGroupMembership = groupReadHandler(
 );
 export const handleMemberHome = groupReadHandler(
   currentGroupMembershipRequestSchema,
+);
+export const handleNotifications = groupReadHandler(
+  currentGroupMembershipRequestSchema,
+);
+export const handleNotificationOpen = groupReadHandler(
+  notificationOpenRequestSchema,
 );
 export const handleFinalizedWeeklyHistory =
   groupReadHandler(groupRequestSchema);
