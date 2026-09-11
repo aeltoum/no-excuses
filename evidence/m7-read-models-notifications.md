@@ -71,6 +71,10 @@ format, generated-contract, TypeScript, secret, dependency, and `git diff --chec
 Current notification-center slice worker focused checks passed 42 of 42 tests. Independent
 read-only validator iteration 1 passed 31 of 31 focused tests covering every acceptance item,
 adjacent behavior, and failure boundaries. Full repository check passed 170 of 170 tests plus
-format, generated-contract, TypeScript, secret, dependency, and `git diff --check` checks.
-PGlite is PostgreSQL-compatible migration/domain evidence; no physical-device, provider,
-hosted-service, real PostgreSQL, or deployment-adapter result is claimed.
+format, generated-contract, TypeScript, secret, dependency, and `git diff --check` checks. M7
+real-PostgreSQL smoke passed on PostgreSQL 17.11, applying every migration and asserting rebuild equivalence,
+live same-Group/current-membership authorization, active-Season zero-Crown Home standings,
+separate social/action caps plus bundling, denied-push canonical persistence, stale/terminal
+route recovery, deterministic caller-owned notification-center ordering, and authoritative
+Member-week/Crown/Consequence non-interference. Physical-device, provider, hosted-service,
+and deployment-adapter results remain unclaimed.
