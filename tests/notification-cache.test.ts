@@ -56,6 +56,21 @@ describe("notification offline cache", () => {
     expect(storage.values.has(key)).toBe(false);
   });
 
+  it("removes parseable timestamps that are not canonical UTC instants", async () => {
+    const key = "no-excuses:notifications:account-a";
+    const storage = memoryStorage({
+      [key]: JSON.stringify({
+        cachedAt: "09/11/2026",
+        value: emptyCenter,
+      }),
+    });
+
+    await expect(
+      readCachedNotifications(storage, "account-a"),
+    ).resolves.toBeUndefined();
+    expect(storage.values.has(key)).toBe(false);
+  });
+
   it("treats unavailable device storage as a cache miss", async () => {
     const storage = {
       getItem: async (_key: string): Promise<string | null> => {
