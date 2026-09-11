@@ -228,6 +228,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/social-interactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSocialInteraction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/members/{membershipId}/remove": {
         parameters: {
             query?: never;
@@ -340,6 +356,34 @@ export interface components {
         DeleteAccountRequest: {
             /** @constant */
             confirmation: true;
+        };
+        CreateSocialInteractionRequest: {
+            /** Format: uuid */
+            interactionId: string;
+            /** Format: uuid */
+            recipientMembershipId: string;
+            /** @constant */
+            kind: "reaction";
+            /** @enum {string} */
+            body: "strong" | "fire" | "cheer";
+        } | {
+            /** Format: uuid */
+            interactionId: string;
+            /** Format: uuid */
+            recipientMembershipId: string;
+            /** @constant */
+            kind: "message";
+            /** @description Canonical message without surrounding whitespace. */
+            body: string;
+        };
+        SocialInteractionResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["SocialInteractionResult"];
+        };
+        SocialInteractionResult: {
+            /** Format: uuid */
+            interactionId: string;
         };
         DeletedAccountResponse: {
             /** @constant */
@@ -907,6 +951,37 @@ export interface operations {
             };
             400: components["responses"]["ApiError"];
             401: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    createSocialInteraction: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSocialInteractionRequest"];
+            };
+        };
+        responses: {
+            /** @description Social interaction created or idempotently replayed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialInteractionResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

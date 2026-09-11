@@ -204,6 +204,23 @@ paths:
         "400": { $ref: "#/components/responses/ApiError" }
         "401": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/social-interactions:
+    post:
+      operationId: createSocialInteraction
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSocialInteractionRequest" }
+      responses:
+        "200": { description: Social interaction created or idempotently replayed, content: { application/json: { schema: { $ref: "#/components/schemas/SocialInteractionResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/members/{membershipId}/remove:
     post:
       operationId: removeGroupMember
@@ -375,6 +392,42 @@ components:
       required: [confirmation]
       properties:
         confirmation: { type: boolean, const: true }
+    CreateSocialInteractionRequest:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [interactionId, recipientMembershipId, kind, body]
+          properties:
+            interactionId: { type: string, format: uuid }
+            recipientMembershipId: { type: string, format: uuid }
+            kind: { type: string, const: reaction }
+            body: { type: string, enum: [strong, fire, cheer] }
+        - type: object
+          additionalProperties: false
+          required: [interactionId, recipientMembershipId, kind, body]
+          properties:
+            interactionId: { type: string, format: uuid }
+            recipientMembershipId: { type: string, format: uuid }
+            kind: { type: string, const: message }
+            body:
+              type: string
+              minLength: 1
+              maxLength: 280
+              pattern: '^\S(?:[\s\S]*\S)?$'
+              description: Canonical message without surrounding whitespace.
+    SocialInteractionResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/SocialInteractionResult" }
+    SocialInteractionResult:
+      type: object
+      additionalProperties: false
+      required: [interactionId]
+      properties:
+        interactionId: { type: string, format: uuid }
     DeletedAccountResponse:
       type: object
       additionalProperties: false

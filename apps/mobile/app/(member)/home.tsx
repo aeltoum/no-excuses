@@ -1,7 +1,14 @@
 import type { MemberHomeResult } from "@no-excuses/contracts";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams } from "expo-router";
-import { type ReactNode, useCallback, useEffect, useReducer } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +22,7 @@ import {
   MobileApiClientError,
   readMobileApiBaseUrl,
 } from "../../src/api-client";
+import { FormAction } from "../../src/FormAction";
 import { readCachedHome, writeCachedHome } from "../../src/home-cache";
 import {
   type MemberReadEvent,
@@ -59,6 +67,128 @@ function Section({
   );
 }
 
+type SocialKind = "reaction" | "message";
+type SocialActionState = Readonly<{
+  kind: SocialKind;
+  status: "loading" | "pending" | "success" | "error" | "conflict" | "denied";
+}>;
+type SocialCommandIdentity = Readonly<{
+  interactionId: string;
+  idempotencyKey: string;
+}>;
+
+function SocialActions({
+  recipientMembershipId,
+}: Readonly<{ recipientMembershipId: string }>) {
+  const [state, setState] = useState<SocialActionState>();
+  const commandIdentities = useRef<
+    Partial<Record<SocialKind, SocialCommandIdentity>>
+  >({});
+
+  const send = useCallback(
+    async (kind: SocialKind) => {
+      setState({ kind, status: "loading" });
+      const pendingTimer = setTimeout(
+        () => setState({ kind, status: "pending" }),
+        5_000,
+      );
+      try {
+        const auth = createLocalMobileSupabaseClient();
+        const { data, error } = await auth.auth.getSession();
+        if (error || !data.session) {
+          delete commandIdentities.current[kind];
+          setState({ kind, status: "denied" });
+          return;
+        }
+        if (!globalThis.crypto?.randomUUID) throw new Error("UUID unavailable");
+        let identity = commandIdentities.current[kind];
+        if (!identity) {
+          identity = {
+            interactionId: globalThis.crypto.randomUUID(),
+            idempotencyKey: globalThis.crypto.randomUUID(),
+          };
+          commandIdentities.current[kind] = identity;
+        }
+        const api = createMobileApiClient({
+          baseUrl: readMobileApiBaseUrl(process.env),
+        });
+        await api.createSocialInteraction({
+          authorization: `Bearer ${data.session.access_token}`,
+          idempotencyKey: identity.idempotencyKey,
+          body: {
+            interactionId: identity.interactionId,
+            recipientMembershipId,
+            kind,
+            body: kind === "reaction" ? "strong" : "You've got this.",
+          },
+        });
+        delete commandIdentities.current[kind];
+        setState({ kind, status: "success" });
+      } catch (error) {
+        const definitive =
+          error instanceof MobileApiClientError &&
+          (error.status === 401 ||
+            error.status === 403 ||
+            error.status === 409);
+        if (definitive) delete commandIdentities.current[kind];
+        setState({
+          kind,
+          status:
+            error instanceof MobileApiClientError &&
+            (error.status === 401 || error.status === 403)
+              ? "denied"
+              : error instanceof MobileApiClientError && error.status === 409
+                ? "conflict"
+                : "error",
+        });
+      } finally {
+        clearTimeout(pendingTimer);
+      }
+    },
+    [recipientMembershipId],
+  );
+
+  const busy = state?.status === "loading" || state?.status === "pending";
+  const message =
+    state?.status === "loading"
+      ? "Sending…"
+      : state?.status === "pending"
+        ? "Still sending. You can safely leave Home."
+        : state?.status === "success"
+          ? state.kind === "reaction"
+            ? "Reaction sent."
+            : "Motivation sent."
+          : state?.status === "denied"
+            ? "Current Group membership required."
+            : state?.status === "conflict"
+              ? "Action changed. Review and try again."
+              : state?.status === "error"
+                ? "Could not send. Try again."
+                : undefined;
+
+  return (
+    <View style={styles.socialActions}>
+      <FormAction
+        disabled={busy}
+        label="Send strong reaction"
+        onPress={() => void send("reaction")}
+        secondary
+      />
+      <FormAction
+        disabled={busy}
+        label="Send motivation"
+        onPress={() => void send("message")}
+        secondary
+      />
+      {message ? (
+        <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>
+          {message}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function MemberHome({ value }: Readonly<{ value: MemberHomeResult }>) {
   const remaining = Math.max(
     0,
@@ -86,11 +216,14 @@ function MemberHome({ value }: Readonly<{ value: MemberHomeResult }>) {
           <Text style={styles.detail}>No friend activity yet.</Text>
         ) : (
           value.friendActivity.map((friend) => (
-            <View key={friend.membershipId} style={styles.row}>
-              <Text style={styles.rowLabel}>Group member</Text>
-              <Text style={styles.rowValue}>
-                {friend.completedWorkoutCount} / {friend.lockedTarget ?? "—"}
-              </Text>
+            <View key={friend.membershipId} style={styles.friendCard}>
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>Group member</Text>
+                <Text style={styles.rowValue}>
+                  {friend.completedWorkoutCount} / {friend.lockedTarget ?? "—"}
+                </Text>
+              </View>
+              <SocialActions recipientMembershipId={friend.membershipId} />
             </View>
           ))
         )}
@@ -295,6 +428,9 @@ const styles = StyleSheet.create({
   },
   rowLabel: { color: "#FAFAF5", flex: 1, fontSize: 16 },
   rowValue: { color: "#E8FF00", fontSize: 16, fontWeight: "700" },
+  friendCard: { gap: 8 },
+  socialActions: { gap: 8 },
+  actionStatus: { color: "#C8C8C0", fontSize: 14, lineHeight: 20 },
   stateCard: {
     backgroundColor: "#2B2B2B",
     borderLeftColor: "#E8FF00",

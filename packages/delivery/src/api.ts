@@ -1,6 +1,7 @@
 import {
   acceptGroupInvitationRequestSchema,
   createGroupRequestSchema,
+  createSocialInteractionRequestSchema,
   currentGroupMembershipRequestSchema,
   deleteAccountRequestSchema,
   groupRequestSchema,
@@ -235,6 +236,10 @@ export const handleFinalizedWeeklyHistory =
 export const handleCreateGroup = groupCommandHandler(
   "create_group",
   createGroupRequestSchema,
+);
+export const handleCreateSocialInteraction = groupCommandHandler(
+  "create_social_interaction",
+  createSocialInteractionRequestSchema,
 );
 export const handleIssueGroupInvitation = groupCommandHandler(
   "issue_group_invitation",

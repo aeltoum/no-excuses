@@ -12,6 +12,7 @@ import {
   notificationCenterResponseSchema,
   notificationOpenResponseSchema,
   revokedGroupInvitationResponseSchema,
+  socialInteractionResponseSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyTargetResponseSchema,
 } from "@no-excuses/contracts";
@@ -115,6 +116,9 @@ export type MobileApiClient = Readonly<{
   openNotification(
     input: Authorized & Readonly<{ notificationId: string }>,
   ): Promise<Schema<"NotificationOpenResponse">>;
+  createSocialInteraction(
+    input: CommandWithBody<Schema<"CreateSocialInteractionRequest">>,
+  ): Promise<Schema<"SocialInteractionResponse">>;
   getCurrentWeekProgress(
     input: Authorized & Readonly<{ groupId: string }>,
   ): Promise<Schema<"CurrentWeekProgressResponse">>;
@@ -292,6 +296,13 @@ export function createMobileApiClient({
         `/v1/notifications/${encodeURIComponent(notificationId)}/open`,
         authorization,
         notificationOpenResponseSchema,
+      ),
+    createSocialInteraction: ({ authorization, idempotencyKey, body }) =>
+      request(
+        "/v1/social-interactions",
+        authorization,
+        socialInteractionResponseSchema,
+        { method: "POST", idempotencyKey, body },
       ),
     getCurrentWeekProgress: ({ authorization, groupId }) =>
       request(

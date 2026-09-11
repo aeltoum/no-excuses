@@ -15,6 +15,7 @@ export type V1HttpHandlers = Readonly<{
   getCurrentGroupMembership: HttpHandler;
   getMemberHome: HttpHandler;
   getNotifications: HttpHandler;
+  createSocialInteraction: HttpHandler;
   openNotification: HttpHandler;
   getCurrentWeekProgress: HttpHandler;
   getFinalizedWeeklyHistory: HttpHandler;
@@ -99,6 +100,12 @@ const routes: readonly Route[] = [
     pattern: /^\/v1\/notifications\/([^/]+)\/open$/,
     parameters: ["notificationId"],
     handler: "openNotification",
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/social-interactions$/,
+    parameters: [],
+    handler: "createSocialInteraction",
   },
   {
     method: "POST",
