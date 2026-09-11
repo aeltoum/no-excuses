@@ -73,8 +73,9 @@ describe("M7 mobile member read states", () => {
     const orderedSections = [
       '<Section title="Needs you">',
       '<Section title="Your weekly progress">',
-      '<Section title="Friend activity">',
-      '<Section title="Season standings">',
+      '<Section title="Log workout">',
+      '<Section title="Group progress">',
+      '<Section title="Weekly history">',
     ];
     let prior = -1;
     for (const section of orderedSections) {
@@ -92,6 +93,17 @@ describe("M7 mobile member read states", () => {
       "Offline. Showing Home saved",
       "error.status === 401 || error.status === 403",
       "error.status === 409",
+      "Self-reported workouts count immediately.",
+      "Save Weekly target",
+      "Attest and count workout",
+      "getCurrentWeekProgress",
+      "getFinalizedWeeklyHistory",
+      "Try again to safely retry same command",
+      "completedAt: identity.occurredAt as string",
+      "void onRefresh().catch(() => undefined)",
+      'if (!background) dispatch({ type: "load" })',
+      "onRefresh={() => load(true)}",
+      "if (background) return",
     ]) {
       expect(source).toContain(text);
     }
@@ -101,5 +113,7 @@ describe("M7 mobile member read states", () => {
       networkFallback,
     );
     expect(source).not.toContain("access_token,");
+    expect(source).not.toContain("Season standings");
+    expect(source).not.toContain("Send motivation");
   });
 });

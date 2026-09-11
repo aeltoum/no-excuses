@@ -20,6 +20,8 @@ export default function MemberLayout() {
           name="notifications"
           options={{ href: null, title: "Notifications" }}
         />
+        <Tabs.Screen name="wall" options={{ href: null, title: "Wall" }} />
+        <Tabs.Screen name="season" options={{ href: null, title: "Season" }} />
       </Tabs>
     </View>
   );
