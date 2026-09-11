@@ -102,6 +102,48 @@ export const currentGroupMembershipResultSchema = z
   })
   .strict();
 
+export const memberHomeWeekStatusSchema = z.enum([
+  "active",
+  "provisional",
+  "attained",
+  "missed",
+  "excepted",
+  "ended_without_result",
+]);
+
+export const memberHomeResultSchema = z
+  .object({
+    membershipId: uuidSchema,
+    groupId: uuidSchema,
+    accountabilityWeekId: uuidSchema.nullable(),
+    weekStatus: memberHomeWeekStatusSchema.nullable(),
+    lockedTarget: positiveIntegerSchema.nullable(),
+    completedWorkoutCount: z.number().int().nonnegative(),
+    needsYouCount: z.number().int().nonnegative(),
+    friendActivity: z.array(
+      z
+        .object({
+          membershipId: uuidSchema,
+          lockedTarget: positiveIntegerSchema.nullable(),
+          completedWorkoutCount: z.number().int().nonnegative(),
+          weekStatus: memberHomeWeekStatusSchema.nullable(),
+        })
+        .strict(),
+    ),
+    seasonStandings: z.array(
+      z
+        .object({
+          membershipId: uuidSchema,
+          crowns: z.number().int().nonnegative(),
+          rank: positiveIntegerSchema,
+          cochampion: z.boolean(),
+        })
+        .strict(),
+    ),
+    rebuiltAt: utcInstantSchema,
+  })
+  .strict();
+
 export const groupInvitationResultSchema = z
   .object({
     invitationId: uuidSchema,
@@ -131,6 +173,7 @@ export const groupMembershipResponseSchema = commandResponse(
 export const currentGroupMembershipResponseSchema = commandResponse(
   currentGroupMembershipResultSchema,
 );
+export const memberHomeResponseSchema = commandResponse(memberHomeResultSchema);
 export const groupInvitationResponseSchema = commandResponse(
   groupInvitationResultSchema,
 );
@@ -229,6 +272,7 @@ export type GroupMembershipResult = z.infer<typeof groupMembershipResultSchema>;
 export type CurrentGroupMembershipResult = z.infer<
   typeof currentGroupMembershipResultSchema
 >;
+export type MemberHomeResult = z.infer<typeof memberHomeResultSchema>;
 export type GroupInvitationResult = z.infer<typeof groupInvitationResultSchema>;
 export type RevokedGroupInvitationResult = z.infer<
   typeof revokedGroupInvitationResultSchema

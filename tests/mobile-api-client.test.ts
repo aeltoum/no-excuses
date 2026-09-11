@@ -70,6 +70,7 @@ describe("mobile API client", () => {
         "setWeeklyTarget",
         "removeGroupMember",
         "getCurrentGroupMembership",
+        "getMemberHome",
         "getCurrentWeekProgress",
         "getFinalizedWeeklyHistory",
       ].sort(),
@@ -117,6 +118,39 @@ describe("mobile API client", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       `https://api.example.test/v1/groups/${groupId}/current-week-progress`,
+      {
+        method: "GET",
+        headers: { authorization },
+        body: undefined,
+      },
+    );
+  });
+
+  it("loads member Home through its typed read seam", async () => {
+    const data = {
+      membershipId,
+      groupId,
+      accountabilityWeekId: null,
+      weekStatus: null,
+      lockedTarget: null,
+      completedWorkoutCount: 0,
+      needsYouCount: 0,
+      friendActivity: [],
+      seasonStandings: [],
+      rebuiltAt: "2026-09-10T12:00:00Z",
+    };
+    const fetch = vi.fn(async () => response({ contractVersion: 1, data }));
+    const client = createMobileApiClient({
+      baseUrl: "https://api.example.test",
+      fetch,
+    });
+
+    await expect(client.getMemberHome({ authorization })).resolves.toEqual({
+      contractVersion: 1,
+      data,
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.example.test/v1/member-home",
       {
         method: "GET",
         headers: { authorization },

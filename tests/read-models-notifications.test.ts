@@ -141,6 +141,67 @@ describe("M7 read models, social delivery, and notifications", () => {
     ).toEqual([{ count: 1 }]);
   });
 
+  it("returns one authorized composite Home view without mutating outcomes", async () => {
+    const db = await database();
+    await db.exec(`insert into app_private.seasons
+      (season_id,group_id,season_number,starts_at,ends_at,time_zone)
+      values ('a8000000-0000-4000-8000-000000000001','${group}',1,
+        '2026-09-07Z','2026-10-05Z','UTC');`);
+    await db.query(
+      "select * from app_private.rebuild_group_read_models($1,$2)",
+      [group, "2026-09-10Z"],
+    );
+    await actor(db, auth[0]);
+    const before = await db.query(
+      "select membership_id, status from app_private.member_weeks order by membership_id",
+    );
+    const home = await db.query(
+      "select * from app_private.read_member_home_view('2026-09-10Z')",
+    );
+    expect(home.rows).toHaveLength(1);
+    expect(home.rows[0]).toMatchObject({
+      membership_id: memberships[0],
+      completed_workout_count: 1,
+      needs_you_count: 1,
+      friend_activity: [
+        {
+          membership_id: memberships[1],
+          locked_target: 3,
+          completed_workout_count: 0,
+          week_status: "active",
+        },
+      ],
+      season_standings: [
+        {
+          membership_id: memberships[0],
+          crowns: 0,
+          rank: 1,
+          cochampion: true,
+        },
+        {
+          membership_id: memberships[1],
+          crowns: 0,
+          rank: 1,
+          cochampion: true,
+        },
+      ],
+    });
+    expect(
+      await db.query(
+        "select membership_id, status from app_private.member_weeks order by membership_id",
+      ),
+    ).toEqual(expect.objectContaining({ rows: before.rows }));
+
+    await actor(db, auth[2]);
+    expect(
+      (
+        await db.query(
+          "select * from app_private.read_member_home_view('2026-09-10Z')",
+        )
+      ).rows,
+    ).toEqual([]);
+  });
+
   it("records idempotent same-Group social interactions without changing outcomes", async () => {
     const db = await database();
     await actor(db, auth[0]);
