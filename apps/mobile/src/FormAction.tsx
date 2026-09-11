@@ -41,7 +41,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  actionText: { color: "#0A0A0A", fontSize: 17, fontWeight: "800" },
+  actionText: {
+    color: "#0A0A0A",
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: "800",
+    textAlign: "center",
+  },
   secondary: {
     backgroundColor: "transparent",
     borderColor: "#E8E8E8",

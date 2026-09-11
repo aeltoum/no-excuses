@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useReducer, useRef } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+import { focusAccessibleText } from "../../src/accessibility";
 import {
   createMobileApiClient,
   readMobileApiBaseUrl,
@@ -15,6 +16,7 @@ import {
   MAX_TARGET_INPUT_LENGTH,
   MAX_TIME_ZONE_LENGTH,
 } from "../../src/group-entry-state";
+import { KeyboardAwareScreen } from "../../src/KeyboardAwareScreen";
 import { createLocalMobileSupabaseClient } from "../../src/native-supabase";
 
 function Field({
@@ -55,6 +57,7 @@ export default function Group() {
     initialGroupEntryState,
   );
   const errorSummary = useRef<Text>(null);
+  const successReceipt = useRef<Text>(null);
   const submitting = useRef(false);
   const submissionIds = useRef<
     | {
@@ -66,14 +69,11 @@ export default function Group() {
   >(undefined);
 
   useEffect(() => {
-    if (state.screen === "success") router.replace("/home");
-  }, [router, state]);
-
-  useEffect(() => {
     if ((state.screen === "create" || state.screen === "join") && state.error) {
-      errorSummary.current?.focus();
+      focusAccessibleText(errorSummary.current);
     }
-  }, [state]);
+    if (state.screen === "success") focusAccessibleText(successReceipt.current);
+  }, [state.error, state.screen]);
 
   async function submit() {
     if (
@@ -162,9 +162,19 @@ export default function Group() {
     );
   } else if (state.screen === "success") {
     content = (
-      <Text accessibilityLiveRegion="polite" style={styles.body}>
-        Group membership confirmed. Opening Home.
-      </Text>
+      <>
+        <Text
+          ref={successReceipt}
+          accessible
+          accessibilityLiveRegion="polite"
+          accessibilityRole="header"
+          style={styles.title}
+        >
+          Group membership confirmed
+        </Text>
+        <Text style={styles.body}>Your private Group is ready.</Text>
+        <FormAction label="Open Home" onPress={() => router.replace("/home")} />
+      </>
     );
   } else {
     const create = state.screen === "create";
@@ -258,12 +268,9 @@ export default function Group() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <View style={styles.panel}>{content}</View>
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

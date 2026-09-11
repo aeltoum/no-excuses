@@ -1,11 +1,13 @@
-import { useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { focusAccessibleText } from "../../src/accessibility";
 import {
   createMobileApiClient,
   MobileApiClientError,
   readMobileApiBaseUrl,
 } from "../../src/api-client";
 import { FormAction } from "../../src/FormAction";
+import { KeyboardAwareScreen } from "../../src/KeyboardAwareScreen";
 import { createLocalMobileSupabaseClient } from "../../src/native-supabase";
 
 export default function You() {
@@ -14,6 +16,11 @@ export default function You() {
   const [status, setStatus] = useState<string>();
   const [deleted, setDeleted] = useState(false);
   const idempotencyKey = useRef<string>();
+  const resultStatus = useRef<Text>(null);
+
+  useEffect(() => {
+    if (deleted || (status && !busy)) focusAccessibleText(resultStatus.current);
+  }, [busy, deleted, status]);
 
   async function removeAccount() {
     if (busy) return;
@@ -62,7 +69,7 @@ export default function You() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text accessibilityRole="header" style={styles.title}>
         You
       </Text>
@@ -72,7 +79,13 @@ export default function You() {
         </Text>
         {deleted ? (
           <>
-            <Text accessibilityLiveRegion="polite" style={styles.body}>
+            <Text
+              ref={resultStatus}
+              accessible
+              accessibilityLiveRegion="polite"
+              accessibilityRole="header"
+              style={styles.body}
+            >
               Account deleted. Membership ended; personal identifiers removed.
             </Text>
             <Text style={styles.receipt}>Deletion completed.</Text>
@@ -100,7 +113,13 @@ export default function You() {
               secondary
             />
             {status ? (
-              <Text accessibilityLiveRegion="polite" style={styles.status}>
+              <Text
+                ref={resultStatus}
+                accessible
+                accessibilityLiveRegion="polite"
+                accessibilityRole="summary"
+                style={styles.status}
+              >
                 {status}
               </Text>
             ) : null}
@@ -113,7 +132,7 @@ export default function You() {
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

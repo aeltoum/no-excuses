@@ -16,12 +16,12 @@ import {
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { focusAccessibleText } from "../../src/accessibility";
 import {
   createMobileApiClient,
   MobileApiClientError,
@@ -29,6 +29,7 @@ import {
 } from "../../src/api-client";
 import { FormAction } from "../../src/FormAction";
 import { readCachedHome, writeCachedHome } from "../../src/home-cache";
+import { KeyboardAwareScreen } from "../../src/KeyboardAwareScreen";
 import {
   type MemberReadEvent,
   type MemberReadState,
@@ -97,6 +98,11 @@ function MemberHome({
   const [busy, setBusy] = useState(false);
   const targetIdentity = useRef<CommandIdentity>();
   const workoutIdentity = useRef<CommandIdentity>();
+  const actionStatus = useRef<Text>(null);
+
+  useEffect(() => {
+    if (status && !busy) focusAccessibleText(actionStatus.current);
+  }, [busy, status]);
 
   async function authorization() {
     const { data, error } =
@@ -175,6 +181,7 @@ function MemberHome({
         <Text style={styles.detail}>
           {value.weekStatus ?? "No active accountability week"}
         </Text>
+        <Text style={styles.inputLabel}>Weekly target</Text>
         <TextInput
           accessibilityLabel="Weekly target"
           editable={!busy}
@@ -186,6 +193,7 @@ function MemberHome({
           style={styles.input}
           value={target}
         />
+        <Text style={styles.inputHelp}>Enter a whole number of 1 or more.</Text>
         <FormAction
           disabled={
             busy || !Number.isInteger(Number(target)) || Number(target) < 1
@@ -206,6 +214,7 @@ function MemberHome({
         <Text style={styles.detail}>
           Self-reported workouts count immediately.
         </Text>
+        <Text style={styles.inputLabel}>Activity type</Text>
         <TextInput
           accessibilityLabel="Activity type"
           editable={!busy}
@@ -216,6 +225,7 @@ function MemberHome({
           style={styles.input}
           value={activityType}
         />
+        <Text style={styles.inputLabel}>Duration in minutes</Text>
         <TextInput
           accessibilityLabel="Duration in minutes"
           editable={!busy}
@@ -227,6 +237,7 @@ function MemberHome({
           style={styles.input}
           value={duration}
         />
+        <Text style={styles.inputLabel}>Perceived intensity</Text>
         <TextInput
           accessibilityLabel="Perceived intensity"
           editable={!busy}
@@ -237,6 +248,10 @@ function MemberHome({
           style={styles.input}
           value={intensity}
         />
+        <Text style={styles.inputHelp}>
+          Activity: strength, cardio, class, sport, or mixed. Intensity: low,
+          moderate, or high. Duration: whole minutes of 1 or more.
+        </Text>
         <FormAction
           disabled={
             busy ||
@@ -271,7 +286,13 @@ function MemberHome({
           }
         />
         {status ? (
-          <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>
+          <Text
+            ref={actionStatus}
+            accessible
+            accessibilityLiveRegion="polite"
+            accessibilityRole="summary"
+            style={styles.actionStatus}
+          >
             {status}
           </Text>
         ) : null}
@@ -467,7 +488,7 @@ export default function Home() {
   else content = <StateMessage message={state.message} />;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       {notice ? (
         <StateMessage message="No longer available. Returned safely to Home." />
       ) : null}
@@ -476,7 +497,7 @@ export default function Home() {
         This week
       </Text>
       {content}
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 
@@ -514,16 +535,17 @@ const styles = StyleSheet.create({
   metric: { color: "#FAFAF5", fontSize: 28, fontWeight: "800" },
   detail: { color: "#C8C8C0", fontSize: 16, lineHeight: 22 },
   row: {
-    alignItems: "center",
+    alignItems: "flex-start",
     borderTopColor: "#444",
     borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
     minHeight: 48,
+    gap: 6,
     paddingVertical: 10,
   },
   rowLabel: { color: "#FAFAF5", flex: 1, fontSize: 16 },
   rowValue: { color: "#E8FF00", fontSize: 16, fontWeight: "700" },
+  inputLabel: { color: "#FAFAF5", fontSize: 16, fontWeight: "700" },
+  inputHelp: { color: "#C8C8C0", fontSize: 14, lineHeight: 20 },
   actionStatus: { color: "#C8C8C0", fontSize: 14, lineHeight: 20 },
   input: {
     backgroundColor: "#171717",

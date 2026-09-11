@@ -4,12 +4,12 @@ import { type ReactNode, useEffect, useReducer, useRef, useState } from "react";
 import {
   ActivityIndicator,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { focusAccessibleText } from "../src/accessibility";
 import {
   observeMobileSession,
   requestEmailOtp,
@@ -23,6 +23,7 @@ import {
   MAX_OTP_INPUT_LENGTH,
 } from "../src/auth-entry-state";
 import { FormAction } from "../src/FormAction";
+import { KeyboardAwareScreen } from "../src/KeyboardAwareScreen";
 import { createLocalMobileSupabaseClient } from "../src/native-supabase";
 
 export default function Index() {
@@ -36,6 +37,8 @@ export default function Index() {
     }
   });
   const errorSummary = useRef<Text>(null);
+  const screenTitle = useRef<Text>(null);
+  const previousScreen = useRef(state.screen);
 
   useEffect(() => {
     if (!client) {
@@ -57,8 +60,19 @@ export default function Index() {
   }, [router, state]);
 
   useEffect(() => {
-    if (state.screen !== "launch" && state.error) errorSummary.current?.focus();
-  }, [state]);
+    if (state.screen !== "launch" && state.error)
+      focusAccessibleText(errorSummary.current);
+  }, [state.error, state.screen]);
+
+  useEffect(() => {
+    if (
+      state.screen !== previousScreen.current &&
+      state.screen !== "launch" &&
+      !state.error
+    )
+      focusAccessibleText(screenTitle.current);
+    previousScreen.current = state.screen;
+  }, [state.error, state.screen]);
 
   async function sendCode() {
     if (!client || state.screen !== "request" || state.busy) return;
@@ -128,7 +142,7 @@ export default function Index() {
   } else if (state.screen === "request") {
     content = (
       <View style={styles.panel}>
-        <Text accessibilityRole="header" style={styles.title}>
+        <Text ref={screenTitle} accessibilityRole="header" style={styles.title}>
           Sign in
         </Text>
         <Text style={styles.body}>
@@ -170,7 +184,7 @@ export default function Index() {
   } else {
     content = (
       <View style={styles.panel}>
-        <Text accessibilityRole="header" style={styles.title}>
+        <Text ref={screenTitle} accessibilityRole="header" style={styles.title}>
           Enter your code
         </Text>
         <Text style={styles.body}>
@@ -218,12 +232,9 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
+      <KeyboardAwareScreen contentContainerStyle={styles.container}>
         {content}
-      </ScrollView>
+      </KeyboardAwareScreen>
       <StatusBar style="light" />
     </SafeAreaView>
   );
