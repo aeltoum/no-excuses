@@ -64,4 +64,42 @@ describe("M7 mobile member read states", () => {
       expect(source).toContain(text);
     }
   });
+
+  it("keeps Home task-first and limits cached rendering to network failure", async () => {
+    const source = await readFile(
+      new URL("../apps/mobile/app/(member)/home.tsx", import.meta.url),
+      "utf8",
+    );
+    const orderedSections = [
+      '<Section title="Needs you">',
+      '<Section title="Your weekly progress">',
+      '<Section title="Friend activity">',
+      '<Section title="Season standings">',
+    ];
+    let prior = -1;
+    for (const section of orderedSections) {
+      const position = source.indexOf(section);
+      expect(position).toBeGreaterThan(prior);
+      prior = position;
+    }
+    for (const text of [
+      "accountId = data.session.user.id",
+      "writeCachedHome",
+      ").catch(() => undefined)",
+      'error.kind === "network"',
+      "readCachedHome",
+      "staleAt: cached.cachedAt",
+      "Offline. Showing Home saved",
+      "error.status === 401 || error.status === 403",
+      "error.status === 409",
+    ]) {
+      expect(source).toContain(text);
+    }
+    const networkFallback = source.indexOf('error.kind === "network"');
+    expect(networkFallback).toBeGreaterThan(-1);
+    expect(source.indexOf("readCachedHome", networkFallback)).toBeGreaterThan(
+      networkFallback,
+    );
+    expect(source).not.toContain("access_token,");
+  });
 });

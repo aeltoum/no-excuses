@@ -1,27 +1,27 @@
 import {
-  type NotificationCenterResult,
-  notificationCenterResultSchema,
+  type MemberHomeResult,
+  memberHomeResultSchema,
 } from "@no-excuses/contracts";
 
-export type NotificationCacheStorage = Readonly<{
+export type HomeCacheStorage = Readonly<{
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
   removeItem(key: string): Promise<void>;
 }>;
 
-type CachedNotifications = Readonly<{
+type CachedHome = Readonly<{
   cachedAt: string;
-  value: NotificationCenterResult;
+  value: MemberHomeResult;
 }>;
 
 function cacheKey(accountId: string): string {
-  return `no-excuses:notifications:${accountId}`;
+  return `no-excuses:home:${accountId}`;
 }
 
-export async function readCachedNotifications(
-  storage: NotificationCacheStorage,
+export async function readCachedHome(
+  storage: HomeCacheStorage,
   accountId: string,
-): Promise<CachedNotifications | undefined> {
+): Promise<CachedHome | undefined> {
   const key = cacheKey(accountId);
   try {
     const serialized = await storage.getItem(key);
@@ -34,16 +34,16 @@ export async function readCachedNotifications(
       typeof candidate.cachedAt !== "string" ||
       !("value" in candidate)
     ) {
-      throw new Error("invalid_notification_cache");
+      throw new Error("invalid_home_cache");
     }
-    const value = notificationCenterResultSchema.safeParse(candidate.value);
+    const value = memberHomeResultSchema.safeParse(candidate.value);
     const cachedTime = Date.parse(candidate.cachedAt);
     if (
       !value.success ||
       Number.isNaN(cachedTime) ||
       new Date(cachedTime).toISOString() !== candidate.cachedAt
     ) {
-      throw new Error("invalid_notification_cache");
+      throw new Error("invalid_home_cache");
     }
     return { cachedAt: candidate.cachedAt, value: value.data };
   } catch {
@@ -52,10 +52,10 @@ export async function readCachedNotifications(
   }
 }
 
-export async function writeCachedNotifications(
-  storage: NotificationCacheStorage,
+export async function writeCachedHome(
+  storage: HomeCacheStorage,
   accountId: string,
-  value: NotificationCenterResult,
+  value: MemberHomeResult,
   cachedAt: string,
 ): Promise<void> {
   await storage.setItem(

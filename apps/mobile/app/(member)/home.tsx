@@ -1,4 +1,5 @@
 import type { MemberHomeResult } from "@no-excuses/contracts";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useReducer } from "react";
 import {
@@ -14,6 +15,7 @@ import {
   MobileApiClientError,
   readMobileApiBaseUrl,
 } from "../../src/api-client";
+import { readCachedHome, writeCachedHome } from "../../src/home-cache";
 import {
   type MemberReadEvent,
   type MemberReadState,
@@ -122,6 +124,7 @@ export default function Home() {
   );
   const load = useCallback(async () => {
     dispatch({ type: "load" });
+    let accountId: string | undefined;
     const pendingTimer = setTimeout(
       () =>
         dispatch({
@@ -140,6 +143,7 @@ export default function Home() {
         });
         return;
       }
+      accountId = data.session.user.id;
       const api = createMobileApiClient({
         baseUrl: readMobileApiBaseUrl(process.env),
       });
@@ -148,6 +152,12 @@ export default function Home() {
           authorization: `Bearer ${data.session.access_token}`,
         })
       ).data;
+      void writeCachedHome(
+        AsyncStorage,
+        accountId,
+        value,
+        new Date().toISOString(),
+      ).catch(() => undefined);
       const empty =
         value.accountabilityWeekId === null &&
         value.friendActivity.length === 0 &&
@@ -161,6 +171,19 @@ export default function Home() {
           : { type: "loaded", value },
       );
     } catch (error) {
+      if (error instanceof MobileApiClientError && error.kind === "network") {
+        const cached = accountId
+          ? await readCachedHome(AsyncStorage, accountId)
+          : undefined;
+        if (cached) {
+          dispatch({
+            type: "loaded",
+            value: cached.value,
+            staleAt: cached.cachedAt,
+          });
+          return;
+        }
+      }
       const event: MemberReadEvent<MemberHomeResult> =
         error instanceof MobileApiClientError &&
         (error.status === 401 || error.status === 403)
@@ -199,7 +222,7 @@ export default function Home() {
         <MemberHome value={state.value} />
         {state.staleAt ? (
           <StateMessage
-            message={`Showing stale data from ${state.staleAt}. Refresh when online.`}
+            message={`Offline. Showing Home saved ${state.staleAt}. Refresh when online.`}
             retry={load}
           />
         ) : null}

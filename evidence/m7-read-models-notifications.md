@@ -39,6 +39,11 @@ only; no email adapter was added.
   generic in-app items with an explicit saved-at stale label and retry; denied, conflict,
   malformed-response, and server failures never fall back to cache. Notification opening
   remains live-authorized and recovers safely when offline.
+- `apps/mobile/src/home-cache.ts` and `apps/mobile/app/(member)/home.tsx`: contract-validated,
+  Account-scoped last-success Home cache using existing AsyncStorage. Network failure alone
+  may render cached task-first Home data with explicit offline saved-at status and retry;
+  missing session, authorization denial, conflict, malformed response, and server/API failure
+  never fall back to cache. Cache persistence is nonblocking and storage failure is nonfatal.
 - `tests/read-models-notifications.test.ts`: authoritative rebuild equivalence, cross-Group
   denial, departure cleanup, active-Season zero-Crown standings, composite Home-read outcome
   non-interference, idempotent social writes, bundle and separate-cap behavior, denied-push
@@ -62,7 +67,7 @@ account, processor, payment, or provisioning added.
 
 Remaining M7 work is explicit: complete authoritative task sources, actual Proof feed and
 historical Wall projection after Proof/retained-media activation, delivery/runtime adapter
-binding, provider delivery, broader Home and command-draft offline behavior, and
+binding, provider delivery, command-draft offline behavior, and
 physical-device accessibility/push validation. Hosted services
 remain separately gated. Current Home friend activity is structured weekly progress, not a
 claim that Proof media/feed or Wall exists.
@@ -87,4 +92,10 @@ and deployment-adapter results remain unclaimed. Notification offline-cache focu
 cover Account separation, contract validation, malformed-entry deletion, and unavailable
 device storage. Independent read-only validator iteration 2 passed 20 of 20 focused tests,
 format, TypeScript, dependency-policy, and diff checks. Physical-device persistence remains
-unclaimed.
+unclaimed. Home offline-cache worker coverage adds Account isolation, contract-valid round
+trip, malformed-entry removal, unavailable-storage behavior, and source invariants for
+task-first ordering plus network-only fallback. Independent read-only validator iteration 2
+passed the original Home cache acceptance and strict canonical UTC ISO saved-timestamp repair:
+29 of 29 focused tests across 4 files and the full 182-of-182-test `pnpm check` passed.
+Physical-device persistence/accessibility, provider, hosted-service, and deployment-adapter
+results remain unclaimed.
