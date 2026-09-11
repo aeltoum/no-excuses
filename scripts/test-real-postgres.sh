@@ -479,3 +479,238 @@ begin
   end if;
 end $$;
 SQL
+
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" <<'SQL'
+insert into app_private.accounts
+  (account_id, auth_user_id, email, adult_attested_at)
+values
+  ('b2000000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001', 'm7-a@example.test', now()),
+  ('b2000000-0000-4000-8000-000000000002', 'b3000000-0000-4000-8000-000000000002', 'm7-b@example.test', now()),
+  ('b2000000-0000-4000-8000-000000000003', 'b3000000-0000-4000-8000-000000000003', 'm7-outsider@example.test', now());
+insert into app_private.groups (group_id, name, time_zone, status, activation_at)
+values
+  ('b1000000-0000-4000-8000-000000000001', 'M7 Friends', 'UTC', 'active', '2026-09-07Z'),
+  ('b1000000-0000-4000-8000-000000000002', 'M7 Other', 'UTC', 'active', '2026-06-07Z');
+insert into app_private.memberships
+  (membership_id, account_id, group_id, joined_at, recurring_target)
+values
+  ('b4000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', '2026-09-07Z', 2),
+  ('b4000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', '2026-09-07Z', 3),
+  ('b4000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000002', '2026-06-07Z', 2);
+insert into app_private.accountability_weeks
+  (accountability_week_id, group_id, starts_at, ends_at, time_zone, activation_at)
+values ('b5000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001',
+  '2026-09-07Z', '2026-09-14Z', 'UTC', '2026-09-07Z');
+insert into app_private.member_weeks
+  (member_week_id, membership_id, accountability_week_id, target, target_locked_at)
+values
+  ('b6000000-0000-4000-8000-000000000001', 'b4000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000001', 2, '2026-09-07Z'),
+  ('b6000000-0000-4000-8000-000000000002', 'b4000000-0000-4000-8000-000000000002', 'b5000000-0000-4000-8000-000000000001', 3, '2026-09-07Z');
+insert into app_private.workout_checkins
+  (workout_checkin_id, member_week_id, membership_id, activity_type,
+   completed_at, duration_minutes, perceived_intensity, self_report_attested, submitted_at)
+values ('b7000000-0000-4000-8000-000000000001', 'b6000000-0000-4000-8000-000000000001',
+  'b4000000-0000-4000-8000-000000000001', 'strength', '2026-09-08Z', 30, 'moderate', true, '2026-09-08Z');
+insert into app_private.seasons
+  (season_id, group_id, season_number, starts_at, ends_at, time_zone)
+values ('b8000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001',
+  1, '2026-09-07Z', '2026-10-05Z', 'UTC');
+insert into app_private.consequence_obligations
+  (obligation_id, membership_id, source_kind, source_id, created_at)
+values ('b9000000-0000-4000-8000-000000000001', 'b4000000-0000-4000-8000-000000000001',
+  'missed_target', 'b9000000-0000-4000-8000-000000000002', '2026-09-09Z');
+
+do $$
+declare first_rebuild jsonb; second_rebuild jsonb;
+begin
+  perform * from app_private.rebuild_group_read_models(
+    'b1000000-0000-4000-8000-000000000001', '2026-09-10Z');
+  select jsonb_build_object(
+    'home', (select jsonb_agg(to_jsonb(p) order by p.membership_id)
+      from app_private.member_home_projections p
+      where p.group_id = 'b1000000-0000-4000-8000-000000000001'),
+    'group', (select jsonb_agg(to_jsonb(p) order by p.viewer_membership_id, p.subject_membership_id)
+      from app_private.group_member_projections p
+      where p.group_id = 'b1000000-0000-4000-8000-000000000001'),
+    'season', (select jsonb_agg(to_jsonb(p) order by p.viewer_membership_id, p.subject_membership_id)
+      from app_private.season_standing_projections p
+      where p.season_id = 'b8000000-0000-4000-8000-000000000001'))
+    into first_rebuild;
+  perform * from app_private.rebuild_group_read_models(
+    'b1000000-0000-4000-8000-000000000001', '2026-09-10Z');
+  select jsonb_build_object(
+    'home', (select jsonb_agg(to_jsonb(p) order by p.membership_id)
+      from app_private.member_home_projections p
+      where p.group_id = 'b1000000-0000-4000-8000-000000000001'),
+    'group', (select jsonb_agg(to_jsonb(p) order by p.viewer_membership_id, p.subject_membership_id)
+      from app_private.group_member_projections p
+      where p.group_id = 'b1000000-0000-4000-8000-000000000001'),
+    'season', (select jsonb_agg(to_jsonb(p) order by p.viewer_membership_id, p.subject_membership_id)
+      from app_private.season_standing_projections p
+      where p.season_id = 'b8000000-0000-4000-8000-000000000001'))
+    into second_rebuild;
+  if first_rebuild is distinct from second_rebuild then
+    raise exception 'M7 projection rebuild was not equivalent';
+  end if;
+  if (select count(*) from app_private.group_member_projections
+      where group_id = 'b1000000-0000-4000-8000-000000000001') <> 4
+     or exists (select from app_private.group_member_projections
+       where subject_membership_id = 'b4000000-0000-4000-8000-000000000003') then
+    raise exception 'M7 projections crossed Group boundary';
+  end if;
+  if (select count(*) from app_private.season_standing_projections
+      where season_id = 'b8000000-0000-4000-8000-000000000001'
+        and crowns = 0 and rank = 1 and cochampion) <> 4 then
+    raise exception 'M7 current active-Season zero-Crown standings were incomplete';
+  end if;
+end $$;
+
+select set_config('app.auth_user_id', 'b3000000-0000-4000-8000-000000000001', false);
+select set_config('app.token_issued_at', '2026-09-10Z', false);
+set role authenticated;
+do $$
+declare home record;
+begin
+  select * into home from app_private.read_member_home_view('2026-09-10Z');
+  if home.membership_id <> 'b4000000-0000-4000-8000-000000000001'
+     or home.completed_workout_count <> 1 or home.needs_you_count <> 1
+     or jsonb_array_length(home.friend_activity) <> 1
+     or jsonb_array_length(home.season_standings) <> 2 then
+    raise exception 'M7 member Home read did not return expected current projection';
+  end if;
+  begin
+    perform app_private.create_social_interaction(gen_random_uuid(),
+      'b4000000-0000-4000-8000-000000000003', 'reaction', 'fire', '2026-09-10Z');
+    raise exception 'M7 cross-Group social write unexpectedly succeeded';
+  exception when insufficient_privilege then null;
+  end;
+  perform app_private.create_social_interaction(
+    'ba000000-0000-4000-8000-000000000001',
+    'b4000000-0000-4000-8000-000000000002', 'reaction', 'fire', '2026-09-10Z');
+end $$;
+reset role;
+
+select set_config('app.auth_user_id', 'b3000000-0000-4000-8000-000000000003', false);
+set role authenticated;
+do $$
+begin
+  if exists (select from app_private.read_member_home_view('2026-09-10Z')) then
+    raise exception 'M7 member Home read crossed Group boundary';
+  end if;
+end $$;
+reset role;
+
+insert into app_private.notification_preferences
+  (account_id, notification_time_zone, changed_at)
+values
+  ('b2000000-0000-4000-8000-000000000001', 'UTC', '2026-09-01Z'),
+  ('b2000000-0000-4000-8000-000000000002', 'UTC', '2026-09-01Z');
+insert into app_private.push_subscriptions
+  (subscription_id, account_id, installation_id, permission, endpoint_digest, verified_at)
+values ('bb000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000002',
+  'bb000000-0000-4000-8000-000000000002', 'granted', repeat('a', 64), '2026-09-01Z');
+insert into app_private.push_subscriptions
+  (subscription_id, account_id, installation_id, permission, endpoint_digest)
+values ('bb000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000001',
+  'bb000000-0000-4000-8000-000000000004', 'denied', repeat('b', 64));
+
+do $$
+declare n integer;
+begin
+  for n in 1..5 loop
+    perform app_private.schedule_notification(gen_random_uuid(),
+      'b2000000-0000-4000-8000-000000000002', 'm7-social-' || n,
+      'social', 1, 'generic', 'home', null,
+      '2026-09-10Z'::timestamptz + (n || ' hours')::interval, '2026-09-11Z');
+    perform * from app_private.dispatch_notification_work(
+      '2026-09-10Z'::timestamptz + (n || ' hours')::interval);
+    perform app_private.schedule_notification(gen_random_uuid(),
+      'b2000000-0000-4000-8000-000000000002', 'm7-action-' || n,
+      'action', 1, 'generic', 'home', null,
+      '2026-09-10Z'::timestamptz + (n || ' hours')::interval, '2026-09-11Z');
+    perform * from app_private.dispatch_notification_work(
+      '2026-09-10Z'::timestamptz + (n || ' hours')::interval);
+  end loop;
+  if (select count(*) from app_private.notification_budgets
+      where account_id = 'b2000000-0000-4000-8000-000000000002' and consumed = 3) <> 2
+     or not exists (select from app_private.push_bundles
+       where recipient_account_id = 'b2000000-0000-4000-8000-000000000002'
+         and class = 'social' and notification_count = 2)
+     or (select count(*) from app_private.notification_delivery_work
+       where state = 'suppressed' and suppression_reason = 'daily_cap'
+         and notification_id in (select notification_id from app_private.notification_items
+           where recipient_account_id = 'b2000000-0000-4000-8000-000000000002')) <> 4 then
+    raise exception 'M7 social/action caps were not separate';
+  end if;
+
+  perform app_private.schedule_notification('bc000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000001', 'm7-denied', 'action', 1,
+    'deadline_due', 'task', 'bc000000-0000-4000-8000-000000000002', '2026-09-10Z', '2026-09-11Z');
+  perform * from app_private.dispatch_notification_work('2026-09-10Z');
+  if not exists (select from app_private.notification_delivery_work
+      where notification_id = 'bc000000-0000-4000-8000-000000000001'
+        and state = 'suppressed' and suppression_reason = 'permission_unavailable')
+     or not exists (select from app_private.notification_items
+       where notification_id = 'bc000000-0000-4000-8000-000000000001' and state = 'unread') then
+    raise exception 'M7 denied push changed canonical notification authority';
+  end if;
+end $$;
+
+insert into app_private.notification_items
+  (notification_id, recipient_account_id, source_identity, class, priority,
+   template_key, route_kind, route_id, state, created_at, relevant_until)
+values
+  ('bd000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'm7-order-1', 'action', 2, 'generic', 'home', null, 'unread', '2026-09-10T10:00Z', '2026-09-11Z'),
+  ('bd000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'm7-order-2', 'social', 1, 'generic', 'home', null, 'unread', '2026-09-10T09:00Z', '2026-09-11Z'),
+  ('bd000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000001', 'm7-order-3', 'action', 1, 'generic', 'home', null, 'read', '2026-09-10T11:00Z', '2026-09-11Z'),
+  ('bd000000-0000-4000-8000-000000000004', 'b2000000-0000-4000-8000-000000000001', 'm7-resolved', 'action', 1, 'generic', 'home', null, 'resolved', '2026-09-10Z', '2026-09-11Z'),
+  ('bd000000-0000-4000-8000-000000000005', 'b2000000-0000-4000-8000-000000000001', 'm7-malformed', 'action', 1, 'generic', 'task', null, 'unread', '2026-09-10Z', '2026-09-11Z');
+
+select set_config('app.auth_user_id', 'b3000000-0000-4000-8000-000000000001', false);
+select set_config('app.token_issued_at', '2026-09-10Z', false);
+set role authenticated;
+do $$
+declare ordered_ids uuid[];
+begin
+  select array_agg(notification_id) into ordered_ids
+  from app_private.read_notification_center('2026-09-10T12:00Z');
+  if ordered_ids <> array[
+      'bd000000-0000-4000-8000-000000000002'::uuid,
+      'bc000000-0000-4000-8000-000000000001'::uuid,
+      'bd000000-0000-4000-8000-000000000005'::uuid,
+      'bd000000-0000-4000-8000-000000000001'::uuid,
+      'bd000000-0000-4000-8000-000000000003'::uuid] then
+    raise exception 'M7 notification center ordering was not deterministic';
+  end if;
+  if app_private.resolve_member_route(
+      'bd000000-0000-4000-8000-000000000004', '2026-09-10T12:00Z') <> '/notifications?notice=resolved'
+     or app_private.resolve_member_route(
+       'bd000000-0000-4000-8000-000000000005', '2026-09-10T12:00Z') <> '/home?notice=unavailable'
+     or app_private.resolve_member_route(
+       'bc000000-0000-4000-8000-000000000001', '2026-09-12Z') <> '/home?notice=unavailable' then
+    raise exception 'M7 stale or terminal route recovery was unsafe';
+  end if;
+end $$;
+reset role;
+
+do $$
+begin
+  if (select count(*) from app_private.member_weeks
+      where member_week_id in ('b6000000-0000-4000-8000-000000000001', 'b6000000-0000-4000-8000-000000000002')
+        and status = 'active') <> 2
+     or exists (select from app_private.crown_awards
+       where membership_id in ('b4000000-0000-4000-8000-000000000001', 'b4000000-0000-4000-8000-000000000002'))
+     or not exists (select from app_private.consequence_obligations
+       where obligation_id = 'b9000000-0000-4000-8000-000000000001' and status = 'open') then
+    raise exception 'M7 social or notification work changed authoritative outcomes';
+  end if;
+  update app_private.memberships set ended_at = '2026-09-10Z', end_reason = 'left'
+    where membership_id = 'b4000000-0000-4000-8000-000000000002';
+  perform * from app_private.rebuild_group_read_models(
+    'b1000000-0000-4000-8000-000000000001', '2026-09-10T00:01Z');
+  if (select count(*) from app_private.group_member_projections
+      where group_id = 'b1000000-0000-4000-8000-000000000001') <> 1 then
+    raise exception 'M7 projection rebuild retained departed membership';
+  end if;
+end $$;
+SQL
