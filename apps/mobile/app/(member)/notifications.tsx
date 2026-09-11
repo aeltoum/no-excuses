@@ -2,6 +2,7 @@ import type {
   NotificationCenterResult,
   NotificationOpenResult,
 } from "@no-excuses/contracts";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useReducer } from "react";
 import {
@@ -23,6 +24,10 @@ import {
   reduceMemberReadState,
 } from "../../src/member-read-state";
 import { createLocalMobileSupabaseClient } from "../../src/native-supabase";
+import {
+  readCachedNotifications,
+  writeCachedNotifications,
+} from "../../src/notification-cache";
 
 const initialState: MemberReadState<NotificationCenterResult> = {
   status: "loading",
@@ -105,6 +110,7 @@ export default function Notifications() {
     if (error || !data.session) throw new Error("session_required");
     return {
       authorization: `Bearer ${data.session.access_token}`,
+      accountId: data.session.user.id,
       api: createMobileApiClient({
         baseUrl: readMobileApiBaseUrl(process.env),
       }),
@@ -113,6 +119,7 @@ export default function Notifications() {
 
   const load = useCallback(async () => {
     dispatch({ type: "load" });
+    let accountId: string | undefined;
     const pendingTimer = setTimeout(
       () =>
         dispatch({
@@ -123,8 +130,16 @@ export default function Notifications() {
       5_000,
     );
     try {
-      const { api, authorization } = await authorizedClient();
+      const authorized = await authorizedClient();
+      accountId = authorized.accountId;
+      const { api, authorization } = authorized;
       const value = (await api.getNotifications({ authorization })).data;
+      void writeCachedNotifications(
+        AsyncStorage,
+        accountId,
+        value,
+        new Date().toISOString(),
+      ).catch(() => undefined);
       dispatch(
         value.unread.length === 0 && value.read.length === 0
           ? {
@@ -134,6 +149,19 @@ export default function Notifications() {
           : { type: "loaded", value },
       );
     } catch (error) {
+      if (error instanceof MobileApiClientError && error.kind === "network") {
+        const cached = accountId
+          ? await readCachedNotifications(AsyncStorage, accountId)
+          : undefined;
+        if (cached) {
+          dispatch({
+            type: "loaded",
+            value: cached.value,
+            staleAt: cached.cachedAt,
+          });
+          return;
+        }
+      }
       const event: MemberReadEvent<NotificationCenterResult> =
         (!(error instanceof MobileApiClientError) &&
           error instanceof Error &&
@@ -197,6 +225,12 @@ export default function Notifications() {
           open={open}
         />
         <NotificationGroup title="Read" items={state.value.read} open={open} />
+        {state.staleAt ? (
+          <StateMessage
+            message={`Offline. Showing Notifications saved ${state.staleAt}. Refresh when online.`}
+            retry={load}
+          />
+        ) : null}
       </>
     );
   else if (state.status === "failure")
