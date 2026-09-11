@@ -34,6 +34,11 @@ only; no email adapter was added.
   and stale/invalid-target notice states. Notification opens use server-authorized recovery;
   failures return safely to Home. Copy states that in-app authority remains available when
   device notifications are off.
+- `apps/mobile/src/notification-cache.ts` and AsyncStorage `2.2.0`: contract-validated,
+  Account-scoped last-success notification cache. Network failure alone may render cached
+  generic in-app items with an explicit saved-at stale label and retry; denied, conflict,
+  malformed-response, and server failures never fall back to cache. Notification opening
+  remains live-authorized and recovers safely when offline.
 - `tests/read-models-notifications.test.ts`: authoritative rebuild equivalence, cross-Group
   denial, departure cleanup, active-Season zero-Crown standings, composite Home-read outcome
   non-interference, idempotent social writes, bundle and separate-cap behavior, denied-push
@@ -52,12 +57,13 @@ from existing facts. Social writes and push receipt state never mutate Member-we
 Season, Consequence, or other authoritative outcomes. Push is optional transport; denied or
 missing permission suppresses only delivery while canonical in-app items remain unread.
 External copy uses template keys and opaque identifiers; no private content enters delivery
-records. No hosted service, dependency, account, processor, payment, or provisioning added.
+records. Owner-approved AsyncStorage is pinned for local cache persistence. No hosted service,
+account, processor, payment, or provisioning added.
 
 Remaining M7 work is explicit: complete authoritative task sources, actual Proof feed and
 historical Wall projection after Proof/retained-media activation, delivery/runtime adapter
-binding, provider delivery, offline cache/recovery behavior, real
-PostgreSQL verification, and physical-device accessibility/push validation. Hosted services
+binding, provider delivery, broader Home and command-draft offline behavior, and
+physical-device accessibility/push validation. Hosted services
 remain separately gated. Current Home friend activity is structured weekly progress, not a
 claim that Proof media/feed or Wall exists.
 
@@ -77,4 +83,8 @@ live same-Group/current-membership authorization, active-Season zero-Crown Home 
 separate social/action caps plus bundling, denied-push canonical persistence, stale/terminal
 route recovery, deterministic caller-owned notification-center ordering, and authoritative
 Member-week/Crown/Consequence non-interference. Physical-device, provider, hosted-service,
-and deployment-adapter results remain unclaimed.
+and deployment-adapter results remain unclaimed. Notification offline-cache focused tests
+cover Account separation, contract validation, malformed-entry deletion, and unavailable
+device storage. Independent read-only validator iteration 2 passed 20 of 20 focused tests,
+format, TypeScript, dependency-policy, and diff checks. Physical-device persistence remains
+unclaimed.

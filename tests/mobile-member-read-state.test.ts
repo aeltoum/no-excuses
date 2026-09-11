@@ -56,6 +56,9 @@ describe("M7 mobile member read states", () => {
       'type: "conflict"',
       'type: "pending"',
       "In-app status stays available even when device notifications are off.",
+      "Offline. Showing Notifications saved",
+      "readCachedNotifications",
+      'error.kind === "network"',
       "/home?notice=unavailable",
     ]) {
       expect(source).toContain(text);
