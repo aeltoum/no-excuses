@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -35,6 +37,24 @@ function authClient(auth: Record<string, unknown>) {
 }
 
 describe("mobile Supabase configuration", () => {
+  it("delivers the six-digit token required by the mobile OTP form", async () => {
+    const config = await readFile(
+      new URL("../supabase/config.toml", import.meta.url),
+      "utf8",
+    );
+    const template = await readFile(
+      new URL("../supabase/templates/magic-link.html", import.meta.url),
+      "utf8",
+    );
+
+    expect(config).toContain("[auth.email.template.magic_link]");
+    expect(config).toContain("otp_length = 6");
+    expect(config).toContain(
+      'content_path = "./supabase/templates/magic-link.html"',
+    );
+    expect(template).toContain("{{ .Token }}");
+  });
+
   it("requires public URL and anonymous key", () => {
     expect(() => readMobileSupabaseConfig({})).toThrow(
       MobileSupabaseConfigError,

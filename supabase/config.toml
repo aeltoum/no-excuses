@@ -26,6 +26,13 @@ site_url = "noexcuses://local"
 additional_redirect_urls = ["noexcuses://local/**"]
 enable_signup = false
 
+[auth.email]
+otp_length = 6
+
+[auth.email.template.magic_link]
+subject = "Your No Excuses sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
 [storage]
 enabled = true
 file_size_limit = "10MiB"
