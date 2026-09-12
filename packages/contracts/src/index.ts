@@ -1,4 +1,4 @@
-export type { components, paths } from "./generated.js";
+export type { components, paths } from "./generated.ts";
 export type {
   AcceptGroupInvitationRequest,
   CreateGroupRequest,
@@ -27,7 +27,7 @@ export type {
   SubmitWorkoutCheckinRequest,
   WeeklyTargetResult,
   WorkoutCheckinResult,
-} from "./runtime.js";
+} from "./runtime.ts";
 export {
   acceptGroupInvitationRequestSchema,
   apiErrorCodeSchema,
@@ -76,4 +76,4 @@ export {
   weeklyTargetResultSchema,
   workoutActivityTypeSchema,
   workoutCheckinResultSchema,
-} from "./runtime.js";
+} from "./runtime.ts";

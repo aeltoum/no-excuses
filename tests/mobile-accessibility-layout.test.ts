@@ -5,6 +5,19 @@ const mobileFile = (path: string) =>
   readFile(new URL(`../apps/mobile/${path}`, import.meta.url), "utf8");
 
 describe("mobile accessibility and responsive layout contracts", () => {
+  it("keeps source-exported contracts resolvable by native Metro", async () => {
+    const contractsIndex = await readFile(
+      new URL("../packages/contracts/src/index.ts", import.meta.url),
+      "utf8",
+    );
+    const tsconfig = JSON.parse(
+      await readFile(new URL("../tsconfig.json", import.meta.url), "utf8"),
+    );
+
+    expect(contractsIndex).not.toMatch(/from "\.\/[^"]+\.js"/);
+    expect(tsconfig.compilerOptions.allowImportingTsExtensions).toBe(true);
+  });
+
   it("keeps form screens inside the shared keyboard-aware scrolling surface", async () => {
     const wrapper = await mobileFile("src/KeyboardAwareScreen.tsx");
     for (const contract of [
