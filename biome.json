@@ -3,6 +3,8 @@
   "files": {
     "includes": [
       "apps/**",
+      "!!apps/**/dist",
+      "!!apps/**/test-results",
       "packages/**",
       "tests/**",
       "scripts/**",

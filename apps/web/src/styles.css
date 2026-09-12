@@ -1,0 +1,177 @@
+:root {
+  color: #e8e8e8;
+  background: #0a0a0a;
+  font-family: Archivo, Inter, system-ui, sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  --ground: #0a0a0a;
+  --surface: #111111;
+  --ink: #e8e8e8;
+  --safety: #ffd400;
+  --ink-on-safety: #0a0a0a;
+  --muted: #898989;
+  --rule: #2a2a2a;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--ground);
+}
+body {
+  margin: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+a {
+  color: inherit;
+}
+a:focus-visible {
+  outline: 3px solid var(--safety);
+  outline-offset: 3px;
+}
+.app-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.masthead {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.wordmark,
+.eyebrow,
+.status,
+nav a {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.wordmark {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.status span {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  background: var(--safety);
+}
+main {
+  width: min(100%, 960px);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(40px, 9vw, 96px) 20px;
+}
+.hero {
+  min-width: 0;
+}
+.eyebrow {
+  margin: 0 0 16px;
+  color: var(--safety);
+}
+h1 {
+  max-width: 12ch;
+  margin: 0;
+  font-family: Impact, "Arial Narrow", sans-serif;
+  font-size: clamp(3rem, 12vw, 8rem);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.92;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.lead {
+  max-width: 42rem;
+  margin: 24px 0 32px;
+  color: var(--muted);
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+}
+.primary-action {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--safety);
+  color: var(--ink-on-safety);
+  font-weight: 700;
+  text-decoration: none;
+}
+.install-help {
+  max-width: 42rem;
+  margin-top: clamp(48px, 9vw, 80px);
+  padding: 24px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.install-help h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+.install-help p {
+  margin: 8px 0;
+}
+nav {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  position: sticky;
+  bottom: 0;
+  background: var(--ground);
+  border-top: 1px solid var(--rule);
+}
+nav a {
+  min-width: 0;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 8px 4px;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+nav a[aria-current="page"] {
+  background: var(--safety);
+  color: var(--ink-on-safety);
+}
+@media (max-width: 420px) {
+  nav a {
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  main {
+    padding-block: 32px;
+  }
+  .install-help {
+    margin-top: 32px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero {
+    animation: reveal 240ms ease-out;
+  }
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+}

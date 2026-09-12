@@ -24,8 +24,9 @@ pnpm db:start
 pnpm db:reset
 ```
 
-PWA application setup is not selected or implemented yet. Existing `mobile:*` commands run
-the deferred React Native/Expo client and are not the active True MVP delivery path.
+Start active True MVP PWA shell with `pnpm web:dev`, then open exactly
+`http://127.0.0.1:4174/`. Existing `mobile:*` commands run deferred React Native/Expo client
+and are not active True MVP delivery path.
 `pnpm db:start` prints the local anonymous key; copy it into an ignored `.env.local` using
 `.env.example`. Do not put hosted URLs or privileged keys in client-readable variables.
 
