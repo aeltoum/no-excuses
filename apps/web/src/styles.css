@@ -30,6 +30,11 @@ a:focus-visible {
   outline: 3px solid var(--safety);
   outline-offset: 3px;
 }
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--safety);
+  outline-offset: 3px;
+}
 .app-shell {
   min-height: 100dvh;
   display: grid;
@@ -103,6 +108,79 @@ h1 {
   color: var(--muted);
   font-size: clamp(1rem, 2.5vw, 1.25rem);
 }
+form {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  margin: 28px 0;
+  padding: 20px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.form-grid form {
+  margin: 0;
+}
+form h2,
+form p {
+  margin: 0 0 4px;
+}
+label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 700;
+}
+input,
+button {
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid var(--muted);
+  border-radius: 0;
+  font: inherit;
+}
+input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--ground);
+  color: var(--ink);
+}
+button {
+  padding: 10px 16px;
+  background: var(--safety);
+  color: var(--ink-on-safety);
+  font-weight: 800;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.danger,
+.danger-zone button {
+  background: #ff766d;
+}
+.danger-zone {
+  display: grid;
+  gap: 16px;
+  margin-top: 48px;
+  padding: 20px;
+  border-color: #ff766d;
+}
+.result {
+  max-width: 42rem;
+  padding: 16px;
+  border: 1px solid var(--safety);
+  overflow-wrap: anywhere;
+}
+.result.error {
+  border-color: #ff766d;
+}
 .primary-action {
   min-height: 48px;
   display: inline-flex;
@@ -151,6 +229,9 @@ nav a[aria-current="page"] {
   color: var(--ink-on-safety);
 }
 @media (max-width: 420px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   nav a {
     font-size: 0.62rem;
     letter-spacing: 0.04em;

@@ -1,0 +1,277 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Page, test } from "@playwright/test";
+
+const userId = "20000000-0000-4000-8000-000000000001";
+const membershipId = "30000000-0000-4000-8000-000000000001";
+const groupId = "40000000-0000-4000-8000-000000000001";
+const session = {
+  access_token: "live-access",
+  token_type: "bearer",
+  expires_in: 3600,
+  expires_at: 1999999999,
+  refresh_token: "refresh",
+  user: {
+    id: userId,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "member@example.test",
+    app_metadata: {},
+    user_metadata: {},
+    created_at: "2026-09-12T00:00:00Z",
+  },
+};
+
+const findings = new WeakMap<
+  object,
+  { console: string[]; page: string[]; network: string[] }
+>();
+test.beforeEach(async ({ page }) => {
+  const found = {
+    console: [] as string[],
+    page: [] as string[],
+    network: [] as string[],
+  };
+  findings.set(page, found);
+  page.on("console", (message) => {
+    if (message.type() === "error") found.console.push(message.text());
+  });
+  page.on("pageerror", (error) => found.page.push(error.message));
+  page.on("requestfailed", (request) =>
+    found.network.push(`${request.method()} ${request.url()}`),
+  );
+});
+test.afterEach(async ({ page }, testInfo) => {
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath("verdict.png"),
+  });
+  expect(findings.get(page)).toEqual({ console: [], page: [], network: [] });
+});
+
+async function mockSignedOut(page: Page) {
+  await page.route("http://127.0.0.1:54321/auth/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
+    if (path.endsWith("/verify"))
+      return route.fulfill({ status: 200, json: session });
+    if (path.endsWith("/user"))
+      return route.fulfill({ status: 200, json: session.user });
+    if (path.endsWith("/logout"))
+      return route.fulfill({ status: 204, body: "" });
+    return route.fulfill({ status: 401, json: { message: "no session" } });
+  });
+}
+
+async function mockApi(page: Page, member: boolean) {
+  await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
+    const request = route.request();
+    expect(request.headers().authorization).toBe("Bearer live-access");
+    const path = new URL(request.url()).pathname;
+    if (path === "/v1/group-memberships/current")
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: { membership: member ? { groupId, membershipId } : null },
+        },
+      });
+    if (path === "/v1/account")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { accountId: userId } },
+      });
+    if (path === "/v1/group-invitations")
+      return route.fulfill({
+        status: 403,
+        json: {
+          contractVersion: 1,
+          error: {
+            code: "denied",
+            message: "private detail",
+            retryable: false,
+          },
+        },
+      });
+    return route.fulfill({
+      status: 200,
+      json: { contractVersion: 1, data: { membershipId } },
+    });
+  });
+}
+
+test("generic email OTP then live API authorization restores Group entry", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, false);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "If this account is eligible, a code was sent.",
+  );
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:4174/group");
+  await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
+});
+
+test("ineligible OTP request has same observable result", async ({ page }) => {
+  await page.route("http://127.0.0.1:54321/auth/v1/**", (route) =>
+    route.fulfill({ status: 400, json: { message: "unknown" } }),
+  );
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("unknown@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "If this account is eligible, a code was sent.",
+  );
+  findings.get(page)?.console.splice(0);
+});
+
+test("invalid code retains email and denied Group action hides private detail", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("12345");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Enter the six-digit code.");
+  await expect(page.getByLabel("Email address")).toHaveValue(
+    "member@example.test",
+  );
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Every rep counts." }),
+  ).toBeVisible();
+  await page.goto("/group");
+  await page.getByLabel("Friend email").fill("friend@example.test");
+  await page.getByRole("button", { name: "Create invitation" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Action denied.");
+  await expect(page.getByText("private detail")).toHaveCount(0);
+  findings.get(page)?.console.splice(0);
+});
+
+test("exact Account deletion confirmation cuts off browser session", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Review Account deletion" }).click();
+  await expect(
+    page.getByText("current Group access ends immediately"),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Send fresh verification code" })
+    .click();
+  await page.getByLabel("Fresh six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Reverify identity" }).click();
+  await expect(page.getByText("Identity reverified")).toBeVisible();
+  await page.getByLabel("Type DELETE MY ACCOUNT").fill("delete");
+  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Type DELETE MY ACCOUNT exactly.",
+  );
+  await expect(page.getByLabel("Type DELETE MY ACCOUNT")).toHaveValue("delete");
+  await page.getByLabel("Type DELETE MY ACCOUNT").fill("DELETE MY ACCOUNT");
+  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Account deletion completed. Access ended immediately.",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Sign in required" }),
+  ).toBeVisible();
+  const cutoffFindings = findings.get(page);
+  expect(
+    cutoffFindings?.network.every(
+      (item) =>
+        item.includes("/group-memberships/current") ||
+        item.includes("/auth/v1/logout"),
+    ),
+  ).toBe(true);
+  cutoffFindings?.network.splice(0);
+});
+
+test("Group conflict retains draft and retries same idempotency key", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  const keys: string[] = [];
+  let creates = 0;
+  await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
+    const request = route.request();
+    if (new URL(request.url()).pathname === "/v1/group-memberships/current")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { membership: null } },
+      });
+    keys.push(request.headers()["idempotency-key"] ?? "");
+    creates += 1;
+    return creates === 1
+      ? route.fulfill({
+          status: 409,
+          json: {
+            contractVersion: 1,
+            error: {
+              code: "idempotency_conflict",
+              message: "private",
+              retryable: true,
+            },
+          },
+        })
+      : route.fulfill({
+          status: 200,
+          json: { contractVersion: 1, data: { membershipId } },
+        });
+  });
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
+  await page.getByLabel("Group name").fill("Morning crew");
+  await page.getByLabel("Weekly target").first().fill("3");
+  await page.getByRole("button", { name: "Create Group" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Action conflicts with current Group state.",
+  );
+  await expect(page.getByLabel("Group name")).toHaveValue("Morning crew");
+  findings.get(page)?.console.splice(0);
+  await page.getByRole("button", { name: "Create Group" }).click();
+  await expect(page.getByRole("status")).toHaveText("Group created.");
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBe(keys[1]);
+});
+
+test("compact enlarged-text Group entry has no serious axe or overflow", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, false);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/sign-in");
+  await page.addStyleTag({ content: ":root { font-size: 200% !important; }" });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(320);
+  const findings = await new AxeBuilder({ page }).analyze();
+  expect(
+    findings.violations.filter(
+      ({ impact }) => impact === "serious" || impact === "critical",
+    ),
+  ).toEqual([]);
+});
