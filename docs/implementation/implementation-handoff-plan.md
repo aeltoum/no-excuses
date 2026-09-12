@@ -1,5 +1,10 @@
 # Implementation handoff plan
 
+> **Deferred target-product plan:** ADR-0004 makes an installable PWA the active True MVP
+> delivery target. Native-client milestones, device gates, estimates, costs, and app-store
+> assumptions below are preserved for later native implementation and do not govern current
+> PWA work. A separate PWA implementation plan must be approved before application changes.
+
 This is the execution plan for one developer working with Codex and one Private-pilot operator to build, rehearse, and admit No Excuses to the Validation pilot. It orders the accepted product and technical decisions into dependency-aware milestones, identifies evidence and approval gates, and gives effort and cost ranges. It does not authorize application work, service provisioning, trial activation, payment, participant enrollment, or spending.
 
 Source contracts remain authoritative. This plan is an index and sequence, not a replacement for:
@@ -9,7 +14,7 @@ Source contracts remain authoritative. This plan is an index and sequence, not a
 - the [screen, state, and accessibility contracts](screen-state-accessibility-contracts.md) for member and operator behavior;
 - the [private-pilot technical quality bar](private-pilot-technical-quality-bar.md) for non-waivable thresholds;
 - the [verification and pilot-readiness test strategy](verification-and-pilot-readiness-test-strategy.md) for evidence layers and release gates; and
-- the accepted architecture decisions for [React Native and Expo](../adr/0001-use-react-native-and-expo-for-the-mobile-client.md), [Supabase](../adr/0002-use-supabase-for-the-private-pilot-backend.md), and [email OTP with live database authorization](../adr/0003-use-email-otp-and-live-database-authorization.md).
+- the accepted architecture decisions for the [True MVP PWA](../adr/0004-use-an-installable-pwa-for-the-true-mvp-client.md), [Supabase](../adr/0002-use-supabase-for-the-private-pilot-backend.md), and [email OTP with live database authorization](../adr/0003-use-email-otp-and-live-database-authorization.md), plus the superseded native-client decision preserved in [ADR-0001](../adr/0001-use-react-native-and-expo-for-the-mobile-client.md).
 
 ## Planning assumptions
 

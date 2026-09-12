@@ -1,8 +1,9 @@
 # No Excuses
 
-Private friend-group fitness accountability app. The accepted implementation baseline is a
-React Native/Expo development build backed by local Supabase; hosted services remain behind
-separate approval gates.
+Private friend-group fitness accountability product. Active True MVP delivery target is an
+installable Progressive Web App for iPhone and Android browsers, backed by Supabase. Existing
+React Native/Expo work is preserved for deferred native-app implementation. Hosted services
+remain behind separate approval gates.
 
 ## Local setup
 
@@ -11,7 +12,7 @@ Prerequisites:
 - Node.js `24.19.0` (see `.node-version`)
 - pnpm `11.19.0` through Corepack
 - Docker Desktop or another Docker-compatible runtime for the local Supabase stack
-- Xcode or Android Studio only when running the corresponding native development build
+- Xcode or Android Studio only when working on deferred native applications
 
 From a clean clone:
 
@@ -21,13 +22,12 @@ pnpm install --frozen-lockfile
 pnpm check
 pnpm db:start
 pnpm db:reset
-pnpm --filter @no-excuses/mobile start
 ```
 
-In a second terminal, build the local development client with `pnpm mobile:ios` or
-`pnpm mobile:android`. Expo Go is not supported. `pnpm db:start` prints the local anonymous
-key; copy it into an ignored `.env.local` using `.env.example`. Do not put hosted URLs or
-privileged keys in client-readable variables.
+PWA application setup is not selected or implemented yet. Existing `mobile:*` commands run
+the deferred React Native/Expo client and are not the active True MVP delivery path.
+`pnpm db:start` prints the local anonymous key; copy it into an ignored `.env.local` using
+`.env.example`. Do not put hosted URLs or privileged keys in client-readable variables.
 
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and
@@ -39,7 +39,7 @@ data.
 
 ## Repository layout
 
-- `apps/mobile`: Expo Router development-build shell
+- `apps/mobile`: preserved deferred Expo Router native-client implementation
 - `packages/contracts`: versioned OpenAPI source, generated TypeScript, and runtime schemas
 - `packages/shared-kernel`: domain-neutral identity, time, request, result, event, and transaction primitives
 - `packages/delivery`: thin API, queue/Cron worker, and environment-config boundaries
@@ -90,8 +90,9 @@ git push -u origin <branch-name>
 ## Current phase
 
 True-MVP rescope after the identity, Group, and accountability-calendar foundation. The
-active product boundary is [`docs/product/true-mvp-scope.md`](docs/product/true-mvp-scope.md).
-Previously accepted features remain documented as deferred target-product behavior; they
+active product and PWA delivery boundary is
+[`docs/product/true-mvp-scope.md`](docs/product/true-mvp-scope.md). Previously accepted
+features and native-client work remain documented as deferred target-product behavior; they
 have not been rejected or erased.
 
 ## Product and design context
