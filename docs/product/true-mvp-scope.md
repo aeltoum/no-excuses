@@ -2,6 +2,12 @@
 
 Status: accepted product boundary on 2026-09-08.
 
+Delivery amendment accepted 2026-09-12: an installable Progressive Web App is the active
+True MVP client and distribution target for iPhone and Android browsers. Native iOS and
+Android applications and app-store distribution are deferred without deleting existing
+React Native/Expo work. This amendment selects no web framework, host, paid service, or
+deployment configuration.
+
 ## Purpose
 
 The True MVP tests one hypothesis:
@@ -39,6 +45,7 @@ Only this loop ships:
 - Automatic weekly `Met` or `Missed` outcome from self-reported workout count versus target.
 - Basic Group-visible history containing weekly outcome and workout count.
 - Accessible loading, empty, failure, denied, and success states for included flows.
+- Responsive installable PWA delivery across supported iPhone and Android browsers.
 
 Self-reported check-ins count immediately. True MVP does not claim independent verification.
 Product copy must say that plainly.
@@ -56,8 +63,8 @@ Product copy must say that plainly.
 - Reactions, messages, digests, email reminders, or push notifications.
 - User-authored content, Content reports, Safety blocks, moderation cases, moderation holds,
   or content-screening operations.
-- Offline-first behavior, install prompts, app-store distribution, and advanced PWA lifecycle
-  behavior beyond what included flows require.
+- Offline-first behavior, app-store distribution, native-device integrations, and advanced
+  PWA lifecycle behavior beyond an installable shell and the included flows.
 - Scored Validation-pilot operations, research analytics, automated operator dashboards,
   and production-shaped rehearsal machinery.
 
@@ -99,7 +106,7 @@ reconstructing decisions from chat.
 | Reactions, messages, digests, and notifications | `CONTEXT.md`; `docs/implementation/screen-state-accessibility-contracts.md` | #26, #45, #83, #97, #104 |
 | Safety, UGC policy, blocking, moderation, and operator controls | `CONTEXT.md`; `docs/implementation/private-pilot-technical-quality-bar.md`; `docs/research/proof-media-safety-screening.md` | #7, #39, #47, #54, #65, #84 |
 | Full Account lifecycle, deletion, export, and retained-history rules | `CONTEXT.md`; `docs/implementation/requirements-and-acceptance-matrix.md`; `docs/research/supabase-storage-proof-deletion-and-restore.md` | #42, #44, #66, #84 |
-| Advanced native/PWA delivery, offline operation, installation, and browser readiness | ADRs under `docs/adr/`; `docs/implementation/implementation-handoff-plan.md`; PWA research attached to roadmap issues | #36, #40, #67, #95–#106 |
+| Native delivery, app-store distribution, offline operation, and advanced PWA lifecycle | ADRs under `docs/adr/`; `docs/implementation/implementation-handoff-plan.md`; PWA research attached to roadmap issues | #36, #40, #67, #95–#106, #150 |
 | Validation analytics, pilot operations, rehearsal, recovery, and activation | `CONTEXT.md`; all files under `docs/implementation/`; `docs/research/validation-observability-options.md` | #10, #34, #35, #39, #47, #49–#51, #85–#88 |
 
 `CONTEXT.md` retains full definitions for Account, Group governance, competition, Proof,
