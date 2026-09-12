@@ -59,12 +59,14 @@ test("unsupported route recovers without prior-route content", async ({
   page,
 }) => {
   await page.goto("/group");
-  await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Sign in required" }),
+  ).toBeVisible();
   await page.goto("/not-a-route");
   await expect(
     page.getByRole("heading", { name: "Nothing shared here." }),
   ).toBeVisible();
-  await expect(page.getByText("Private Group setup")).toHaveCount(0);
+  await expect(page.getByText("Use your invited email")).toHaveCount(0);
   await page.getByRole("link", { name: "Return to start" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/");
 });
@@ -135,7 +137,7 @@ test("200% text keeps routes and action in page width", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: "Continue to sign in" }),
   ).toBeVisible();
-  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
 });
 
 test("manifest exposes install metadata and icons", async ({ request }) => {

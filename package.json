@@ -25,7 +25,7 @@
     "mobile:ios": "pnpm --filter @no-excuses/mobile ios",
     "web:dev": "pnpm --filter @no-excuses/web dev",
     "web:test:browser": "pnpm --filter @no-excuses/web test:browser",
-    "test": "vitest run --maxWorkers=1 --exclude apps/web/tests/**",
+    "test": "vitest run --maxWorkers=1 --exclude 'apps/web/tests/**'",
     "typecheck": "tsc --noEmit && pnpm --filter @no-excuses/web typecheck"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -9,10 +10,21 @@ if (!rootElement) throw new Error("Missing application root");
 const root = createRoot(rootElement);
 
 try {
-  readPublicEnvironment(import.meta.env);
+  const environment = readPublicEnvironment(import.meta.env);
+  const auth = createClient(
+    environment.supabaseUrl,
+    environment.supabaseAnonKey,
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    },
+  );
   root.render(
     <StrictMode>
-      <App />
+      <App auth={auth} apiBaseUrl={environment.apiBaseUrl} />
     </StrictMode>,
   );
 } catch {
