@@ -17,7 +17,10 @@ Thumbs.db
 !.env.example
 .expo/
 node_modules/
+.pnpm-store/
 dist/
+*.tsbuildinfo
 coverage/
+apps/web/test-results/
 supabase/.branches/
 supabase/.temp/
