@@ -6,6 +6,7 @@ import {
   requireAccountDeletionMatch,
 } from "./api-client";
 import { requestOtp, resolveLiveAccess, verifyOtp, WebAuthError } from "./auth";
+import { Weekly } from "./Weekly";
 
 type Route =
   | "/"
@@ -750,16 +751,17 @@ export function App({
             <Result notice={notice} />
           </Page>
         ) : (
-          <Page
-            eyebrow="True MVP"
-            title={
-              route === "/home"
-                ? "Every rep counts."
-                : route === "/target"
-                  ? "Weekly target"
-                  : "Your history"
-            }
-            lead="Weekly accountability arrives in delivery slice three."
+          <Weekly
+            key={route}
+            route={route as "/home" | "/target" | "/history"}
+            api={api}
+            token={token()}
+            membership={membership}
+            onRevoked={() => {
+              setSession(null);
+              setMembership(null);
+              setAccess("revoked");
+            }}
           />
         )}
       </main>

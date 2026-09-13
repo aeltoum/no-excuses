@@ -75,6 +75,15 @@ async function mockApi(page: Page, member: boolean) {
           data: { membership: member ? { groupId, membershipId } : null },
         },
       });
+    if (path === `/v1/groups/${groupId}/current-week-progress`)
+      return route.fulfill({
+        status: 200,
+        headers: { "access-control-allow-origin": "*" },
+        json: {
+          contractVersion: 1,
+          data: [{ membershipId, lockedTarget: 3, completedWorkoutCount: 0 }],
+        },
+      });
     if (path === "/v1/account")
       return route.fulfill({
         status: 200,
@@ -168,6 +177,7 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page.getByText("0 / 3").first()).toBeVisible();
   await page.goto("/account");
   await page.getByRole("button", { name: "Review Account deletion" }).click();
   await expect(
