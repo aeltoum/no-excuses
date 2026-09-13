@@ -1,10 +1,14 @@
 import {
   apiErrorResponseSchema,
   currentGroupMembershipResponseSchema,
+  currentWeekProgressResponseSchema,
   deletedAccountResponseSchema,
+  finalizedWeeklyHistoryResponseSchema,
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
   revokedGroupInvitationResponseSchema,
+  submitWorkoutCheckinResponseSchema,
+  weeklyTargetResponseSchema,
 } from "@no-excuses/contracts";
 
 type Parser<T> = {
@@ -40,7 +44,11 @@ export function createApiClient(
     path: string,
     token: string,
     parser: Parser<T>,
-    command?: { method: "POST" | "DELETE"; body?: unknown; key: string },
+    command?: {
+      method: "POST" | "DELETE" | "PUT";
+      body?: unknown;
+      key: string;
+    },
   ) {
     let response: Response;
     try {
@@ -102,10 +110,51 @@ export function createApiClient(
     token: string,
     parser: Parser<T>,
     body?: unknown,
-    method: "POST" | "DELETE" = "POST",
+    method: "POST" | "DELETE" | "PUT" = "POST",
     key: string = crypto.randomUUID(),
   ) => request(path, token, parser, { method, body, key });
   return {
+    progress: (token: string, groupId: string) =>
+      request(
+        `/v1/groups/${encodeURIComponent(groupId)}/current-week-progress`,
+        token,
+        currentWeekProgressResponseSchema,
+      ),
+    history: (token: string, groupId: string) =>
+      request(
+        `/v1/groups/${encodeURIComponent(groupId)}/finalized-weekly-history`,
+        token,
+        finalizedWeeklyHistoryResponseSchema,
+      ),
+    setTarget: (token: string, weeklyTarget: number, key: string) =>
+      command(
+        "/v1/group-memberships/weekly-target",
+        token,
+        weeklyTargetResponseSchema,
+        { weeklyTarget },
+        "PUT",
+        key,
+      ),
+    checkIn: (
+      token: string,
+      body: {
+        workoutCheckinId: string;
+        activityType: "strength" | "cardio" | "class" | "sport" | "mixed";
+        completedAt: string;
+        durationMinutes: number;
+        perceivedIntensity: "low" | "moderate" | "high";
+        selfReportAttested: true;
+      },
+      key: string,
+    ) =>
+      command(
+        "/v1/workout-check-ins",
+        token,
+        submitWorkoutCheckinResponseSchema,
+        body,
+        "POST",
+        key,
+      ),
     current: (token: string) =>
       request(
         "/v1/group-memberships/current",
