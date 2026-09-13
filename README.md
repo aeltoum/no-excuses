@@ -36,10 +36,15 @@ This test adapter binds only `127.0.0.1:8787`, verifies bearer tokens against lo
 Supabase Auth, and calls existing private PostgreSQL functions. Keep database URL and any
 service-role key in process environment only; never use them as `VITE_*` values. Start
 `pnpm web:dev` with local public `VITE_*` values from `.env.local`. For the unmocked
-Chromium/WebKit flow, set `LIVE_PWA_INTEGRATION=1`, `DATABASE_URL`, and
-`LOCAL_SUPABASE_SERVICE_ROLE_KEY`, then run
+Chromium/WebKit flow, set `LIVE_PWA_INTEGRATION=1`, `DATABASE_URL`,
+`LOCAL_SUPABASE_ANON_KEY`, and `LOCAL_SUPABASE_SERVICE_ROLE_KEY`, then run
 `pnpm --filter @no-excuses/web test:browser live-local.spec.ts`. This creates new
 synthetic local Auth users and Groups; it does not reset or clean existing data.
+For a deterministic recovery pass, start the API with `LOCAL_FAIL_ONCE_TARGET=1` and
+run the same live browser command with `LIVE_PWA_FAIL_ONCE=1`. The first target request
+then returns a test-only 503 before DB mutation; retry uses the same idempotency key.
+With local `DATABASE_URL` set, `pnpm db:test:pwa-settlement` runs the existing
+PostgreSQL settlement fixture in a disposable database and drops it on exit.
 
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and

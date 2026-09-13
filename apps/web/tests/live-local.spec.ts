@@ -12,6 +12,26 @@ const supabase = "http://127.0.0.1:54321";
 const mailbox = "http://127.0.0.1:54324";
 const databaseUrl = process.env.DATABASE_URL;
 const serviceKey = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.LOCAL_SUPABASE_ANON_KEY;
+
+function localPsql(sql: string) {
+  if (!databaseUrl || new URL(databaseUrl).hostname !== "127.0.0.1")
+    throw new Error("Local database URL required");
+  const database = new URL(databaseUrl);
+  const result = spawnSync("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1"], {
+    input: sql,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PGHOST: database.hostname,
+      PGPORT: database.port,
+      PGUSER: decodeURIComponent(database.username),
+      PGPASSWORD: decodeURIComponent(database.password),
+      PGDATABASE: database.pathname.slice(1),
+    },
+  });
+  if (result.status !== 0) throw new Error("Local SQL fixture failed");
+}
 
 async function makeAccount() {
   if (
@@ -34,28 +54,11 @@ async function makeAccount() {
   const user = await created.json();
   const accountId = randomUUID();
   const sql = `insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at) values ('${accountId}'::uuid, '${user.id}'::uuid, '${email}', now()); insert into app_private.consents (account_id, purpose, version, granted_at) select '${accountId}'::uuid, purpose, 'v1', now() from (values ('pilot'), ('product'), ('media')) p(purpose);`;
-  const database = new URL(databaseUrl);
-  const seeded = spawnSync("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1"], {
-    input: sql,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      PGHOST: database.hostname,
-      PGPORT: database.port,
-      PGUSER: decodeURIComponent(database.username),
-      PGPASSWORD: decodeURIComponent(database.password),
-      PGDATABASE: database.pathname.slice(1),
-    },
-  });
-  if (seeded.status !== 0) throw new Error("Local Account seed failed");
+  localPsql(sql);
   return email;
 }
 
-async function signIn(page: Page, email: string) {
-  await page.goto(`${root}/sign-in`);
-  await page.getByLabel("Email address").fill(email);
-  await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+async function readCode(email: string) {
   let code = "";
   await expect
     .poll(
@@ -79,9 +82,39 @@ async function signIn(page: Page, email: string) {
       { timeout: 15_000 },
     )
     .not.toBe("");
+  return code;
+}
+
+async function signIn(page: Page, email: string) {
+  await page.goto(`${root}/sign-in`);
+  await page.getByLabel("Email address").fill(email);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+  const code = await readCode(email);
   await page.getByLabel("Six-digit code").fill(code);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
+}
+
+async function directToken(email: string) {
+  if (!anonKey) throw new Error("Local anonymous key required");
+  const headers = { apikey: anonKey, "content-type": "application/json" };
+  const sent = await fetch(`${supabase}/auth/v1/otp`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, create_user: false }),
+  });
+  if (!sent.ok) throw new Error(`Local OTP request failed: ${sent.status}`);
+  const code = await readCode(email);
+  const verified = await fetch(`${supabase}/auth/v1/verify`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, token: code, type: "email" }),
+  });
+  if (!verified.ok)
+    throw new Error(`Local OTP verification failed: ${verified.status}`);
+  const session = await verified.json();
+  return session.access_token as string;
 }
 
 test("live local Auth and PostgreSQL weekly loop", async ({
@@ -166,7 +199,39 @@ test("live local Auth and PostgreSQL weekly loop", async ({
   });
   await page.getByRole("link", { name: "Target" }).click();
   await page.getByLabel("Workouts per week").fill("3");
+  const targetKeys: string[] = [];
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/v1/group-memberships/weekly-target"
+    )
+      targetKeys.push(request.headers()["idempotency-key"] ?? "");
+  });
   await page.getByRole("button", { name: "Save target" }).click();
+  if (process.env.LIVE_PWA_FAIL_ONCE === "1") {
+    await expect(page.getByRole("alert")).toContainText(
+      "Action failed. Try again.",
+    );
+    await expect(page.getByLabel("Workouts per week")).toHaveValue("3");
+    await expect(
+      page.getByRole("button", { name: "Save target" }),
+    ).toBeEnabled();
+    await page.screenshot({
+      path: testInfo.outputPath("target-retry.png"),
+      fullPage: true,
+    });
+    const expected = failures.splice(0);
+    expect(expected).toContain("503 /v1/group-memberships/weekly-target");
+    expect(
+      expected.every(
+        (item) =>
+          item === "503 /v1/group-memberships/weekly-target" ||
+          item.includes("503 (Service Unavailable)"),
+      ),
+    ).toBe(true);
+    await page.getByRole("button", { name: "Save target" }).click();
+    expect(targetKeys).toHaveLength(2);
+    expect(targetKeys[0]).toBe(targetKeys[1]);
+  }
   await expect(
     page.getByText("Weekly target set to 3", { exact: false }),
   ).toBeVisible();
@@ -197,4 +262,92 @@ test("live local Auth and PostgreSQL weekly loop", async ({
   expect(failures).toEqual([]);
   await peerContext.close();
   await context.close();
+});
+
+test("live local API denies cross-Group and ended access", async () => {
+  const ownerEmail = await makeAccount();
+  const outsiderEmail = await makeAccount();
+  const ownerToken = await directToken(ownerEmail);
+  const outsiderToken = await directToken(outsiderEmail);
+  const ownerGroup = randomUUID();
+  const outsiderGroup = randomUUID();
+  const outsiderMembership = randomUUID();
+  const call = async (path: string, token: string, body?: unknown) => {
+    const response = await fetch(`http://127.0.0.1:8787${path}`, {
+      method: body ? "POST" : "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(body
+          ? {
+              "content-type": "application/json",
+              "idempotency-key": randomUUID(),
+            }
+          : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  const create = (groupId: string, membershipId: string) => ({
+    groupId,
+    membershipId,
+    name: "Synthetic authorization Group",
+    timeZone: "UTC",
+    weeklyTarget: 2,
+  });
+  expect(
+    (await call("/v1/groups", ownerToken, create(ownerGroup, randomUUID())))
+      .status,
+  ).toBe(200);
+  expect(
+    (
+      await call(
+        "/v1/groups",
+        outsiderToken,
+        create(outsiderGroup, outsiderMembership),
+      )
+    ).status,
+  ).toBe(200);
+  const denied = {
+    contractVersion: 1,
+    error: { code: "denied", message: "Action denied.", retryable: false },
+  };
+  for (const suffix of ["current-week-progress", "finalized-weekly-history"]) {
+    const result = await call(
+      `/v1/groups/${ownerGroup}/${suffix}`,
+      outsiderToken,
+    );
+    expect(result).toEqual({ status: 403, body: denied });
+  }
+  localPsql(
+    `update app_private.memberships set ended_at = now(), end_reason = 'left' where membership_id = '${outsiderMembership}'::uuid;`,
+  );
+  for (const suffix of ["current-week-progress", "finalized-weekly-history"]) {
+    const result = await call(
+      `/v1/groups/${outsiderGroup}/${suffix}`,
+      outsiderToken,
+    );
+    expect(result).toEqual({ status: 403, body: denied });
+  }
+  localPsql(
+    `update app_private.accounts set access_cutoff = now() where email = '${outsiderEmail}';`,
+  );
+  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
+    status: 403,
+    body: denied,
+  });
+  localPsql(
+    `update app_private.accounts set access_cutoff = null where email = '${outsiderEmail}';`,
+  );
+  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
+    status: 200,
+    body: { contractVersion: 1, data: { membership: null } },
+  });
+  localPsql(
+    `update app_private.accounts set status = 'deleted' where email = '${outsiderEmail}';`,
+  );
+  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
+    status: 403,
+    body: denied,
+  });
 });

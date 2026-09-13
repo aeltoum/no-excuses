@@ -34,6 +34,7 @@ const q = (field) => `(:'payload'::jsonb->>'${field}')`;
 const request = `:'request'::uuid`;
 const key = `:'key'::uuid`;
 const hash = `:'hash'::text`;
+const failedTargetKeys = new Set();
 
 const routes = [
   {
@@ -205,6 +206,14 @@ createServer(async (incoming, response) => {
         : randomUUID();
     if (typeof idempotencyKey !== "string" || !uuid.test(idempotencyKey))
       return error(response, 400, "idempotency_required");
+    if (
+      process.env.LOCAL_FAIL_ONCE_TARGET === "1" &&
+      pathname === "/v1/group-memberships/weekly-target" &&
+      !failedTargetKeys.has(idempotencyKey)
+    ) {
+      failedTargetKeys.add(idempotencyKey);
+      return error(response, 503, "domain_failure");
+    }
     const clean = parsed?.data ?? body;
     const payload = route.prepare
       ? route.prepare(clean, idempotencyKey)
