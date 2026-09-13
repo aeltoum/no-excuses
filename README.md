@@ -30,6 +30,17 @@ and are not active True MVP delivery path.
 `pnpm db:start` prints the local anonymous key; copy it into an ignored `.env.local` using
 `.env.example`. Do not put hosted URLs or privileged keys in client-readable variables.
 
+For local PWA integration, start `pnpm api:local` in a separate terminal with
+`DATABASE_URL` and `SUPABASE_ANON_KEY` from `pnpm exec supabase status --output json`.
+This test adapter binds only `127.0.0.1:8787`, verifies bearer tokens against local
+Supabase Auth, and calls existing private PostgreSQL functions. Keep database URL and any
+service-role key in process environment only; never use them as `VITE_*` values. Start
+`pnpm web:dev` with local public `VITE_*` values from `.env.local`. For the unmocked
+Chromium/WebKit flow, set `LIVE_PWA_INTEGRATION=1`, `DATABASE_URL`, and
+`LOCAL_SUPABASE_SERVICE_ROLE_KEY`, then run
+`pnpm --filter @no-excuses/web test:browser live-local.spec.ts`. This creates new
+synthetic local Auth users and Groups; it does not reset or clean existing data.
+
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and
 `pnpm db:reset` are the integration path for the complete local Supabase stack. To run the

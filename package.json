@@ -8,6 +8,7 @@
     "node": "24.19.0"
   },
   "scripts": {
+    "api:local": "node scripts/local-pwa-api.mjs",
     "audit:dependencies": "pnpm audit --audit-level high",
     "build": "pnpm contracts:generate && tsc --noEmit",
     "check": "pnpm format:check && pnpm contracts:check && pnpm typecheck && pnpm test && pnpm check:secrets && pnpm check:dependencies",
