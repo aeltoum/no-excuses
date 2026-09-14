@@ -17,7 +17,7 @@ import {
 
 const accountId = "20000000-0000-4000-8000-000000000001";
 const idempotencyKey = "018f63c2-7d33-7f54-9fa7-9f55d735ae35";
-const body = { confirmation: true } as const;
+const body = { confirmation: true, otpCode: "123456" } as const;
 const request = (requestBody: unknown = body): ApiRequest => ({
   authorization: "Bearer local",
   body: requestBody,
@@ -72,22 +72,17 @@ function dependencies() {
 }
 
 describe("Account deletion API contract", () => {
-  it("exposes review, pending, retry-safe failure, and bounded receipt in You", async () => {
+  it("keeps native deletion unavailable until fresh-code verification exists", async () => {
     const source = await readFile(
       new URL("../apps/mobile/app/(member)/you.tsx", import.meta.url),
       "utf8",
     );
-    for (const text of [
-      "Review Account deletion",
-      "Confirm Account deletion",
-      "Deletion still pending",
-      "safely retry same request",
-      "idempotencyKey.current ??=",
-      "Deletion completed.",
-    ])
-      expect(source).toContain(text);
-    expect(source).not.toContain("result.data.accountId");
-    expect(source).not.toContain("Receipt:");
+    expect(source).toContain(
+      "Account deletion is unavailable in the native app",
+    );
+    expect(source).toContain("Use the PWA Account page");
+    expect(source).not.toContain("deleteAccount(");
+    expect(source).not.toContain("Confirm Account deletion");
   });
 
   it("publishes authenticated idempotent version 1 deletion", async () => {
@@ -112,6 +107,7 @@ describe("Account deletion API contract", () => {
     for (const invalid of [
       {},
       { confirmation: false },
+      { confirmation: true },
       { confirmation: true, extra: true },
     ]) {
       expect(deleteAccountRequestSchema.safeParse(invalid).success).toBe(false);
@@ -185,10 +181,13 @@ describe("Account deletion delivery entrypoint", () => {
       body,
     });
     expect(
-      await handleDeleteAccount(request({ confirmation: true }), {
-        ...deps,
-        hash: async () => "b".repeat(64),
-      }),
+      await handleDeleteAccount(
+        request({ confirmation: true, otpCode: "654321" }),
+        {
+          ...deps,
+          hash: async () => "b".repeat(64),
+        },
+      ),
     ).toMatchObject({
       status: 409,
       body: { error: { code: "idempotency_conflict" } },

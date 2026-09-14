@@ -89,7 +89,21 @@ export const setWeeklyTargetRequestSchema = z
   .strict();
 
 export const deleteAccountRequestSchema = z
-  .object({ confirmation: z.literal(true) })
+  .object({
+    confirmation: z.literal(true),
+    otpCode: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+
+export const enrollmentRequestSchema = z
+  .object({ email: z.email().max(254), token: boundedTextSchema(256) })
+  .strict();
+export const consentRequestSchema = z
+  .object({
+    adult: z.literal(true),
+    pilot: z.literal(true),
+    product: z.literal(true),
+  })
   .strict();
 
 const socialInteractionIdentitySchema = z.object({
@@ -247,6 +261,21 @@ export const weeklyTargetResponseSchema = commandResponse(
 );
 export const deletedAccountResponseSchema = commandResponse(
   deletedAccountResultSchema,
+);
+export const pendingAccountDeletionResponseSchema = commandResponse(
+  z
+    .object({ accountId: uuidSchema, authDeletion: z.literal("pending") })
+    .strict(),
+);
+export const enrollmentResponseSchema = commandResponse(
+  z
+    .object({
+      message: z.literal("If invitation is eligible, request a sign-in code."),
+    })
+    .strict(),
+);
+export const consentResponseSchema = commandResponse(
+  z.object({ accepted: z.literal(true) }).strict(),
 );
 export const socialInteractionResponseSchema = commandResponse(
   socialInteractionResultSchema,

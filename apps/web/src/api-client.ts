@@ -1,11 +1,14 @@
 import {
   apiErrorResponseSchema,
+  consentResponseSchema,
   currentGroupMembershipResponseSchema,
   currentWeekProgressResponseSchema,
   deletedAccountResponseSchema,
+  enrollmentResponseSchema,
   finalizedWeeklyHistoryResponseSchema,
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
+  pendingAccountDeletionResponseSchema,
   revokedGroupInvitationResponseSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyTargetResponseSchema,
@@ -25,14 +28,6 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
-}
-
-export function requireAccountDeletionMatch(expected: string, actual: string) {
-  if (actual !== expected)
-    throw new ApiError(
-      "failure",
-      "Deletion confirmation did not match this Account.",
-    );
 }
 
 export function createApiClient(
@@ -114,6 +109,40 @@ export function createApiClient(
     key: string = crypto.randomUUID(),
   ) => request(path, token, parser, { method, body, key });
   return {
+    enroll: async (email: string, token: string) => {
+      let response: Response;
+      try {
+        response = await fetcher(`${root}/v1/enrollment`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, token }),
+        });
+      } catch {
+        throw new ApiError(
+          "failure",
+          "Enrollment service unavailable. Try again.",
+          true,
+        );
+      }
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new ApiError("failure", "Service returned an invalid response.");
+      }
+      if (!response.ok || !enrollmentResponseSchema.safeParse(body).success)
+        throw new ApiError(
+          "failure",
+          "Enrollment unavailable. Try again.",
+          response.status >= 500,
+        );
+    },
+    consent: (token: string) =>
+      request("/v1/consent", token, consentResponseSchema, {
+        method: "POST",
+        body: { adult: true, pilot: true, product: true },
+        key: crypto.randomUUID(),
+      }),
     progress: (token: string, groupId: string) =>
       request(
         `/v1/groups/${encodeURIComponent(groupId)}/current-week-progress`,
@@ -243,12 +272,12 @@ export function createApiClient(
         "POST",
         key,
       ),
-    deleteAccount: (token: string, key: string) =>
+    deleteAccount: (token: string, key: string, otpCode: string) =>
       command(
         "/v1/account",
         token,
-        deletedAccountResponseSchema,
-        { confirmation: true },
+        deletedAccountResponseSchema.or(pendingAccountDeletionResponseSchema),
+        { confirmation: true, otpCode },
         "DELETE",
         key,
       ),
