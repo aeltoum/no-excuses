@@ -156,3 +156,13 @@ test("manifest exposes install metadata and icons", async ({ request }) => {
       true,
     );
 });
+
+test("document favicon resolves from an explicit PWA icon", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  const href = await page.locator('link[rel="icon"]').getAttribute("href");
+  expect(href).toBe("/icons/icon.svg");
+  expect((await request.get(`http://127.0.0.1:4174${href}`)).ok()).toBe(true);
+});
