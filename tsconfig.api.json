@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "outDir": "dist/api"
+  },
+  "include": [
+    "packages/delivery/src/**/*.ts",
+    "packages/contracts/src/**/*.ts",
+    "packages/shared-kernel/src/**/*.ts"
+  ]
+}

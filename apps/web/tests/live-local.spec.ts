@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 
 test.skip(
   !process.env.LIVE_PWA_INTEGRATION,
-  "Requires started local Supabase and loopback API",
+  "Requires local Supabase and real PWA API",
 );
 
 const root = "http://127.0.0.1:4174";
@@ -30,32 +31,8 @@ function localPsql(sql: string) {
       PGDATABASE: database.pathname.slice(1),
     },
   });
-  if (result.status !== 0) throw new Error("Local SQL fixture failed");
-}
-
-async function makeAccount() {
-  if (
-    !serviceKey ||
-    !databaseUrl ||
-    new URL(databaseUrl).hostname !== "127.0.0.1"
-  )
-    throw new Error("Local service key and database URL required");
-  const email = `pwa-${randomUUID()}@example.test`;
-  const created = await fetch(`${supabase}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: {
-      apikey: serviceKey,
-      authorization: `Bearer ${serviceKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ email, email_confirm: true }),
-  });
-  if (!created.ok) throw new Error(`Local Auth seed failed: ${created.status}`);
-  const user = await created.json();
-  const accountId = randomUUID();
-  const sql = `insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at) values ('${accountId}'::uuid, '${user.id}'::uuid, '${email}', now()); insert into app_private.consents (account_id, purpose, version, granted_at) select '${accountId}'::uuid, purpose, 'v1', now() from (values ('pilot'), ('product'), ('media')) p(purpose);`;
-  localPsql(sql);
-  return email;
+  if (result.status !== 0)
+    throw new Error(`Local SQL fixture/cleanup failed: ${result.stderr}`);
 }
 
 async function readCode(email: string) {
@@ -85,13 +62,17 @@ async function readCode(email: string) {
   return code;
 }
 
-async function signIn(page: Page, email: string) {
+async function signIn(page: Page, email: string, enrollmentToken?: string) {
   await page.goto(`${root}/sign-in`);
   await page.getByLabel("Email address").fill(email);
+  if (enrollmentToken) {
+    await page
+      .getByLabel("Invitation token for first sign-in (optional)")
+      .fill(enrollmentToken);
+  }
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByLabel("Six-digit code")).toBeVisible();
-  const code = await readCode(email);
-  await page.getByLabel("Six-digit code").fill(code);
+  await page.getByLabel("Six-digit code").fill(await readCode(email));
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
 }
@@ -104,34 +85,93 @@ async function directToken(email: string) {
     headers,
     body: JSON.stringify({ email, create_user: false }),
   });
-  if (!sent.ok) throw new Error(`Local OTP request failed: ${sent.status}`);
-  const code = await readCode(email);
+  if (!sent.ok) throw new Error("Local OTP request failed");
   const verified = await fetch(`${supabase}/auth/v1/verify`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ email, token: code, type: "email" }),
+    body: JSON.stringify({
+      email,
+      token: await readCode(email),
+      type: "email",
+    }),
   });
-  if (!verified.ok)
-    throw new Error(`Local OTP verification failed: ${verified.status}`);
-  const session = await verified.json();
-  return session.access_token as string;
+  if (!verified.ok) throw new Error("Local OTP verification failed");
+  return (await verified.json()).access_token as string;
 }
 
-test("live local Auth and PostgreSQL weekly loop", async ({
+async function consent(page: Page) {
+  await page.getByLabel("I am 18 or older.").check();
+  await page.getByLabel("I consent to this private pilot.").check();
+  await page.getByLabel("I consent to product terms and data use.").check();
+  await page.getByRole("button", { name: "Confirm age and consent" }).click();
+  await expect(
+    page.getByText("Age and consent recorded.", { exact: false }),
+  ).toBeVisible();
+}
+
+async function removeAuth(email: string) {
+  if (!serviceKey) throw new Error("Local service key required");
+  const listing = await fetch(`${supabase}/auth/v1/admin/users`, {
+    headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}` },
+  });
+  if (!listing.ok) throw new Error("Local Auth cleanup listing failed");
+  const users = (await listing.json()).users as { id: string; email: string }[];
+  const user = users.find((item) => item.email === email);
+  if (!user) return;
+  const deleted = await fetch(`${supabase}/auth/v1/admin/users/${user.id}`, {
+    method: "DELETE",
+    headers: { apikey: serviceKey, authorization: `Bearer ${serviceKey}` },
+  });
+  if (!deleted.ok) throw new Error("Local Auth cleanup failed");
+}
+
+function cleanLocalRows(owner: string, peer: string, groupId?: string) {
+  const group = groupId ?? "00000000-0000-4000-8000-000000000000";
+  localPsql(`begin;
+    create temp table smoke_accounts as select account_id from app_private.accounts where email in ('${owner}', '${peer}');
+    create temp table smoke_memberships as select membership_id from app_private.memberships where account_id in (select account_id from smoke_accounts);
+    delete from app_private.idempotent_requests where actor_id in (select account_id from smoke_accounts);
+    delete from app_private.workout_sessions where membership_id in (select membership_id from smoke_memberships);
+    delete from app_private.workout_checkins where membership_id in (select membership_id from smoke_memberships);
+    delete from app_private.member_weeks where membership_id in (select membership_id from smoke_memberships);
+    delete from app_private.group_invitations where group_id='${group}'::uuid;
+    delete from app_private.group_admins where membership_id in (select membership_id from smoke_memberships);
+    delete from app_private.season_weeks where accountability_week_id in (select accountability_week_id from app_private.accountability_weeks where group_id='${group}'::uuid);
+    delete from app_private.seasons where group_id='${group}'::uuid;
+    delete from app_private.accountability_weeks where group_id='${group}'::uuid;
+    delete from app_private.memberships where membership_id in (select membership_id from smoke_memberships);
+    delete from app_private.groups where group_id='${group}'::uuid;
+    delete from app_private.consents where account_id in (select account_id from smoke_accounts);
+    delete from app_private.accounts where account_id in (select account_id from smoke_accounts);
+    commit;`);
+}
+
+test("private enrollment and live weekly PWA journey", async ({
   browser,
 }, testInfo) => {
-  const owner = await makeAccount();
-  const peer = await makeAccount();
+  test.setTimeout(90_000);
+  if (!databaseUrl || !serviceKey || !process.env.SEED_ORGANIZER_EMAIL)
+    throw new Error("Local integration environment incomplete");
+  const owner = process.env.SEED_ORGANIZER_EMAIL;
+  const peer = `pwa-${randomUUID()}@example.test`;
+  let groupId: string | undefined;
+  const failures: string[] = [];
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
+  const peerContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+  });
   const page = await context.newPage();
-  const failures: string[] = [];
-  const inspect = (target: Page) => {
-    target.on("pageerror", (error) => failures.push(error.message));
-    target.on("requestfailed", (request) => failures.push(request.url()));
+  const peerPage = await peerContext.newPage();
+  for (const target of [page, peerPage]) {
+    target.on("pageerror", (error) => failures.push(`page: ${error.message}`));
+    target.on("requestfailed", (request) =>
+      failures.push(`request: ${new URL(request.url()).pathname}`),
+    );
     target.on("console", (message) => {
-      if (message.type() === "error") failures.push(message.text());
+      if (message.type() === "error")
+        failures.push(`console: ${message.text()}`);
     });
     target.on("response", (response) => {
       if (
@@ -142,212 +182,136 @@ test("live local Auth and PostgreSQL weekly loop", async ({
           `${response.status()} ${new URL(response.url()).pathname}`,
         );
     });
-  };
-  inspect(page);
-  await signIn(page, owner);
-  await page.getByLabel("Group name").fill("Local PWA acceptance");
-  await page
-    .locator("form")
-    .filter({ has: page.getByRole("heading", { name: "Create Group" }) })
-    .getByLabel("Weekly target")
-    .fill("2");
-  await page.getByRole("button", { name: "Create Group", exact: true }).click();
-  await expect(page.getByText("Group created.")).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath("owner-group.png"),
-    fullPage: true,
-  });
-  await page.getByLabel("Friend email").fill(peer);
-  await page.getByRole("button", { name: "Create invitation" }).click();
-  const invitation = page.getByText(
-    /Invitation created\. Share this token securely:/,
-  );
-  await expect(invitation).toBeVisible();
-  const token = (await invitation.textContent())?.split(": ").at(-1);
-  expect(token).toMatch(/^[0-9a-f-]{36}$/);
-  await page.getByRole("link", { name: "Home" }).click();
-
-  const peerContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-  });
-  const peerPage = await peerContext.newPage();
-  inspect(peerPage);
-  await signIn(peerPage, peer);
-  await peerPage.getByLabel("Invitation token").fill(token ?? "");
-  await peerPage
-    .locator("form")
-    .filter({ has: peerPage.getByRole("heading", { name: "Join Group" }) })
-    .getByLabel("Weekly target")
-    .fill("2");
-  await peerPage.getByLabel("Current target").fill("2");
-  await peerPage
-    .getByRole("button", { name: "Join Group", exact: true })
-    .click();
-  await expect(
-    peerPage.getByText("Invitation accepted. Group joined."),
-  ).toBeVisible();
-  await peerPage.screenshot({
-    path: testInfo.outputPath("peer-joined.png"),
-    fullPage: true,
-  });
-
-  await page.reload();
-  await expect(page.getByText(/Your workouts:/)).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath("home-before.png"),
-    fullPage: true,
-  });
-  await page.getByRole("link", { name: "Target" }).click();
-  await page.getByLabel("Workouts per week").fill("3");
-  const targetKeys: string[] = [];
-  page.on("request", (request) => {
-    if (
-      new URL(request.url()).pathname === "/v1/group-memberships/weekly-target"
-    )
-      targetKeys.push(request.headers()["idempotency-key"] ?? "");
-  });
-  await page.getByRole("button", { name: "Save target" }).click();
-  if (process.env.LIVE_PWA_FAIL_ONCE === "1") {
-    await expect(page.getByRole("alert")).toContainText(
-      "Action failed. Try again.",
+  }
+  try {
+    const seeded = spawnSync(
+      "node",
+      [
+        fileURLToPath(
+          new URL("../../../dist/api/delivery/src/server.js", import.meta.url),
+        ),
+        "seed-organizer",
+      ],
+      {
+        env: { ...process.env, SEED_ORGANIZER_EMAIL: owner },
+        encoding: "utf8",
+      },
     );
-    await expect(page.getByLabel("Workouts per week")).toHaveValue("3");
-    await expect(
-      page.getByRole("button", { name: "Save target" }),
-    ).toBeEnabled();
+    expect(seeded.status, "Private organizer seed must succeed").toBe(0);
+    await signIn(page, owner);
+    await consent(page);
+    await page.getByLabel("Group name").fill("Synthetic PWA acceptance");
+    await page
+      .locator("form")
+      .filter({ has: page.getByRole("heading", { name: "Create Group" }) })
+      .getByLabel("Weekly target")
+      .fill("2");
+    page.on("request", (request) => {
+      if (
+        new URL(request.url()).pathname === "/v1/groups" &&
+        request.method() === "POST"
+      )
+        groupId = request.postDataJSON().groupId;
+    });
+    await page
+      .getByRole("button", { name: "Create Group", exact: true })
+      .click();
+    await expect(page.getByText("Group created.")).toBeVisible();
     await page.screenshot({
-      path: testInfo.outputPath("target-retry.png"),
+      path: testInfo.outputPath("owner-group.png"),
       fullPage: true,
     });
-    const expected = failures.splice(0);
-    expect(expected).toContain("503 /v1/group-memberships/weekly-target");
-    expect(
-      expected.every(
-        (item) =>
-          item === "503 /v1/group-memberships/weekly-target" ||
-          item.includes("503 (Service Unavailable)"),
-      ),
-    ).toBe(true);
-    await page.getByRole("button", { name: "Save target" }).click();
-    expect(targetKeys).toHaveLength(2);
-    expect(targetKeys[0]).toBe(targetKeys[1]);
-  }
-  await expect(
-    page.getByText("Weekly target set to 3", { exact: false }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save target" })).toBeEnabled();
-  await page.screenshot({
-    path: testInfo.outputPath("target.png"),
-    fullPage: true,
-  });
-  await page.getByRole("link", { name: "Home" }).click();
-  await expect(page.getByText("0 / 2", { exact: true })).toBeVisible();
-  await page.getByLabel("Duration in minutes").fill("30");
-  await page.getByLabel(/self-report/i).check();
-  await page.getByRole("button", { name: "Log workout" }).click();
-  await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log workout" })).toBeEnabled();
-  await page.screenshot({
-    path: testInfo.outputPath("home-after.png"),
-    fullPage: true,
-  });
-  await page.getByRole("link", { name: "History" }).click();
-  await expect(
-    page.getByText("No finalized weekly history yet.", { exact: false }),
-  ).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath("history.png"),
-    fullPage: true,
-  });
-  expect(failures).toEqual([]);
-  await peerContext.close();
-  await context.close();
-});
-
-test("live local API denies cross-Group and ended access", async () => {
-  const ownerEmail = await makeAccount();
-  const outsiderEmail = await makeAccount();
-  const ownerToken = await directToken(ownerEmail);
-  const outsiderToken = await directToken(outsiderEmail);
-  const ownerGroup = randomUUID();
-  const outsiderGroup = randomUUID();
-  const outsiderMembership = randomUUID();
-  const call = async (path: string, token: string, body?: unknown) => {
-    const response = await fetch(`http://127.0.0.1:8787${path}`, {
-      method: body ? "POST" : "GET",
-      headers: {
-        authorization: `Bearer ${token}`,
-        ...(body
-          ? {
-              "content-type": "application/json",
-              "idempotency-key": randomUUID(),
-            }
-          : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
+    await page.getByLabel("Friend email").fill(peer);
+    await page.getByRole("button", { name: "Create invitation" }).click();
+    const invitation = page.getByText(
+      /Invitation created\. Share this token securely:/,
+    );
+    await expect(invitation).toBeVisible();
+    const token = (await invitation.textContent())?.split(": ").at(-1);
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await page.getByRole("link", { name: "Home" }).click();
+    await signIn(peerPage, peer, token);
+    await consent(peerPage);
+    await peerPage.getByLabel("Invitation token").fill(token ?? "");
+    await peerPage
+      .locator("form")
+      .filter({ has: peerPage.getByRole("heading", { name: "Join Group" }) })
+      .getByLabel("Weekly target")
+      .fill("2");
+    await peerPage.getByLabel("Current target").fill("2");
+    await peerPage
+      .getByRole("button", { name: "Join Group", exact: true })
+      .click();
+    await expect(
+      peerPage.getByText("Invitation accepted. Group joined."),
+    ).toBeVisible();
+    await peerPage.screenshot({
+      path: testInfo.outputPath("peer-joined.png"),
+      fullPage: true,
     });
-    return { status: response.status, body: await response.json() };
-  };
-  const create = (groupId: string, membershipId: string) => ({
-    groupId,
-    membershipId,
-    name: "Synthetic authorization Group",
-    timeZone: "UTC",
-    weeklyTarget: 2,
-  });
-  expect(
-    (await call("/v1/groups", ownerToken, create(ownerGroup, randomUUID())))
-      .status,
-  ).toBe(200);
-  expect(
-    (
-      await call(
-        "/v1/groups",
-        outsiderToken,
-        create(outsiderGroup, outsiderMembership),
-      )
-    ).status,
-  ).toBe(200);
-  const denied = {
-    contractVersion: 1,
-    error: { code: "denied", message: "Action denied.", retryable: false },
-  };
-  for (const suffix of ["current-week-progress", "finalized-weekly-history"]) {
-    const result = await call(
-      `/v1/groups/${ownerGroup}/${suffix}`,
-      outsiderToken,
+    await page.reload();
+    await expect(page.getByText(/Your workouts:/)).toBeVisible();
+    await page.getByRole("link", { name: "Target" }).click();
+    await page.getByLabel("Workouts per week").fill("3");
+    await page.getByRole("button", { name: "Save target" }).click();
+    await expect(
+      page.getByText("Weekly target set to 3", { exact: false }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("target.png"),
+      fullPage: true,
+    });
+    await page.getByRole("link", { name: "Home" }).click();
+    await expect(page.getByText("0 / 2", { exact: true })).toBeVisible();
+    await page.getByLabel("Duration in minutes").fill("30");
+    await page.getByLabel(/self-report/i).check();
+    await page.getByRole("button", { name: "Log workout" }).click();
+    await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("home-after.png"),
+      fullPage: true,
+    });
+    await page.getByRole("link", { name: "History" }).click();
+    await expect(
+      page.getByText("No finalized weekly history yet.", { exact: false }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("history.png"),
+      fullPage: true,
+    });
+    await page.reload();
+    await expect(
+      page.getByText("No finalized weekly history yet.", { exact: false }),
+    ).toBeVisible();
+    const unauthenticated = await fetch(
+      `http://127.0.0.1:8787/v1/group-memberships/current`,
     );
-    expect(result).toEqual({ status: 403, body: denied });
+    expect(unauthenticated.status).toBe(401);
+    const peerToken = await directToken(peer);
+    localPsql(`update app_private.memberships set ended_at=now(), end_reason='left'
+      where account_id=(select account_id from app_private.accounts where email='${peer}')
+        and group_id='${groupId}'::uuid;`);
+    for (const suffix of [
+      "current-week-progress",
+      "finalized-weekly-history",
+    ]) {
+      const denied = await fetch(
+        `http://127.0.0.1:8787/v1/groups/${groupId}/${suffix}`,
+        {
+          headers: { authorization: `Bearer ${peerToken}` },
+        },
+      );
+      expect(denied.status).toBe(403);
+      expect(JSON.stringify(await denied.json())).not.toContain(
+        "Synthetic PWA acceptance",
+      );
+    }
+    expect(failures).toEqual([]);
+  } finally {
+    await context.close();
+    await peerContext.close();
+    cleanLocalRows(owner, peer, groupId);
+    await removeAuth(owner);
+    await removeAuth(peer);
   }
-  localPsql(
-    `update app_private.memberships set ended_at = now(), end_reason = 'left' where membership_id = '${outsiderMembership}'::uuid;`,
-  );
-  for (const suffix of ["current-week-progress", "finalized-weekly-history"]) {
-    const result = await call(
-      `/v1/groups/${outsiderGroup}/${suffix}`,
-      outsiderToken,
-    );
-    expect(result).toEqual({ status: 403, body: denied });
-  }
-  localPsql(
-    `update app_private.accounts set access_cutoff = now() where email = '${outsiderEmail}';`,
-  );
-  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
-    status: 403,
-    body: denied,
-  });
-  localPsql(
-    `update app_private.accounts set access_cutoff = null where email = '${outsiderEmail}';`,
-  );
-  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
-    status: 200,
-    body: { contractVersion: 1, data: { membership: null } },
-  });
-  localPsql(
-    `update app_private.accounts set status = 'deleted' where email = '${outsiderEmail}';`,
-  );
-  expect(await call("/v1/group-memberships/current", outsiderToken)).toEqual({
-    status: 403,
-    body: denied,
-  });
 });

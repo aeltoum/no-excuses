@@ -14,7 +14,10 @@ export default defineConfig({
     env: {
       VITE_API_BASE_URL: "http://127.0.0.1:8787",
       VITE_SUPABASE_URL: "http://127.0.0.1:54321",
-      VITE_SUPABASE_ANON_KEY: "local-public-test-key",
+      VITE_SUPABASE_ANON_KEY:
+        process.env.LIVE_PWA_INTEGRATION === "1"
+          ? (process.env.LOCAL_SUPABASE_ANON_KEY ?? "")
+          : "local-public-test-key",
     },
     url: "http://127.0.0.1:4174",
     reuseExistingServer: !process.env.CI,

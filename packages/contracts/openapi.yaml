@@ -23,6 +23,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /v1/enrollment:
+    post:
+      operationId: enrollByInvitation
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/EnrollmentRequest" } } }
+      responses:
+        "200": { description: Uniform eligibility response, content: { application/json: { schema: { $ref: "#/components/schemas/EnrollmentResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
+  /v1/consent:
+    post:
+      operationId: recordTrueMvpConsent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ConsentRequest" } } }
+      responses:
+        "200": { description: Age and pilot/product consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "503": { $ref: "#/components/responses/ApiError" }
   /v1/account:
     delete:
       operationId: deleteAccount
@@ -35,6 +58,7 @@ paths:
             schema: { $ref: "#/components/schemas/DeleteAccountRequest" }
       responses:
         "200": { description: Account deleted or idempotently replayed, content: { application/json: { schema: { $ref: "#/components/schemas/DeletedAccountResponse" } } } }
+        "202": { description: DB cutoff committed; Auth hard deletion pending retry, content: { application/json: { schema: { $ref: "#/components/schemas/PendingAccountDeletionResponse" } } } }
         "400": { $ref: "#/components/responses/ApiError" }
         "401": { $ref: "#/components/responses/ApiError" }
         "403": { $ref: "#/components/responses/ApiError" }
@@ -389,9 +413,49 @@ components:
     DeleteAccountRequest:
       type: object
       additionalProperties: false
-      required: [confirmation]
+      required: [confirmation, otpCode]
       properties:
         confirmation: { type: boolean, const: true }
+        otpCode: { type: string, pattern: '^[0-9]{6}$', description: 'Fresh email code required by active PWA API' }
+    EnrollmentRequest:
+      type: object
+      additionalProperties: false
+      required: [email, token]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        token: { type: string, minLength: 1, maxLength: 256 }
+    EnrollmentResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [message]
+          properties:
+            message: { type: string, const: "If invitation is eligible, request a sign-in code." }
+    ConsentRequest:
+      type: object
+      additionalProperties: false
+      required: [adult, pilot, product]
+      properties:
+        adult: { type: boolean, const: true }
+        pilot: { type: boolean, const: true }
+        product: { type: boolean, const: true }
+    ConsentResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [accepted]
+          properties:
+            accepted: { type: boolean, const: true }
     CreateSocialInteractionRequest:
       oneOf:
         - type: object
@@ -435,6 +499,19 @@ components:
       properties:
         contractVersion: { type: integer, const: 1 }
         data: { $ref: "#/components/schemas/DeletedAccountResult" }
+    PendingAccountDeletionResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [accountId, authDeletion]
+          properties:
+            accountId: { type: string, format: uuid }
+            authDeletion: { type: string, const: pending }
     DeletedAccountResult:
       type: object
       additionalProperties: false

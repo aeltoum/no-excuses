@@ -84,11 +84,16 @@ async function mockApi(page: Page, member: boolean) {
           data: [{ membershipId, lockedTarget: 3, completedWorkoutCount: 0 }],
         },
       });
-    if (path === "/v1/account")
+    if (path === "/v1/account") {
+      expect(request.postDataJSON()).toEqual({
+        confirmation: true,
+        otpCode: "123456",
+      });
       return route.fulfill({
         status: 200,
         json: { contractVersion: 1, data: { accountId: userId } },
       });
+    }
     if (path === "/v1/group-invitations")
       return route.fulfill({
         status: 403,
@@ -107,6 +112,34 @@ async function mockApi(page: Page, member: boolean) {
     });
   });
 }
+
+test("invitation token enrolls before email code request", async ({ page }) => {
+  await mockSignedOut(page);
+  let enrollment: unknown;
+  await page.route("http://127.0.0.1:8787/v1/enrollment", async (route) => {
+    enrollment = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      json: {
+        contractVersion: 1,
+        data: { message: "If invitation is eligible, request a sign-in code." },
+      },
+    });
+  });
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("Invited@Example.Test");
+  await page
+    .getByLabel("Invitation token for first sign-in (optional)")
+    .fill("invitation-secret");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(
+    page.getByText("If this account is eligible, a code was sent."),
+  ).toBeVisible();
+  expect(enrollment).toEqual({
+    email: "invited@example.test",
+    token: "invitation-secret",
+  });
+});
 
 test("generic email OTP then live API authorization restores Group entry", async ({
   page,
@@ -188,7 +221,11 @@ test("exact Account deletion confirmation cuts off browser session", async ({
     .click();
   await page.getByLabel("Fresh six-digit code").fill("123456");
   await page.getByRole("button", { name: "Reverify identity" }).click();
-  await expect(page.getByText("Identity reverified")).toBeVisible();
+  await expect(
+    page.getByText(
+      "Code ready. Final confirmation will verify identity before deletion.",
+    ),
+  ).toBeVisible();
   await page.getByLabel("Type DELETE MY ACCOUNT").fill("delete");
   await page.getByRole("button", { name: "Confirm Account deletion" }).click();
   await expect(page.getByRole("alert")).toHaveText(
@@ -199,6 +236,50 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await page.getByRole("button", { name: "Confirm Account deletion" }).click();
   await expect(page.getByRole("status")).toHaveText(
     "Account deletion completed. Access ended immediately.",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Sign in required" }),
+  ).toBeVisible();
+  const cutoffFindings = findings.get(page);
+  expect(
+    cutoffFindings?.network.every(
+      (item) =>
+        item.includes("/group-memberships/current") ||
+        item.includes("/auth/v1/logout"),
+    ),
+  ).toBe(true);
+  cutoffFindings?.network.splice(0);
+});
+
+test("pending Auth deletion still ends browser access", async ({ page }) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.route("http://127.0.0.1:8787/v1/account", (route) =>
+    route.fulfill({
+      status: 202,
+      json: {
+        contractVersion: 1,
+        data: { accountId: userId, authDeletion: "pending" },
+      },
+    }),
+  );
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page.getByText("0 / 3").first()).toBeVisible();
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Review Account deletion" }).click();
+  await page
+    .getByRole("button", { name: "Send fresh verification code" })
+    .click();
+  await page.getByLabel("Fresh six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Reverify identity" }).click();
+  await page.getByLabel("Type DELETE MY ACCOUNT").fill("DELETE MY ACCOUNT");
+  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Account deletion accepted. Access ended; Auth removal pending.",
   );
   await expect(
     page.getByRole("heading", { name: "Sign in required" }),

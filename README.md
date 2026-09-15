@@ -30,21 +30,24 @@ and are not active True MVP delivery path.
 `pnpm db:start` prints the local anonymous key; copy it into an ignored `.env.local` using
 `.env.example`. Do not put hosted URLs or privileged keys in client-readable variables.
 
-For local PWA integration, start `pnpm api:local` in a separate terminal with
-`DATABASE_URL` and `SUPABASE_ANON_KEY` from `pnpm exec supabase status --output json`.
-This test adapter binds only `127.0.0.1:8787`, verifies bearer tokens against local
-Supabase Auth, and calls existing private PostgreSQL functions. Keep database URL and any
-service-role key in process environment only; never use them as `VITE_*` values. Start
-`pnpm web:dev` with local public `VITE_*` values from `.env.local`. For the unmocked
-Chromium/WebKit flow, set `LIVE_PWA_INTEGRATION=1`, `DATABASE_URL`,
-`LOCAL_SUPABASE_ANON_KEY`, and `LOCAL_SUPABASE_SERVICE_ROLE_KEY`, then run
-`pnpm --filter @no-excuses/web test:browser live-local.spec.ts`. This creates new
-synthetic local Auth users and Groups; it does not reset or clean existing data.
-For a deterministic recovery pass, start the API with `LOCAL_FAIL_ONCE_TARGET=1` and
-run the same live browser command with `LIVE_PWA_FAIL_ONCE=1`. The first target request
-then returns a test-only 503 before DB mutation; retry uses the same idempotency key.
-With local `DATABASE_URL` set, `pnpm db:test:pwa-settlement` runs the existing
-PostgreSQL settlement fixture in a disposable database and drops it on exit.
+Run local API after `pnpm db:start`: copy local Auth keys into ignored `.env.local`,
+run `pnpm api:build`, then `node --env-file=.env.local dist/api/delivery/src/server.js`.
+For first organizer only, set `SEED_ORGANIZER_EMAIL` in `.env.local` and run
+`node --env-file=.env.local dist/api/delivery/src/server.js seed-organizer` once.
+This private operator step creates Auth identity and Account without age/consent. Organizer
+signs in by email code, attests 18+, and accepts pilot/product consent before Group creation.
+Invited members enter invitation token during first sign-in; server validates application
+invitation before creating Auth identity. Keep `INVITATION_SECRET` stable: changing it
+invalidates outstanding tokens. Server credentials stay server-only. API startup performs
+idempotent weekly rollover/close and retries pending Auth hard deletions after DB cutoff;
+maintenance repeats each minute while API runs.
+
+For local unmocked browser validation, start the API and web preview against local Supabase,
+then set `LIVE_PWA_INTEGRATION=1` and run the opt-in `live-local.spec.ts` suite. The suite
+uses synthetic local Auth users and Groups; never point it at hosted services. With a local
+`DATABASE_URL`, `pnpm db:test:pwa-settlement` uses a disposable PostgreSQL database and
+drops it on exit.
+
 
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and

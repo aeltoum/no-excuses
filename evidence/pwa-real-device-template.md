@@ -2,7 +2,7 @@
 
 Copy once per candidate and physical device. Fill actual observations; leave unrun items `not run`. Use synthetic accounts. Store screenshots/logs in approved evidence location without tokens, email addresses, or private Group data.
 
-Candidate commit: `not run`
+Candidate commit or exact working-tree identifier: `not run`
 
 Date/tester: `not run`
 
@@ -33,5 +33,7 @@ Evidence artifact paths: `not run`
 Defect or compatibility ticket (URL, device, exact reproduction): `none recorded`
 
 Overall verdict and reason: `not run`
+
+Automated local integration evidence does not satisfy this physical-device gate.
 
 One passing device does not cover both platforms. Record iPhone Safari and Android Chrome separately. If actual pilot device misses support floor or a check fails, keep release gate open and link a compatibility ticket.

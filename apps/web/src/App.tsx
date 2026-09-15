@@ -1,11 +1,13 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
+import { ApiError, createApiClient } from "./api-client";
 import {
-  ApiError,
-  createApiClient,
-  requireAccountDeletionMatch,
-} from "./api-client";
-import { requestOtp, resolveLiveAccess, verifyOtp, WebAuthError } from "./auth";
+  normalizeOtp,
+  requestOtp,
+  resolveLiveAccess,
+  verifyOtp,
+  WebAuthError,
+} from "./auth";
 import { Weekly } from "./Weekly";
 
 type Route =
@@ -68,6 +70,7 @@ export function App({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [email, setEmail] = useState("");
+  const [enrollmentToken, setEnrollmentToken] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [inviteId, setInviteId] = useState("");
@@ -209,7 +212,11 @@ export function App({
           (await api.current(session.access_token)).data.membership,
         );
       if (options.cutoff) {
-        await auth.auth.signOut({ scope: "local" });
+        try {
+          await auth.auth.signOut({ scope: "local" });
+        } catch {
+          // DB cutoff remains authoritative even when local sign-out fails.
+        }
         setSession(null);
         setMembership(null);
         setAccess("signed-out");
@@ -332,6 +339,11 @@ export function App({
           >
             <form
               onSubmit={submit(async () => {
+                if (enrollmentToken.trim())
+                  await api.enroll(
+                    email.trim().toLowerCase(),
+                    enrollmentToken.trim(),
+                  );
                 const normalized = await requestOtp(auth, email);
                 setEmail(normalized);
                 setCodeSent(true);
@@ -347,6 +359,18 @@ export function App({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={busy}
+              />
+              <label htmlFor="enrollment-token">
+                Invitation token for first sign-in (optional)
+              </label>
+              <input
+                id="enrollment-token"
+                type="password"
+                autoComplete="off"
+                maxLength={256}
+                value={enrollmentToken}
+                onChange={(e) => setEnrollmentToken(e.target.value)}
                 disabled={busy}
               />
               <button type="submit" disabled={busy}>
@@ -397,6 +421,55 @@ export function App({
                 : "Create a private Group or join with an invitation token."
             }
           >
+            {!membership && (
+              <form
+                onSubmit={submit(async (f) => {
+                  if (
+                    f.get("adult") !== "on" ||
+                    f.get("pilot") !== "on" ||
+                    f.get("product") !== "on"
+                  )
+                    throw new ApiError(
+                      "failure",
+                      "Confirm age and both consents before Group action.",
+                    );
+                  await api.consent(token());
+                  return "Age and consent recorded. You can create or join a Group.";
+                })}
+              >
+                <h2>Before Group participation</h2>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="adult"
+                    required
+                    disabled={busy}
+                  />{" "}
+                  I am 18 or older.
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="pilot"
+                    required
+                    disabled={busy}
+                  />{" "}
+                  I consent to this private pilot.
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    name="product"
+                    required
+                    disabled={busy}
+                  />{" "}
+                  I consent to product terms and data use.
+                </label>
+                <button type="submit" disabled={busy}>
+                  Confirm age and consent
+                </button>
+              </form>
+            )}
             {!membership && (
               <div className="form-grid">
                 <form
@@ -674,16 +747,9 @@ export function App({
                   {deletionStep === "code-sent" && (
                     <form
                       onSubmit={submit(async () => {
-                        const address = session?.user.email;
-                        if (!address)
-                          throw new WebAuthError(
-                            "rejected",
-                            "Verified Account email unavailable.",
-                          );
-                        await verifyOtp(auth, address, deletionCode);
-                        setDeletionCode("");
+                        normalizeOtp(deletionCode);
                         setDeletionStep("ready");
-                        return "Identity reverified. Review effects, then confirm deletion.";
+                        return "Code ready. Final confirmation will verify identity before deletion.";
                       })}
                     >
                       <label>
@@ -717,15 +783,15 @@ export function App({
                               "Type DELETE MY ACCOUNT exactly.",
                             );
                           deletionKey.current ??= crypto.randomUUID();
-                          const result = await api.deleteAccount(
+                          const deletion = await api.deleteAccount(
                             token(),
                             deletionKey.current,
+                            deletionCode,
                           );
-                          requireAccountDeletionMatch(
-                            session?.user.id ?? "",
-                            result.data.accountId,
-                          );
-                          return "Account deletion completed. Access ended immediately.";
+                          setDeletionCode("");
+                          return "authDeletion" in deletion.data
+                            ? "Account deletion accepted. Access ended; Auth removal pending."
+                            : "Account deletion completed. Access ended immediately.";
                         },
                         { cutoff: true },
                       )}

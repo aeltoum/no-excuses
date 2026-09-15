@@ -8,7 +8,6 @@
     "node": "24.19.0"
   },
   "scripts": {
-    "api:local": "node scripts/local-pwa-api.mjs",
     "audit:dependencies": "pnpm audit --audit-level high",
     "build": "pnpm contracts:generate && tsc --noEmit",
     "check": "pnpm format:check && pnpm contracts:check && pnpm typecheck && pnpm test && pnpm check:secrets && pnpm check:dependencies",
@@ -20,6 +19,8 @@
     "db:test:pwa-settlement": "bash scripts/test-local-pwa-settlement.sh",
     "db:test:postgres": "bash scripts/test-real-postgres.sh",
     "db:start": "supabase start",
+    "api:build": "tsc -p tsconfig.api.json",
+    "api:start": "pnpm api:build && node dist/api/delivery/src/server.js",
     "db:stop": "supabase stop",
     "format": "biome check --write .",
     "format:check": "biome check .",
@@ -34,10 +35,15 @@
     "@biomejs/biome": "2.5.12",
     "@electric-sql/pglite": "0.5.8",
     "@types/node": "24.10.1",
+    "@types/pg": "8.15.5",
     "image-size-next": "2.1.1",
     "openapi-typescript": "7.13.0",
     "supabase": "2.117.0",
     "typescript": "5.9.3",
     "vitest": "5.0.0"
+  },
+  "dependencies": {
+    "pg": "8.23.0",
+    "zod": "4.5.4"
   }
 }
