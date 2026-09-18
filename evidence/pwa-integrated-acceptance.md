@@ -19,6 +19,6 @@ Android Chrome physical-device scope passed on Pixel 10 Pro XL, Android 17, Chro
 
 Real iPhone Safari remains **NOT RUN**: browser use, installation, standalone launch, OTP/session restoration after relaunch, keyboard/safe-area layout, 200% text, reduced motion, VoiceOver, and alternative input. Use [real-device template](pwa-real-device-template.md). Confirm iOS/Safari 16.4+ support floor or open a compatibility ticket.
 
-Finalized Met/Missed browser presentation on a naturally elapsed live week is not run. Hosted service, production provisioning, release deployment, and spending are outside this candidate and were not performed.
+Finalized Met/Missed browser presentation on a naturally elapsed live week is not run. A [local synthetic week](pwa-natural-week-boundary.md) is active and awaiting its actual 2026-09-20 10:00 UTC boundary; pre-boundary PostgreSQL and API facts are recorded there. Hosted service, production provisioning, release deployment, and spending are outside this candidate and were not performed.
 
 Status: **automated local integration and Android physical-device scope pass; iPhone physical-device evidence remains a release gate**.
