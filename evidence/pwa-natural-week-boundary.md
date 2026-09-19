@@ -14,4 +14,4 @@ Private local state and maintenance scripts are outside Git, mode `0600`:
 
 To resume, start local Supabase **without reset**, build/start the existing API using local `supabase status` values in process environment, then run the private verify script with `SUPABASE_ANON_KEY` set from that local status. API startup/minute maintenance will close the week using actual time. If verification passes, capture sanitized browser History evidence at `http://127.0.0.1:4174/` before running cleanup with local `DATABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Keep keys, OTP, synthetic emails, and identifiers out of screenshots and repository logs. The private scripts and state are local temporary artifacts; preserve them until verification and cleanup finish.
 
-Physical iPhone Safari remains NOT RUN and is a separate release gate.
+Physical iPhone Safari was exercised separately and accepted for issue #158. Physical Safari Page Zoom at 200% still failed text/background-box alignment and is deferred to [#166](https://github.com/aeltoum/no-excuses/issues/166).

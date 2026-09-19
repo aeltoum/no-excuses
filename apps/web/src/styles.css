@@ -271,6 +271,25 @@ nav a[aria-current="page"] {
     letter-spacing: 0.04em;
   }
 }
+@media (max-width: 240px) {
+  main {
+    padding-inline: 12px;
+  }
+  h1 {
+    font-size: 2.25rem;
+  }
+  form {
+    padding: 12px;
+  }
+  select {
+    padding-inline: 4px;
+    font-size: 0.875rem;
+  }
+  nav {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (orientation: landscape) and (max-height: 500px) {
   main {
     padding-block: 32px;
