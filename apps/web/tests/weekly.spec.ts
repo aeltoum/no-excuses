@@ -20,6 +20,108 @@ const session = {
   },
 };
 
+test("one-member Group pauses workouts until a second member joins", async ({
+  page,
+}, testInfo) => {
+  const failures: string[] = [];
+  let workoutPostCount = 0;
+  page.on("pageerror", (error) => failures.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") failures.push(message.text());
+  });
+  page.on("requestfailed", (request) => failures.push(request.url()));
+  await page.route("http://127.0.0.1:54321/auth/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
+    if (path.endsWith("/verify"))
+      return route.fulfill({ status: 200, json: session });
+    if (path.endsWith("/user"))
+      return route.fulfill({ status: 200, json: session.user });
+    return route.fulfill({ status: 401, json: { message: "no session" } });
+  });
+  await page.route("http://127.0.0.1:8787/v1/**", (route) => {
+    const request = route.request();
+    expect(request.headers().authorization).toBe("Bearer live-access");
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith("/current"))
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: { membership: { groupId, membershipId } },
+        },
+      });
+    if (path.endsWith("/current-week-progress"))
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: [] },
+      });
+    if (path.endsWith("/finalized-weekly-history"))
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: [] },
+      });
+    if (path.endsWith("/workout-check-ins")) {
+      workoutPostCount++;
+      return route.fulfill({
+        status: 403,
+        json: {
+          contractVersion: 1,
+          error: {
+            code: "denied",
+            message: "private detail",
+            retryable: false,
+          },
+        },
+      });
+    }
+    return route.fulfill({ status: 404, json: {} });
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+
+  await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  const logWorkout = page.getByRole("button", { name: "Log workout" });
+  let actionDenied = false;
+  if ((await logWorkout.count()) > 0) {
+    await page.getByLabel("Duration in minutes").fill("30");
+    await page
+      .getByLabel("I completed this workout. This is my self-report.")
+      .check();
+    await logWorkout.click();
+    actionDenied = await page.getByText("Action denied.").isVisible();
+  }
+  await expect(
+    page.getByText(
+      "Accountability and workouts begin once a second member joins your Group.",
+    ),
+  ).toBeVisible();
+  expect(actionDenied).toBe(false);
+  await expect(logWorkout).toHaveCount(0);
+  await expect(page.getByText("Action denied.")).toHaveCount(0);
+  expect(workoutPostCount).toBe(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath("one-member-group.png"),
+  });
+  expect(
+    (await new AxeBuilder({ page }).analyze()).violations.filter((item) =>
+      ["serious", "critical"].includes(item.impact ?? ""),
+    ),
+  ).toEqual([]);
+  expect(failures).toEqual([]);
+});
+
 test("weekly loop: self-report, target, finalized result", async ({
   page,
 }, testInfo) => {

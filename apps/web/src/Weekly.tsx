@@ -192,8 +192,8 @@ export function Weekly({
                 </p>
               ) : (
                 <p>
-                  No current accountability week yet. Group progress appears
-                  after activation.
+                  Accountability and workouts begin once a second member joins
+                  your Group.
                 </p>
               )}
               <h2>Group progress</h2>
@@ -216,138 +216,141 @@ export function Weekly({
               ) : (
                 <p>No current Group progress yet.</p>
               )}
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (busy) return;
-                  const minutes = Number(duration);
-                  if (!Number.isSafeInteger(minutes) || minutes < 1) {
-                    setNotice({
-                      kind: "error",
-                      text: "Enter a valid duration of at least one minute.",
-                    });
-                    return;
-                  }
-                  const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
-                  if (!draft.current || draft.current.signature !== signature)
-                    draft.current = {
-                      signature,
-                      key: crypto.randomUUID(),
-                      id: crypto.randomUUID(),
-                      completedAt: new Date().toISOString(),
-                    };
-                  const current = draft.current;
-                  setBusy(true);
-                  setNotice(null);
-                  void api
-                    .checkIn(
-                      token,
-                      {
-                        workoutCheckinId: current.id,
-                        activityType,
-                        completedAt: current.completedAt,
-                        durationMinutes: minutes,
-                        perceivedIntensity: intensity,
-                        selfReportAttested: true,
-                      },
-                      current.key,
-                    )
-                    .then(async (response) => {
-                      if (response.data.workoutCheckinId !== current.id)
-                        throw new ApiError(
-                          "failure",
-                          "Check-in response did not match this workout.",
-                        );
-                      draft.current = null;
-                      setDuration("");
-                      setAttested(false);
+              {own && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (busy) return;
+                    const minutes = Number(duration);
+                    if (!Number.isSafeInteger(minutes) || minutes < 1) {
                       setNotice({
-                        kind: "success",
-                        text: "Workout saved. Refreshing current count…",
+                        kind: "error",
+                        text: "Enter a valid duration of at least one minute.",
                       });
-                      try {
-                        setProgress(
-                          (await api.progress(token, membership.groupId)).data,
-                        );
-                        setRefreshWarning(false);
+                      return;
+                    }
+                    const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
+                    if (!draft.current || draft.current.signature !== signature)
+                      draft.current = {
+                        signature,
+                        key: crypto.randomUUID(),
+                        id: crypto.randomUUID(),
+                        completedAt: new Date().toISOString(),
+                      };
+                    const current = draft.current;
+                    setBusy(true);
+                    setNotice(null);
+                    void api
+                      .checkIn(
+                        token,
+                        {
+                          workoutCheckinId: current.id,
+                          activityType,
+                          completedAt: current.completedAt,
+                          durationMinutes: minutes,
+                          perceivedIntensity: intensity,
+                          selfReportAttested: true,
+                        },
+                        current.key,
+                      )
+                      .then(async (response) => {
+                        if (response.data.workoutCheckinId !== current.id)
+                          throw new ApiError(
+                            "failure",
+                            "Check-in response did not match this workout.",
+                          );
+                        draft.current = null;
+                        setDuration("");
+                        setAttested(false);
                         setNotice({
                           kind: "success",
-                          text: "Workout saved. Current count refreshed.",
+                          text: "Workout saved. Refreshing current count…",
                         });
-                      } catch (error) {
-                        if (
-                          error instanceof ApiError &&
-                          error.kind === "unauthorized"
-                        )
-                          onRevoked();
-                        setRefreshWarning(true);
-                        setNotice({
-                          kind: "success",
-                          text: "Workout saved. Current count unavailable; refresh count to see latest progress.",
-                        });
+                        try {
+                          setProgress(
+                            (await api.progress(token, membership.groupId))
+                              .data,
+                          );
+                          setRefreshWarning(false);
+                          setNotice({
+                            kind: "success",
+                            text: "Workout saved. Current count refreshed.",
+                          });
+                        } catch (error) {
+                          if (
+                            error instanceof ApiError &&
+                            error.kind === "unauthorized"
+                          )
+                            onRevoked();
+                          setRefreshWarning(true);
+                          setNotice({
+                            kind: "success",
+                            text: "Workout saved. Current count unavailable; refresh count to see latest progress.",
+                          });
+                        }
+                      })
+                      .catch(updateError)
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  <h2>Log workout</h2>
+                  <label>
+                    Activity type
+                    <select
+                      value={activityType}
+                      onChange={(e) =>
+                        setActivityType(e.target.value as typeof activityType)
                       }
-                    })
-                    .catch(updateError)
-                    .finally(() => setBusy(false));
-                }}
-              >
-                <h2>Log workout</h2>
-                <label>
-                  Activity type
-                  <select
-                    value={activityType}
-                    onChange={(e) =>
-                      setActivityType(e.target.value as typeof activityType)
-                    }
-                    disabled={busy}
-                  >
-                    <option value="strength">Strength</option>
-                    <option value="cardio">Cardio</option>
-                    <option value="class">Class</option>
-                    <option value="sport">Sport</option>
-                    <option value="mixed">Mixed</option>
-                  </select>
-                </label>
-                <label>
-                  Duration in minutes
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    disabled={busy}
-                  />
-                </label>
-                <label>
-                  Perceived intensity
-                  <select
-                    value={intensity}
-                    onChange={(e) =>
-                      setIntensity(e.target.value as typeof intensity)
-                    }
-                    disabled={busy}
-                  >
-                    <option value="low">Low</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="high">High</option>
-                  </select>
-                </label>
-                <label className="check-label">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={attested}
-                    onChange={(e) => setAttested(e.target.checked)}
-                    disabled={busy}
-                  />
-                  I completed this workout. This is my self-report.
-                </label>
-                <button type="submit" disabled={busy}>
-                  {busy ? "Logging…" : "Log workout"}
-                </button>
-              </form>
+                      disabled={busy}
+                    >
+                      <option value="strength">Strength</option>
+                      <option value="cardio">Cardio</option>
+                      <option value="class">Class</option>
+                      <option value="sport">Sport</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </label>
+                  <label>
+                    Duration in minutes
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      required
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      disabled={busy}
+                    />
+                  </label>
+                  <label>
+                    Perceived intensity
+                    <select
+                      value={intensity}
+                      onChange={(e) =>
+                        setIntensity(e.target.value as typeof intensity)
+                      }
+                      disabled={busy}
+                    >
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                    </select>
+                  </label>
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={attested}
+                      onChange={(e) => setAttested(e.target.checked)}
+                      disabled={busy}
+                    />
+                    I completed this workout. This is my self-report.
+                  </label>
+                  <button type="submit" disabled={busy}>
+                    {busy ? "Logging…" : "Log workout"}
+                  </button>
+                </form>
+              )}
               {refreshWarning && (
                 <button type="button" onClick={refreshCount} disabled={busy}>
                   {busy ? "Refreshing…" : "Refresh count"}
