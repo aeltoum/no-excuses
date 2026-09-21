@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: no-excuses-api
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm api:build
+    startCommand: node dist/api/delivery/src/server.js
+    healthCheckPath: /v1/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: INVITATION_SECRET
+        sync: false
+      - key: PWA_ORIGIN
+        sync: false
