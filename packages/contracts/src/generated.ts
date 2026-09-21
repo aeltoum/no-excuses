@@ -36,6 +36,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["enrollByInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordTrueMvpConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/account": {
         parameters: {
             query?: never;
@@ -356,6 +388,37 @@ export interface components {
         DeleteAccountRequest: {
             /** @constant */
             confirmation: true;
+            /** @description Fresh email code required by active PWA API */
+            otpCode: string;
+        };
+        EnrollmentRequest: {
+            /** Format: email */
+            email: string;
+            token: string;
+        };
+        EnrollmentResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: {
+                /** @constant */
+                message: "If invitation is eligible, request a sign-in code.";
+            };
+        };
+        ConsentRequest: {
+            /** @constant */
+            adult: true;
+            /** @constant */
+            pilot: true;
+            /** @constant */
+            product: true;
+        };
+        ConsentResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: {
+                /** @constant */
+                accepted: true;
+            };
         };
         CreateSocialInteractionRequest: {
             /** Format: uuid */
@@ -389,6 +452,16 @@ export interface components {
             /** @constant */
             contractVersion: 1;
             data: components["schemas"]["DeletedAccountResult"];
+        };
+        PendingAccountDeletionResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: {
+                /** Format: uuid */
+                accountId: string;
+                /** @constant */
+                authDeletion: "pending";
+            };
         };
         DeletedAccountResult: {
             /** Format: uuid */
@@ -614,6 +687,60 @@ export interface operations {
             };
         };
     };
+    enrollByInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Uniform eligibility response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            503: components["responses"]["ApiError"];
+        };
+    };
+    recordTrueMvpConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description Age and pilot/product consent recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            503: components["responses"]["ApiError"];
+        };
+    };
     deleteAccount: {
         parameters: {
             query?: never;
@@ -636,6 +763,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedAccountResponse"];
+                };
+            };
+            /** @description DB cutoff committed; Auth hard deletion pending retry */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingAccountDeletionResponse"];
                 };
             };
             400: components["responses"]["ApiError"];

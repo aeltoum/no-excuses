@@ -259,7 +259,7 @@ describe("M2 identity, Group authority, and accountability calendar", () => {
     await db.exec(`update app_private.accounts set adult_attested_at = '2026-03-01Z'
       where account_id = '${ids.peer}';
       update app_private.consents set withdrawn_at = '2026-03-05Z'
-      where account_id = '${ids.peer}' and purpose = 'media'`);
+      where account_id = '${ids.peer}' and purpose = 'product'`);
     await expect(
       db.query(`select app_private.accept_group_invitation(
       '${digest}', '${ids.peerMembership}', 3, 2, '2026-03-05T18:00:00Z')`),

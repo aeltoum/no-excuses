@@ -202,6 +202,72 @@ test("weekly loop: self-report, target, finalized result", async ({
   await expect(
     page.getByText("No finalized weekly history yet.", { exact: false }),
   ).toBeVisible();
+  for (const width of [195, 160]) {
+    await page.setViewportSize({ width, height: width === 195 ? 422 : 284 });
+    for (const route of ["Home", "Target", "History"]) {
+      await page.getByRole("link", { name: route }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const geometry = await page.evaluate(() => {
+        const bounds = (element: Element) => element.getBoundingClientRect();
+        const mainElement = document.querySelector("main");
+        const navElement = document.querySelector("nav");
+        if (!mainElement || !navElement)
+          throw new Error("Shell layout missing");
+        const main = bounds(mainElement);
+        const nav = bounds(navElement);
+        return {
+          navOverMain: nav.top < main.bottom - 1,
+          clipped: [
+            ...document.querySelectorAll(
+              "main, main form, main input, main button, main .result, nav",
+            ),
+          ]
+            .map((element) => ({
+              name: element.tagName.toLowerCase(),
+              left: bounds(element).left,
+              right: bounds(element).right,
+            }))
+            .filter(
+              ({ left, right }) => left < -1 || right > window.innerWidth + 1,
+            ),
+        };
+      });
+      expect(geometry, `${route} at ${width}px CSS viewport`).toEqual({
+        navOverMain: false,
+        clipped: [],
+      });
+      if (route === "Home") {
+        const intensityFit = await page
+          .getByLabel("Perceived intensity")
+          .evaluate((select) => {
+            if (!(select instanceof HTMLSelectElement))
+              throw new Error("Intensity select missing");
+            const style = getComputedStyle(select);
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("Canvas unavailable");
+            context.font = style.font;
+            const selectedText = select.selectedOptions[0]?.text ?? "";
+            const textWidth = context.measureText(selectedText).width;
+            const space =
+              select.clientWidth -
+              Number.parseFloat(style.paddingLeft) -
+              Number.parseFloat(style.paddingRight) -
+              24;
+            return { textWidth, space };
+          });
+        expect(
+          intensityFit.space,
+          `Intensity text fits at ${width}px`,
+        ).toBeGreaterThanOrEqual(intensityFit.textWidth);
+      }
+      await page.screenshot({
+        fullPage: true,
+        path: testInfo.outputPath(`zoom-${width}-${route.toLowerCase()}.png`),
+      });
+    }
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "32px";

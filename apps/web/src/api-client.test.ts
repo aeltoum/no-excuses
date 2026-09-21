@@ -1,13 +1,43 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApiClient, requireAccountDeletionMatch } from "./api-client";
+import { createApiClient } from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
 describe("browser API client", () => {
-  it("fails closed when deletion result names another Account", () => {
-    expect(() =>
-      requireAccountDeletionMatch(uuid, "20000000-0000-4000-8000-000000000001"),
-    ).toThrow("did not match this Account");
-    expect(() => requireAccountDeletionMatch(uuid, uuid)).not.toThrow();
+  it("accepts durable pending Account deletion receipt", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            contractVersion: 1,
+            data: { accountId: uuid, authDeletion: "pending" },
+          }),
+          { status: 202 },
+        ),
+    );
+    await expect(
+      createApiClient(
+        "https://api.example.test",
+        fetcher as typeof fetch,
+      ).deleteAccount("token", crypto.randomUUID(), "123456"),
+    ).resolves.toMatchObject({
+      data: { accountId: uuid, authDeletion: "pending" },
+    });
+  });
+
+  it("validates versioned enrollment response", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ contractVersion: 1, data: { message: "wrong" } }),
+          { status: 200 },
+        ),
+    );
+    await expect(
+      createApiClient(
+        "https://api.example.test",
+        fetcher as typeof fetch,
+      ).enroll("friend@example.test", "token"),
+    ).rejects.toThrow("Enrollment unavailable");
   });
   it("sends bearer auth/idempotency and validates command response", async () => {
     const fetcher = vi.fn(

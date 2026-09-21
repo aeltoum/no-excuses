@@ -1,0 +1,13 @@
+# Naturally elapsed weekly outcome: PASS
+
+Issue #158. Candidate: commit `9514ecb` on `codex/pwa-integrated-acceptance` plus this evidence working tree. Local-only synthetic fixture created 2026-09-18 against local Supabase Auth, PostgreSQL schema version 15, and the deployable API at `http://127.0.0.1:8787`. No hosted service, database reset, or real user data was used.
+
+The two-member Group uses `Pacific/Kiritimati`. Its current accountability week starts **2026-09-13 10:00 UTC** and ends naturally **2026-09-20 10:00 UTC** (Monday 00:00 local). Each member has locked target 2. The organizer recorded two self-reported workout check-ins through the real API; the invited member recorded none. Before the boundary, PostgreSQL reports one active week and two active member weeks: organizer 2/2, peer 0/2. Authenticated finalized-history API returned an empty list. No clock override or early finalizer call was used.
+
+At 2026-09-20 10:06 UTC or later, ordinary API maintenance had closed the prior week. Aggregate PostgreSQL evidence showed the 2026-09-13 10:00 UTC–2026-09-20 10:00 UTC week with member statuses `attained` and `missed`, plus the new active week. The prepared verifier initially false-failed because it compared `2026-09-20T10:00:00.000Z` with the equivalent `2026-09-20T10:00:00Z` as strings. After its private timestamp comparison was corrected to compare parsed instants, it passed: organizer **Met** (`attained`, 2/2), peer **Missed** (`missed`, 0/2). No clock override or early finalizer call was used.
+
+Real local PWA History at `http://127.0.0.1:4174/` was authenticated through a fresh OTP and exercised at 390 × 844 in Chromium and WebKit. Both showed `Met · 2 / 2` and `Missed · 0 / 2`. Browser observers found zero page errors, console errors, request failures, or relevant HTTP responses at status 400 or higher. Privacy-safe screenshots: [Chromium History](pwa-natural-week/chromium-history.png) and [WebKit History](pwa-natural-week/webkit-history.png). Membership labels are masked; visual inspection found no email, OTP, or identifier.
+
+After evidence capture, the prepared cleanup completed with output: `PASS: only named synthetic fixture rows and Auth users cleaned.` The private state, verifier, and cleanup artifacts under `/tmp/no-excuses-natural-week-*` were then removed. API and web processes were stopped, and `pnpm db:stop` stopped local Supabase with its backup preserved.
+
+Physical iPhone Safari was exercised separately and accepted for issue #158. Physical Safari Page Zoom at 200% still failed text/background-box alignment and is deferred to [#166](https://github.com/aeltoum/no-excuses/issues/166).

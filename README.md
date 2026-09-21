@@ -30,6 +30,25 @@ and are not active True MVP delivery path.
 `pnpm db:start` prints the local anonymous key; copy it into an ignored `.env.local` using
 `.env.example`. Do not put hosted URLs or privileged keys in client-readable variables.
 
+Run local API after `pnpm db:start`: copy local Auth keys into ignored `.env.local`,
+run `pnpm api:build`, then `node --env-file=.env.local dist/api/delivery/src/server.js`.
+For first organizer only, set `SEED_ORGANIZER_EMAIL` in `.env.local` and run
+`node --env-file=.env.local dist/api/delivery/src/server.js seed-organizer` once.
+This private operator step creates Auth identity and Account without age/consent. Organizer
+signs in by email code, attests 18+, and accepts pilot/product consent before Group creation.
+Invited members enter invitation token during first sign-in; server validates application
+invitation before creating Auth identity. Keep `INVITATION_SECRET` stable: changing it
+invalidates outstanding tokens. Server credentials stay server-only. API startup performs
+idempotent weekly rollover/close and retries pending Auth hard deletions after DB cutoff;
+maintenance repeats each minute while API runs.
+
+For local unmocked browser validation, start the API and web preview against local Supabase,
+then set `LIVE_PWA_INTEGRATION=1` and run the opt-in `live-local.spec.ts` suite. The suite
+uses synthetic local Auth users and Groups; never point it at hosted services. With a local
+`DATABASE_URL`, `pnpm db:test:pwa-settlement` uses a disposable PostgreSQL database and
+drops it on exit.
+
+
 The deterministic migration tests use an in-process PostgreSQL-compatible engine, so
 `pnpm check` does not need Docker or any hosted dependency. `pnpm db:start` and
 `pnpm db:reset` are the integration path for the complete local Supabase stack. To run the
