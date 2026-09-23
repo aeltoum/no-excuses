@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
+const friendMembershipId = "30000000-0000-4000-8000-000000000002";
 const groupId = "40000000-0000-4000-8000-000000000001";
 const session = {
   access_token: "live-access",
@@ -192,7 +193,18 @@ test("weekly loop: self-report, target, finalized result", async ({
     }
     if (path.endsWith("/current-week-progress"))
       return respond([
-        { membershipId, lockedTarget: 3, completedWorkoutCount: count },
+        {
+          membershipId,
+          displayName: "Akrum",
+          lockedTarget: 3,
+          completedWorkoutCount: count,
+        },
+        {
+          membershipId: friendMembershipId,
+          displayName: "Maya",
+          lockedTarget: 2,
+          completedWorkoutCount: 1,
+        },
       ]);
     if (path.endsWith("/finalized-weekly-history") && emptyHistory)
       return respond([]);
@@ -200,6 +212,7 @@ test("weekly loop: self-report, target, finalized result", async ({
       return respond([
         {
           membershipId,
+          displayName: "Akrum",
           startsAt: "2026-09-01T00:00:00Z",
           endsAt: "2026-09-08T00:00:00Z",
           lockedTarget: 3,
@@ -256,6 +269,10 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
+  await expect(page.getByText("Maya")).toBeVisible();
+  await expect(
+    page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("img", { name: "0 of 3 workouts" }),
   ).toBeVisible();

@@ -64,6 +64,29 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/account/display-name:
+    get:
+      operationId: getAccountDisplayName
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Current Account display name, content: { application/json: { schema: { $ref: "#/components/schemas/AccountDisplayNameResponse" } } } }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
+    put:
+      operationId: setAccountDisplayName
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SetDisplayNameRequest" } } }
+      responses:
+        "200": { description: Account display name saved, content: { application/json: { schema: { $ref: "#/components/schemas/AccountDisplayNameResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "409": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/workout-check-ins:
     post:
       operationId: submitWorkoutCheckin
@@ -417,6 +440,31 @@ components:
       properties:
         confirmation: { type: boolean, const: true }
         otpCode: { type: string, pattern: '^[0-9]{6}$', description: 'Fresh email code required by active PWA API' }
+    SetDisplayNameRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 40
+          pattern: '^\S(?:[\s\S]*\S)?$'
+    AccountDisplayNameResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [displayName]
+          properties:
+            displayName:
+              oneOf:
+                - { type: string, minLength: 1, maxLength: 40 }
+                - { type: "null" }
     EnrollmentRequest:
       type: object
       additionalProperties: false
@@ -708,9 +756,10 @@ components:
     CurrentWeekProgressItem:
       type: object
       additionalProperties: false
-      required: [membershipId, lockedTarget, completedWorkoutCount]
+      required: [membershipId, displayName, lockedTarget, completedWorkoutCount]
       properties:
         membershipId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 40 }
         lockedTarget: { type: integer, minimum: 1 }
         completedWorkoutCount: { type: integer, minimum: 0 }
     FinalizedWeeklyHistoryResponse:
@@ -725,9 +774,10 @@ components:
     FinalizedWeeklyHistoryItem:
       type: object
       additionalProperties: false
-      required: [membershipId, startsAt, endsAt, lockedTarget, completedWorkoutCount, outcome]
+      required: [membershipId, displayName, startsAt, endsAt, lockedTarget, completedWorkoutCount, outcome]
       properties:
         membershipId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 40 }
         startsAt: { $ref: "#/components/schemas/UtcInstant" }
         endsAt: { $ref: "#/components/schemas/UtcInstant" }
         lockedTarget: { type: integer, minimum: 1 }

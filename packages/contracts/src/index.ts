@@ -22,6 +22,7 @@ export type {
   RemoveGroupMemberRequest,
   RevokedGroupInvitationResult,
   RevokeGroupInvitationRequest,
+  SetDisplayNameRequest,
   SetWeeklyTargetRequest,
   SocialInteractionResult,
   SubmitWorkoutCheckinRequest,
@@ -30,6 +31,7 @@ export type {
 } from "./runtime.js";
 export {
   acceptGroupInvitationRequestSchema,
+  accountDisplayNameResponseSchema,
   apiErrorCodeSchema,
   apiErrorResponseSchema,
   consentRequestSchema,
@@ -71,6 +73,7 @@ export {
   revokedGroupInvitationResponseSchema,
   revokedGroupInvitationResultSchema,
   revokeGroupInvitationRequestSchema,
+  setDisplayNameRequestSchema,
   setWeeklyTargetRequestSchema,
   socialInteractionResponseSchema,
   socialInteractionResultSchema,

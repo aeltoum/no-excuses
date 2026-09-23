@@ -1,4 +1,5 @@
 import {
+  accountDisplayNameResponseSchema,
   apiErrorResponseSchema,
   consentResponseSchema,
   currentGroupMembershipResponseSchema,
@@ -109,6 +110,21 @@ export function createApiClient(
     key: string = crypto.randomUUID(),
   ) => request(path, token, parser, { method, body, key });
   return {
+    displayName: (token: string) =>
+      request(
+        "/v1/account/display-name",
+        token,
+        accountDisplayNameResponseSchema,
+      ),
+    setDisplayName: (token: string, displayName: string, key: string) =>
+      command(
+        "/v1/account/display-name",
+        token,
+        accountDisplayNameResponseSchema,
+        { displayName },
+        "PUT",
+        key,
+      ),
     enroll: async (email: string, token: string) => {
       let response: Response;
       try {

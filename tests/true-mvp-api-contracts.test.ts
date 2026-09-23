@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
   acceptGroupInvitationRequestSchema,
+  accountDisplayNameResponseSchema,
   apiErrorResponseSchema,
   createGroupRequestSchema,
   currentGroupMembershipRequestSchema,
@@ -16,6 +17,7 @@ import {
   removeGroupMemberRequestSchema,
   revokedGroupInvitationResponseSchema,
   revokeGroupInvitationRequestSchema,
+  setDisplayNameRequestSchema,
   setWeeklyTargetRequestSchema,
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
@@ -134,6 +136,24 @@ describe("True-MVP API runtime contracts", () => {
   });
 
   it("strictly validates every Group command request and bounded result", () => {
+    expect(setDisplayNameRequestSchema.parse({ displayName: "Akrum" })).toEqual(
+      {
+        displayName: "Akrum",
+      },
+    );
+    expect(
+      setDisplayNameRequestSchema.parse({ displayName: " Akrum " }),
+    ).toEqual({ displayName: "Akrum" });
+    for (const displayName of ["", "x".repeat(41)])
+      expect(
+        setDisplayNameRequestSchema.safeParse({ displayName }).success,
+      ).toBe(false);
+    expect(
+      accountDisplayNameResponseSchema.parse({
+        contractVersion: 1,
+        data: { displayName: null },
+      }),
+    ).toBeTruthy();
     expect(
       createGroupRequestSchema.parse({
         groupId,
@@ -269,7 +289,14 @@ describe("True-MVP API runtime contracts", () => {
     expect(
       currentWeekProgressResponseSchema.parse({
         contractVersion: 1,
-        data: [{ membershipId, lockedTarget: 3, completedWorkoutCount: 1 }],
+        data: [
+          {
+            membershipId,
+            displayName: "Akrum",
+            lockedTarget: 3,
+            completedWorkoutCount: 1,
+          },
+        ],
       }),
     ).toBeTruthy();
     expect(
@@ -278,6 +305,7 @@ describe("True-MVP API runtime contracts", () => {
         data: [
           {
             membershipId,
+            displayName: "Akrum",
             startsAt: "2026-03-02T00:00:00.000Z",
             endsAt: "2026-03-09T00:00:00.000Z",
             lockedTarget: 2,
@@ -438,7 +466,14 @@ describe("True-MVP API delivery", () => {
 
   it("executes authenticated queries without an idempotency header", async () => {
     const execute = vi.fn(async () =>
-      success([{ membershipId, lockedTarget: 3, completedWorkoutCount: 1 }]),
+      success([
+        {
+          membershipId,
+          displayName: "Akrum",
+          lockedTarget: 3,
+          completedWorkoutCount: 1,
+        },
+      ]),
     );
     const response = await handleV1ReadRequest(
       { authorization: "Bearer local", body: { groupId }, headers: {} },
@@ -453,7 +488,14 @@ describe("True-MVP API delivery", () => {
       status: 200,
       body: {
         contractVersion: 1,
-        data: [{ membershipId, lockedTarget: 3, completedWorkoutCount: 1 }],
+        data: [
+          {
+            membershipId,
+            displayName: "Akrum",
+            lockedTarget: 3,
+            completedWorkoutCount: 1,
+          },
+        ],
       },
     });
     expect(execute).toHaveBeenCalledWith({ groupId }, actor);
@@ -461,6 +503,7 @@ describe("True-MVP API delivery", () => {
     const history = [
       {
         membershipId,
+        displayName: "Akrum",
         startsAt: "2026-03-02T00:00:00.000Z",
         endsAt: "2026-03-09T00:00:00.000Z",
         lockedTarget: 2,

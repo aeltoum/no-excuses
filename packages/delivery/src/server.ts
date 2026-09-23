@@ -13,6 +13,7 @@ import {
   leaveGroupRequestSchema,
   removeGroupMemberRequestSchema,
   revokeGroupInvitationRequestSchema,
+  setDisplayNameRequestSchema,
   setWeeklyTargetRequestSchema,
   submitWorkoutCheckinRequestSchema,
 } from "../../contracts/src/runtime.js";
@@ -345,6 +346,19 @@ const group = (body: Record<string, unknown>) => [
 ];
 
 const handlers = {
+  getAccountDisplayName: read(
+    "select app_private.current_account_display_name() as display_name",
+    () => [],
+    (rows) => ({ displayName: rows[0]?.display_name ?? null }),
+    currentGroupMembershipRequestSchema,
+  ),
+  setAccountDisplayName: command(
+    "select app_private.set_display_name_command($1,$2,$3,$4) as display_name",
+    (body) => [body.displayName],
+    (rows) => ({ displayName: rows[0]?.display_name }),
+    setDisplayNameRequestSchema,
+    false,
+  ),
   createGroup: command(
     "select app_private.create_group_command($1,$2,$3,$4,$5,$6,$7,$8,$9) as id from app_private.accounts where auth_user_id=current_setting('app.auth_user_id')::uuid and organizer_seeded",
     group,
@@ -475,6 +489,7 @@ const handlers = {
     (rows) =>
       rows.map((row) => ({
         membershipId: row.membership_id,
+        displayName: row.display_name,
         lockedTarget: row.locked_target,
         completedWorkoutCount: row.completed_workout_count,
       })),
@@ -486,6 +501,7 @@ const handlers = {
     (rows) =>
       rows.map((row) => ({
         membershipId: row.membership_id,
+        displayName: row.display_name,
         startsAt: new Date(String(row.starts_at)).toISOString(),
         endsAt: new Date(String(row.ends_at)).toISOString(),
         lockedTarget: row.locked_target,

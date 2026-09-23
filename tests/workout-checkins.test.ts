@@ -62,6 +62,48 @@ function submit() {
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("True-MVP workout check-ins", () => {
+  it("lets an Account set only its own trimmed display name", async () => {
+    const db = await database();
+    await auth(db, adminAuth);
+    await db.exec("set role service_role");
+    const setName = `select app_private.set_display_name_command(
+      '71000000-0000-4000-8000-000000000001', '${"c".repeat(64)}',
+      '71000000-0000-4000-8000-000000000002', 'Akrum') as display_name`;
+    expect((await db.query(setName)).rows).toEqual([{ display_name: "Akrum" }]);
+    expect((await db.query(setName)).rows).toEqual([{ display_name: "Akrum" }]);
+    await expect(
+      db.query(
+        setName
+          .replace("Akrum", " Akrum ")
+          .replace(
+            "71000000-0000-4000-8000-000000000001",
+            "71000000-0000-4000-8000-000000000003",
+          ),
+      ),
+    ).rejects.toThrow("trimmed");
+    await db.exec("reset role");
+    expect(
+      (
+        await db.query(`select auth_user_id, display_name from app_private.accounts
+          where auth_user_id in ('${adminAuth}', '${peerAuth}') order by auth_user_id`)
+      ).rows,
+    ).toEqual([
+      { auth_user_id: adminAuth, display_name: "Akrum" },
+      { auth_user_id: peerAuth, display_name: null },
+    ]);
+    await db.exec(`update app_private.accounts set status = 'deleted'
+      where auth_user_id = '${adminAuth}'`);
+    expect(
+      (
+        await db.query(`select a.display_name,
+          r.response ? 'display_name' as response_keeps_name
+          from app_private.accounts a
+          join app_private.idempotent_requests r on r.actor_id = a.account_id
+          where a.auth_user_id = '${adminAuth}'`)
+      ).rows,
+    ).toEqual([{ display_name: null, response_keeps_name: false }]);
+  });
+
   it("counts an attested structured check-in immediately and replays it exactly once", async () => {
     const db = await database();
     await auth(db, adminAuth);
@@ -148,6 +190,8 @@ describe("True-MVP workout check-ins", () => {
 
   it("returns each current member's locked target and count only to current Group members", async () => {
     const db = await database();
+    await db.exec(`update app_private.accounts set display_name = 'Akrum'
+      where auth_user_id = '${adminAuth}'`);
     await auth(db, adminAuth);
     await db.exec("set role service_role");
     await db.query(submit());
@@ -161,11 +205,13 @@ describe("True-MVP workout check-ins", () => {
     ).toEqual([
       {
         membership_id: "40000000-0000-4000-8000-000000000001",
+        display_name: "Akrum",
         locked_target: 3,
         completed_workout_count: 1,
       },
       {
         membership_id: "40000000-0000-4000-8000-000000000002",
+        display_name: "Member 40000000",
         locked_target: 2,
         completed_workout_count: 0,
       },

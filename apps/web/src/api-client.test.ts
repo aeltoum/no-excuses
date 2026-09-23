@@ -3,6 +3,32 @@ import { createApiClient } from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
 describe("browser API client", () => {
+  it("sets Account display name through own authenticated endpoint", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            contractVersion: 1,
+            data: { displayName: "Akrum" },
+          }),
+          { status: 200 },
+        ),
+    );
+    await expect(
+      createApiClient(
+        "https://api.example.test",
+        fetcher as typeof fetch,
+      ).setDisplayName("token", "Akrum", uuid),
+    ).resolves.toMatchObject({ data: { displayName: "Akrum" } });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/v1/account/display-name",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ displayName: "Akrum" }),
+      }),
+    );
+  });
+
   it("accepts durable pending Account deletion receipt", async () => {
     const fetcher = vi.fn(
       async () =>
