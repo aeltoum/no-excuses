@@ -198,12 +198,14 @@ test("weekly loop: self-report, target, finalized result", async ({
           displayName: "Akrum",
           lockedTarget: 3,
           completedWorkoutCount: count,
+          activityTypes: count ? ["strength"] : [],
         },
         {
           membershipId: friendMembershipId,
           displayName: "Maya",
           lockedTarget: 2,
           completedWorkoutCount: 1,
+          activityTypes: ["cardio"],
         },
       ]);
     if (path.endsWith("/finalized-weekly-history") && emptyHistory)
@@ -270,6 +272,19 @@ test("weekly loop: self-report, target, finalized result", async ({
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await expect(page.getByText("Maya")).toBeVisible();
+  const legend = page.getByRole("list", { name: "Activity colours" });
+  await expect(legend.getByRole("listitem")).toHaveText([
+    "Strength",
+    "Cardio",
+    "Class",
+    "Sport",
+    "Mixed",
+  ]);
+  await expect(
+    page
+      .getByRole("img", { name: "1 of 2 workouts" })
+      .locator('rect[fill="var(--activity-cardio)"]'),
+  ).toHaveCount(2);
   await expect(
     page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
   ).toHaveCount(0);
@@ -293,6 +308,11 @@ test("weekly loop: self-report, target, finalized result", async ({
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
   ).toBeVisible();
+  await expect(
+    page
+      .getByRole("img", { name: "1 of 3 workouts" })
+      .locator('rect[fill="var(--activity-strength)"]'),
+  ).toHaveCount(2);
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
   await page.getByRole("link", { name: "Target" }).click();

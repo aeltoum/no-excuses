@@ -295,6 +295,7 @@ describe("True-MVP API runtime contracts", () => {
             displayName: "Akrum",
             lockedTarget: 3,
             completedWorkoutCount: 1,
+            activityTypes: ["strength"],
           },
         ],
       }),
@@ -472,6 +473,7 @@ describe("True-MVP API delivery", () => {
           displayName: "Akrum",
           lockedTarget: 3,
           completedWorkoutCount: 1,
+          activityTypes: ["cardio"],
         },
       ]),
     );
@@ -494,6 +496,7 @@ describe("True-MVP API delivery", () => {
             displayName: "Akrum",
             lockedTarget: 3,
             completedWorkoutCount: 1,
+            activityTypes: ["cardio"],
           },
         ],
       },

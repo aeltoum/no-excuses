@@ -195,7 +195,15 @@ describe("True-MVP workout check-ins", () => {
     await auth(db, adminAuth);
     await db.exec("set role service_role");
     await db.query(submit());
-    await db.exec("reset role; set role authenticated");
+    await db.exec("reset role");
+    await db.exec(`insert into app_private.workout_checkins
+      (workout_checkin_id, member_week_id, membership_id, activity_type, completed_at,
+       duration_minutes, perceived_intensity, self_report_attested, submitted_at)
+      values ('70000000-0000-4000-8000-000000000004',
+        '60000000-0000-4000-8000-000000000001',
+        '40000000-0000-4000-8000-000000000001', 'strength',
+        '2026-03-04T09:00Z', 30, 'moderate', true, '2026-03-05T10:00Z')`);
+    await db.exec("set role authenticated");
     expect(
       (
         await db.query(
@@ -207,13 +215,15 @@ describe("True-MVP workout check-ins", () => {
         membership_id: "40000000-0000-4000-8000-000000000001",
         display_name: "Akrum",
         locked_target: 3,
-        completed_workout_count: 1,
+        completed_workout_count: 2,
+        activity_types: ["strength", "cardio"],
       },
       {
         membership_id: "40000000-0000-4000-8000-000000000002",
         display_name: "Member 40000000",
         locked_target: 2,
         completed_workout_count: 0,
+        activity_types: [],
       },
     ]);
     await db.exec("reset role");

@@ -630,6 +630,7 @@ export interface components {
             displayName: string;
             lockedTarget: number;
             completedWorkoutCount: number;
+            activityTypes: ("strength" | "cardio" | "class" | "sport" | "mixed")[];
         };
         FinalizedWeeklyHistoryResponse: {
             /** @constant */

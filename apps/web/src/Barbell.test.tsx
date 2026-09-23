@@ -41,4 +41,20 @@ describe("Barbell", () => {
     expect(markup).toContain('aria-label="3 of 5 workouts"');
     expect(markup.match(/stroke-dasharray="3 3"/g)).toHaveLength(4);
   });
+
+  it("colours completed plates by activity and falls back to chalk", () => {
+    const markup = renderToStaticMarkup(
+      <Barbell
+        count={3}
+        target={4}
+        size="big"
+        activityTypes={["strength", "cardio"]}
+      />,
+    );
+
+    expect(markup.match(/fill="var\(--activity-strength\)"/g)).toHaveLength(2);
+    expect(markup.match(/fill="var\(--activity-cardio\)"/g)).toHaveLength(2);
+    expect(markup.match(/fill="var\(--chalk\)"/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="3 of 4 workouts"');
+  });
 });

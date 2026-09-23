@@ -2,10 +2,12 @@ export function Barbell({
   count,
   target,
   size,
+  activityTypes = [],
 }: {
   count: number;
   target: number;
   size: "big" | "mini";
+  activityTypes?: ("strength" | "cardio" | "class" | "sport" | "mixed")[];
 }) {
   const big = size === "big";
   const width = big ? 350 : 170;
@@ -75,7 +77,13 @@ export function Barbell({
                   width={plateWidth}
                   height={plateHeight}
                   rx={big ? 3 : 1.5}
-                  fill={filled ? "var(--chalk)" : "none"}
+                  fill={
+                    filled
+                      ? activityTypes[index]
+                        ? `var(--activity-${activityTypes[index]})`
+                        : "var(--chalk)"
+                      : "none"
+                  }
                   stroke={filled ? undefined : "var(--empty-slot)"}
                   strokeWidth={filled ? undefined : big ? 1.5 : 1.2}
                   strokeDasharray={filled ? undefined : big ? "4 4" : "3 3"}

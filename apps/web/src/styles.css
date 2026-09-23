@@ -55,6 +55,11 @@
   line-height: 1.5;
   --rubber: #1a1b1d;
   --chalk: #f2f2ee;
+  --activity-strength: #d63a2f;
+  --activity-cardio: #2f6fd6;
+  --activity-class: #e8c22e;
+  --activity-sport: #2e9e55;
+  --activity-mixed: #e9e9e4;
   --muted: #8c8f93;
   --rule: #2c2e31;
   --surface: #232427;
@@ -329,6 +334,41 @@ button:disabled {
   font-size: clamp(2.5rem, 11vw, 3.25rem);
   font-weight: 800;
   line-height: 1;
+}
+.activity-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  list-style: none;
+}
+.activity-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.activity-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.activity-strength {
+  background: var(--activity-strength);
+}
+.activity-cardio {
+  background: var(--activity-cardio);
+}
+.activity-class {
+  background: var(--activity-class);
+}
+.activity-sport {
+  background: var(--activity-sport);
+}
+.activity-mixed {
+  background: var(--activity-mixed);
 }
 .home form {
   border: 0;

@@ -756,12 +756,17 @@ components:
     CurrentWeekProgressItem:
       type: object
       additionalProperties: false
-      required: [membershipId, displayName, lockedTarget, completedWorkoutCount]
+      required: [membershipId, displayName, lockedTarget, completedWorkoutCount, activityTypes]
       properties:
         membershipId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 40 }
         lockedTarget: { type: integer, minimum: 1 }
         completedWorkoutCount: { type: integer, minimum: 0 }
+        activityTypes:
+          type: array
+          items:
+            type: string
+            enum: [strength, cardio, class, sport, mixed]
     FinalizedWeeklyHistoryResponse:
       type: object
       additionalProperties: false

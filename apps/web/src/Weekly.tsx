@@ -221,10 +221,23 @@ export function Weekly({
                     count={own.completedWorkoutCount}
                     target={own.lockedTarget}
                     size="big"
+                    activityTypes={own.activityTypes}
                   />
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  <ul className="activity-legend" aria-label="Activity colours">
+                    {(
+                      ["strength", "cardio", "class", "sport", "mixed"] as const
+                    ).map((activity) => (
+                      <li key={activity}>
+                        <span
+                          className={`activity-swatch activity-${activity}`}
+                        />
+                        {activity[0].toUpperCase() + activity.slice(1)}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : (
                 <div className="solo-week">
@@ -249,6 +262,7 @@ export function Weekly({
                           count={item.completedWorkoutCount}
                           target={item.lockedTarget}
                           size="mini"
+                          activityTypes={item.activityTypes}
                         />
                         <span>
                           {item.completedWorkoutCount}/{item.lockedTarget}

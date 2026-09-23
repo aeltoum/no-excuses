@@ -304,6 +304,7 @@ export const currentWeekProgressItemSchema = z
     displayName: boundedTextSchema(40),
     lockedTarget: positiveIntegerSchema,
     completedWorkoutCount: z.number().int().nonnegative(),
+    activityTypes: z.array(workoutActivityTypeSchema),
   })
   .strict();
 
