@@ -26,6 +26,7 @@ type Access =
   | "unavailable"
   | "failure";
 type Notice = { kind: "success" | "error"; text: string } | null;
+const codePositions = [1, 2, 3, 4, 5, 6] as const;
 const memberRoutes: Array<[Route, string]> = [
   ["/home", "Home"],
   ["/group", "Group"],
@@ -120,6 +121,11 @@ export function App({
   const [enrollmentToken, setEnrollmentToken] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [signInDoor, setSignInDoor] = useState<"invited" | "returning" | null>(
+    null,
+  );
+  const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
+  const emailInput = useRef<HTMLInputElement>(null);
   const [inviteId, setInviteId] = useState("");
   const [deletionStep, setDeletionStep] = useState<
     "idle" | "review" | "code-sent" | "ready"
@@ -267,6 +273,10 @@ export function App({
       active = false;
     };
   }, [access, api, path, session]);
+  useEffect(() => {
+    if (codeSent) codeInputs.current[0]?.focus();
+    else if (signInDoor) emailInput.current?.focus();
+  }, [codeSent, signInDoor]);
 
   const act = async (
     work: () => Promise<string>,
@@ -411,50 +421,77 @@ export function App({
             title="Sign in"
             lead="We use a six-digit email code. Unknown or ineligible accounts receive the same response."
           >
-            <form
-              onSubmit={submit(async () => {
-                if (enrollmentToken.trim())
-                  await api.enroll(
-                    email.trim().toLowerCase(),
-                    enrollmentToken.trim(),
-                  );
-                const normalized = await requestOtp(auth, email);
-                setEmail(normalized);
-                setCodeSent(true);
-                return "If this account is eligible, a code was sent.";
-              })}
-            >
-              <label htmlFor="email">Email address</label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                maxLength={254}
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={busy}
-              />
-              <label htmlFor="enrollment-token">
-                Invitation token for first sign-in (optional)
-              </label>
-              <input
-                id="enrollment-token"
-                type="password"
-                autoComplete="off"
-                maxLength={256}
-                value={enrollmentToken}
-                onChange={(e) => setEnrollmentToken(e.target.value)}
-                disabled={busy}
-              />
-              <button type="submit" disabled={busy}>
-                {busy
-                  ? "Sending…"
-                  : codeSent
-                    ? "Send another code"
-                    : "Send code"}
-              </button>
-            </form>
+            {!signInDoor && (
+              <section
+                className="sign-in-doors"
+                aria-label="Choose sign-in path"
+              >
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setSignInDoor("invited")}
+                  >
+                    I was invited
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignInDoor("returning")}
+                  >
+                    I already have an account
+                  </button>
+                </div>
+                <p>
+                  First time here? Use I was invited — the other door can’t
+                  create an account.
+                </p>
+              </section>
+            )}
+            {signInDoor && !codeSent && (
+              <form
+                onSubmit={submit(async () => {
+                  if (signInDoor === "invited")
+                    await api.enroll(
+                      email.trim().toLowerCase(),
+                      enrollmentToken.trim(),
+                    );
+                  const normalized = await requestOtp(auth, email);
+                  setEmail(normalized);
+                  setCodeSent(true);
+                  return "If this account is eligible, a code was sent.";
+                })}
+              >
+                <label htmlFor="email">Email address</label>
+                <input
+                  ref={emailInput}
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  maxLength={254}
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={busy}
+                />
+                {signInDoor === "invited" && (
+                  <>
+                    <label htmlFor="enrollment-token">Invitation code</label>
+                    <input
+                      id="enrollment-token"
+                      type="password"
+                      autoComplete="off"
+                      maxLength={256}
+                      required
+                      value={enrollmentToken}
+                      onChange={(e) => setEnrollmentToken(e.target.value)}
+                      disabled={busy}
+                    />
+                  </>
+                )}
+                <button type="submit" disabled={busy}>
+                  {busy ? "Sending…" : "Send code"}
+                </button>
+              </form>
+            )}
             {codeSent && (
               <form
                 onSubmit={submit(
@@ -465,22 +502,88 @@ export function App({
                   { clearCode: true },
                 )}
               >
-                <label htmlFor="code">Six-digit code</label>
-                <input
-                  id="code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  required
-                  value={code}
-                  onChange={(e) =>
-                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  disabled={busy}
-                />
+                <p>We sent a 6-digit code to {email}. It expires in 1 hour.</p>
+                <fieldset className="otp-fields">
+                  <legend>Six-digit code</legend>
+                  {codePositions.map((position, index) => (
+                    <input
+                      key={position}
+                      ref={(element) => {
+                        codeInputs.current[index] = element;
+                      }}
+                      aria-label={`Code digit ${index + 1}`}
+                      className={
+                        notice?.text ===
+                        "That code didn't match. Check the latest email, or send a new code."
+                          ? "invalid"
+                          : undefined
+                      }
+                      inputMode="numeric"
+                      autoComplete={index === 0 ? "one-time-code" : "off"}
+                      maxLength={1}
+                      required
+                      value={code[index] ?? ""}
+                      onChange={(event) => {
+                        const digit = event.target.value
+                          .replace(/\D/g, "")
+                          .slice(-1);
+                        const digits = code.padEnd(6).split("");
+                        digits[index] = digit;
+                        setCode(digits.join("").trimEnd());
+                        setNotice(null);
+                        if (digit) codeInputs.current[index + 1]?.focus();
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "Backspace" &&
+                          !code[index] &&
+                          index > 0
+                        )
+                          codeInputs.current[index - 1]?.focus();
+                      }}
+                      onPaste={(event) => {
+                        const pasted = event.clipboardData
+                          .getData("text")
+                          .replace(/\D/g, "")
+                          .slice(0, 6);
+                        if (pasted.length !== 6) return;
+                        event.preventDefault();
+                        setCode(pasted);
+                        setNotice(null);
+                        codeInputs.current[5]?.focus();
+                      }}
+                      disabled={busy}
+                    />
+                  ))}
+                </fieldset>
                 <button type="submit" disabled={busy}>
                   {busy ? "Checking…" : "Verify code"}
                 </button>
+                <div className="sign-in-secondary-actions">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        await requestOtp(auth, email);
+                        return "If this account is eligible, a code was sent.";
+                      })
+                    }
+                  >
+                    Send a new code
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setCodeSent(false);
+                      setCode("");
+                      setNotice(null);
+                    }}
+                  >
+                    Use another email
+                  </button>
+                </div>
               </form>
             )}
             <Result notice={notice} />

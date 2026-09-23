@@ -26,6 +26,9 @@ site_url = "noexcuses://local"
 additional_redirect_urls = ["noexcuses://local/**"]
 enable_signup = false
 
+[auth.email]
+otp_expiry = 3600
+
 [auth.email.template.magic_link]
 subject = "Your No Excuses sign-in code"
 content_path = "./supabase/templates/magic_link.html"
