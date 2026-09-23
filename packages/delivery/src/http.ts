@@ -11,6 +11,7 @@ export type V1HttpHandlers = Readonly<{
   issueGroupInvitation: HttpHandler;
   revokeGroupInvitation: HttpHandler;
   acceptGroupInvitation: HttpHandler;
+  previewGroupInvitation: HttpHandler;
   leaveGroup: HttpHandler;
   setWeeklyTarget: HttpHandler;
   removeGroupMember: HttpHandler;
@@ -48,6 +49,12 @@ const routes: readonly Route[] = [
     pattern: /^\/v1\/account$/,
     parameters: [],
     handler: "deleteAccount",
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/group-invitations\/preview$/,
+    parameters: [],
+    handler: "previewGroupInvitation",
   },
   {
     method: "POST",

@@ -9,6 +9,7 @@ import {
   finalizedWeeklyHistoryResponseSchema,
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
+  invitationPreviewResponseSchema,
   pendingAccountDeletionResponseSchema,
   revokedGroupInvitationResponseSchema,
   submitWorkoutCheckinResponseSchema,
@@ -242,6 +243,12 @@ export function createApiClient(
         body,
         "POST",
         key,
+      ),
+    previewInvitation: (token: string, invitationToken: string) =>
+      request(
+        `/v1/group-invitations/preview?token=${encodeURIComponent(invitationToken)}`,
+        token,
+        invitationPreviewResponseSchema,
       ),
     invite: (
       token: string,

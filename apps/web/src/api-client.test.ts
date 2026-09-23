@@ -3,6 +3,31 @@ import { createApiClient } from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
 describe("browser API client", () => {
+  it("reads only narrow invitation preview fields", async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({
+        contractVersion: 1,
+        data: {
+          groupName: "6AM Crew",
+          memberCount: 5,
+          weekEndsAt: "2026-09-28T05:00:00.000Z",
+        },
+      }),
+    );
+    await expect(
+      createApiClient(
+        "https://api.example.test",
+        fetcher as typeof fetch,
+      ).previewInvitation("token", "opaque code"),
+    ).resolves.toMatchObject({
+      data: { groupName: "6AM Crew", memberCount: 5 },
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/v1/group-invitations/preview?token=opaque%20code",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("sets Account display name through own authenticated endpoint", async () => {
     const fetcher = vi.fn(
       async () =>
