@@ -90,10 +90,6 @@ test("one-member Group pauses workouts until a second member joins", async ({
   const logWorkout = page.getByRole("button", { name: "Log workout" });
   let actionDenied = false;
   if ((await logWorkout.count()) > 0) {
-    await page.getByLabel("Duration in minutes").fill("30");
-    await page
-      .getByLabel("I completed this workout. This is my self-report.")
-      .check();
     await logWorkout.click();
     actionDenied = await page.getByText("Action denied.").isVisible();
   }
@@ -141,7 +137,7 @@ test("weekly loop: self-report, target, finalized result", async ({
       return route.fulfill({ status: 200, json: session.user });
     return route.fulfill({ status: 401, json: { message: "no session" } });
   });
-  let count = 0;
+  let count = 2;
   let progressFailed = false;
   let targetProgressFailed = false;
   const keys: string[] = [];
@@ -157,7 +153,7 @@ test("weekly loop: self-report, target, finalized result", async ({
       return respond({ membership: { groupId, membershipId } });
     if (
       path.endsWith("/current-week-progress") &&
-      count === 1 &&
+      count === 3 &&
       !progressFailed
     ) {
       progressFailed = true;
@@ -196,9 +192,12 @@ test("weekly loop: self-report, target, finalized result", async ({
         {
           membershipId,
           displayName: "Akrum",
-          lockedTarget: 3,
+          lockedTarget: 4,
           completedWorkoutCount: count,
-          activityTypes: count ? ["strength"] : [],
+          activityTypes:
+            count === 2
+              ? ["strength", "cardio"]
+              : ["strength", "cardio", "strength"],
         },
         {
           membershipId: friendMembershipId,
@@ -270,7 +269,7 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
-  await expect(page.getByText("0 of 3 this week")).toBeVisible();
+  await expect(page.getByText("2 of 4 this week")).toBeVisible();
   await expect(page.getByText("Maya")).toBeVisible();
   const legend = page.getByRole("list", { name: "Activity colours" });
   await expect(legend.getByRole("listitem")).toHaveText([
@@ -289,30 +288,87 @@ test("weekly loop: self-report, target, finalized result", async ({
     page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("img", { name: "0 of 3 workouts" }),
+    page.getByRole("img", { name: "2 of 4 workouts" }),
   ).toBeVisible();
   await expect(page.getByText("Every rep counts.")).toHaveCount(0);
-  await page.getByLabel("Duration in minutes").fill("45");
+  const opener = page.getByRole("button", { name: "Log workout" });
+  await opener.click();
+  let dialog = page.getByRole("dialog", { name: "Log a workout" });
+  await expect(
+    dialog.getByRole("heading", { name: "Log a workout" }),
+  ).toBeFocused();
+  await expect(
+    dialog.getByRole("button", {
+      name: /^(Strength|Cardio|Class|Sport|Mixed)$/,
+    }),
+  ).toHaveCount(5);
+  await expect(
+    dialog.getByText("Pick an activity and a time to log it."),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Log workout" }),
+  ).toBeDisabled();
+  expect(
+    (
+      await new AxeBuilder({ page }).include("[role=dialog]").analyze()
+    ).violations.filter((item) =>
+      ["serious", "critical"].includes(item.impact ?? ""),
+    ),
+  ).toEqual([]);
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    dialog.getByLabel("I did this workout. It's my own self-report."),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  dialog = page.getByRole("dialog", { name: "Log a workout" });
   await page
-    .getByLabel("I completed this workout. This is my self-report.")
-    .check();
-  await page.getByRole("button", { name: "Log workout" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Action failed. Try again.");
-  await page.getByRole("button", { name: "Log workout" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Workout saved. Current count unavailable",
+    .getByRole("button", { name: "Close dialog" })
+    .click({ position: { x: 4, y: 4 } });
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  dialog = page.getByRole("dialog", { name: "Log a workout" });
+  await dialog.getByRole("button", { name: "Other" }).click();
+  await expect(dialog.getByLabel("Duration in minutes")).toHaveAttribute(
+    "inputmode",
+    "numeric",
+  );
+  await expect(dialog.getByLabel("Duration in minutes")).toHaveAttribute(
+    "min",
+    "1",
+  );
+  await dialog.getByRole("button", { name: "Strength" }).click();
+  await expect(dialog.getByText("This one makes 3 of 4.")).toBeVisible();
+  await dialog.getByRole("button", { name: "45 min" }).click();
+  await page.getByLabel("I did this workout. It's my own self-report.").check();
+  await dialog.getByRole("button", { name: "Log workout" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Couldn't log it — the connection dropped. Your choices are kept; try again.",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Strength" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await dialog.getByRole("button", { name: "Log workout" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveText(
+    "Workout logged. 3 of 4 this week.",
   );
   expect(keys).toHaveLength(2);
-  await page.getByRole("button", { name: "Refresh count" }).click();
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
   await expect(
-    page.getByRole("img", { name: "1 of 3 workouts" }),
+    page.getByText("3 of 4 this week", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "3 of 4 workouts" }),
   ).toBeVisible();
   await expect(
     page
-      .getByRole("img", { name: "1 of 3 workouts" })
+      .getByRole("img", { name: "3 of 4 workouts" })
       .locator('rect[fill="var(--activity-strength)"]'),
-  ).toHaveCount(2);
+  ).toHaveCount(4);
+  await page.getByRole("button", { name: "Refresh count" }).click();
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
   await page.getByRole("link", { name: "Target" }).click();
@@ -383,31 +439,6 @@ test("weekly loop: self-report, target, finalized result", async ({
         navOverMain: false,
         clipped: [],
       });
-      if (route === "Home") {
-        const intensityFit = await page
-          .getByLabel("Perceived intensity")
-          .evaluate((select) => {
-            if (!(select instanceof HTMLSelectElement))
-              throw new Error("Intensity select missing");
-            const style = getComputedStyle(select);
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            if (!context) throw new Error("Canvas unavailable");
-            context.font = style.font;
-            const selectedText = select.selectedOptions[0]?.text ?? "";
-            const textWidth = context.measureText(selectedText).width;
-            const space =
-              select.clientWidth -
-              Number.parseFloat(style.paddingLeft) -
-              Number.parseFloat(style.paddingRight) -
-              24;
-            return { textWidth, space };
-          });
-        expect(
-          intensityFit.space,
-          `Intensity text fits at ${width}px`,
-        ).toBeGreaterThanOrEqual(intensityFit.textWidth);
-      }
       await page.screenshot({
         fullPage: true,
         path: testInfo.outputPath(`zoom-${width}-${route.toLowerCase()}.png`),

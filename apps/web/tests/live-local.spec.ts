@@ -263,9 +263,12 @@ test("private enrollment and live weekly PWA journey", async ({
     });
     await page.getByRole("link", { name: "Home" }).click();
     await expect(page.getByText("0 / 2", { exact: true })).toBeVisible();
-    await page.getByLabel("Duration in minutes").fill("30");
-    await page.getByLabel(/self-report/i).check();
     await page.getByRole("button", { name: "Log workout" }).click();
+    const workoutSheet = page.getByRole("dialog", { name: "Log a workout" });
+    await workoutSheet.getByRole("button", { name: "Strength" }).click();
+    await workoutSheet.getByRole("button", { name: "30 min" }).click();
+    await workoutSheet.getByLabel(/self-report/i).check();
+    await workoutSheet.getByRole("button", { name: "Log workout" }).click();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("home-after.png"),

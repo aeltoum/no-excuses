@@ -5,6 +5,7 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
+import { Sheet } from "./Sheet";
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
@@ -32,13 +33,16 @@ export function Weekly({
   const [retry, setRetry] = useState(0);
   const [target, setTarget] = useState("");
   const [activityType, setActivityType] = useState<
-    "strength" | "cardio" | "class" | "sport" | "mixed"
-  >("strength");
+    "strength" | "cardio" | "class" | "sport" | "mixed" | null
+  >(null);
   const [duration, setDuration] = useState("");
+  const [otherDuration, setOtherDuration] = useState(false);
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
     "moderate",
   );
   const [attested, setAttested] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [logError, setLogError] = useState(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
@@ -155,6 +159,11 @@ export function Weekly({
     (item) => item.membershipId === membership.membershipId,
   );
   const home = route === "/home";
+  const logReady =
+    activityType !== null &&
+    Number.isSafeInteger(Number(duration)) &&
+    Number(duration) >= 1 &&
+    attested;
   return (
     <section className={`hero${home ? " home" : ""}`}>
       {home ? (
@@ -272,139 +281,252 @@ export function Weekly({
                 </ul>
               )}
               {own && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (busy) return;
-                    const minutes = Number(duration);
-                    if (!Number.isSafeInteger(minutes) || minutes < 1) {
-                      setNotice({
-                        kind: "error",
-                        text: "Enter a valid duration of at least one minute.",
-                      });
-                      return;
-                    }
-                    const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
-                    if (!draft.current || draft.current.signature !== signature)
-                      draft.current = {
-                        signature,
-                        key: crypto.randomUUID(),
-                        id: crypto.randomUUID(),
-                        completedAt: new Date().toISOString(),
-                      };
-                    const current = draft.current;
-                    setBusy(true);
-                    setNotice(null);
-                    void api
-                      .checkIn(
-                        token,
-                        {
-                          workoutCheckinId: current.id,
-                          activityType,
-                          completedAt: current.completedAt,
-                          durationMinutes: minutes,
-                          perceivedIntensity: intensity,
-                          selfReportAttested: true,
-                        },
-                        current.key,
-                      )
-                      .then(async (response) => {
-                        if (response.data.workoutCheckinId !== current.id)
-                          throw new ApiError(
-                            "failure",
-                            "Check-in response did not match this workout.",
-                          );
-                        draft.current = null;
-                        setDuration("");
-                        setAttested(false);
-                        setNotice({
-                          kind: "success",
-                          text: "Workout saved. Refreshing current count…",
-                        });
-                        try {
-                          setProgress(
-                            (await api.progress(token, membership.groupId))
-                              .data,
-                          );
-                          setRefreshWarning(false);
-                          setNotice({
-                            kind: "success",
-                            text: "Workout saved. Current count refreshed.",
-                          });
-                        } catch (error) {
-                          if (
-                            error instanceof ApiError &&
-                            error.kind === "unauthorized"
-                          )
-                            onRevoked();
-                          setRefreshWarning(true);
-                          setNotice({
-                            kind: "success",
-                            text: "Workout saved. Current count unavailable; refresh count to see latest progress.",
-                          });
-                        }
-                      })
-                      .catch(updateError)
-                      .finally(() => setBusy(false));
-                  }}
-                >
-                  <h2>Log workout</h2>
-                  <label>
-                    Activity type
-                    <select
-                      value={activityType}
-                      onChange={(e) =>
-                        setActivityType(e.target.value as typeof activityType)
-                      }
-                      disabled={busy}
-                    >
-                      <option value="strength">Strength</option>
-                      <option value="cardio">Cardio</option>
-                      <option value="class">Class</option>
-                      <option value="sport">Sport</option>
-                      <option value="mixed">Mixed</option>
-                    </select>
-                  </label>
-                  <label>
-                    Duration in minutes
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      required
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label>
-                    Perceived intensity
-                    <select
-                      value={intensity}
-                      onChange={(e) =>
-                        setIntensity(e.target.value as typeof intensity)
-                      }
-                      disabled={busy}
-                    >
-                      <option value="low">Low</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="high">High</option>
-                    </select>
-                  </label>
-                  <label className="check-label">
-                    <input
-                      type="checkbox"
-                      required
-                      checked={attested}
-                      onChange={(e) => setAttested(e.target.checked)}
-                      disabled={busy}
-                    />
-                    I completed this workout. This is my self-report.
-                  </label>
-                  <button type="submit" disabled={busy}>
-                    {busy ? "Logging…" : "Log workout"}
+                <>
+                  <button
+                    className="home-log-button"
+                    type="button"
+                    onClick={(event) => {
+                      event.currentTarget.focus();
+                      setSheetOpen(true);
+                    }}
+                  >
+                    Log workout
                   </button>
-                </form>
+                  <Sheet
+                    open={sheetOpen}
+                    title="Log a workout"
+                    dismissible={!busy}
+                    onDismiss={() => setSheetOpen(false)}
+                  >
+                    <div className="sheet-preview">
+                      <Barbell
+                        count={
+                          own.completedWorkoutCount + (activityType ? 1 : 0)
+                        }
+                        target={own.lockedTarget}
+                        size="big"
+                        activityTypes={
+                          activityType
+                            ? [...own.activityTypes, activityType]
+                            : own.activityTypes
+                        }
+                      />
+                      <p>
+                        {activityType
+                          ? `This one makes ${own.completedWorkoutCount + 1} of ${own.lockedTarget}.`
+                          : "Pick what you did to load a plate."}
+                      </p>
+                    </div>
+                    <form
+                      className="log-sheet-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (busy || !logReady || !activityType) return;
+                        const minutes = Number(duration);
+                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
+                        if (
+                          !draft.current ||
+                          draft.current.signature !== signature
+                        )
+                          draft.current = {
+                            signature,
+                            key: crypto.randomUUID(),
+                            id: crypto.randomUUID(),
+                            completedAt: new Date().toISOString(),
+                          };
+                        const current = draft.current;
+                        setBusy(true);
+                        setLogError(false);
+                        void api
+                          .checkIn(
+                            token,
+                            {
+                              workoutCheckinId: current.id,
+                              activityType,
+                              completedAt: current.completedAt,
+                              durationMinutes: minutes,
+                              perceivedIntensity: intensity,
+                              selfReportAttested: true,
+                            },
+                            current.key,
+                          )
+                          .then(async (response) => {
+                            if (response.data.workoutCheckinId !== current.id)
+                              throw new ApiError(
+                                "failure",
+                                "Check-in response did not match this workout.",
+                              );
+                            draft.current = null;
+                            const loggedActivity = activityType;
+                            setProgress((items) =>
+                              items.map((item) =>
+                                item.membershipId === membership.membershipId
+                                  ? {
+                                      ...item,
+                                      completedWorkoutCount:
+                                        response.data.currentWeekCount,
+                                      activityTypes: [
+                                        ...item.activityTypes,
+                                        loggedActivity,
+                                      ],
+                                    }
+                                  : item,
+                              ),
+                            );
+                            setSheetOpen(false);
+                            setActivityType(null);
+                            setDuration("");
+                            setOtherDuration(false);
+                            setAttested(false);
+                            setNotice({
+                              kind: "success",
+                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week.`,
+                            });
+                            try {
+                              setProgress(
+                                (await api.progress(token, membership.groupId))
+                                  .data,
+                              );
+                              setRefreshWarning(false);
+                            } catch (error) {
+                              if (
+                                error instanceof ApiError &&
+                                error.kind === "unauthorized"
+                              )
+                                onRevoked();
+                              setRefreshWarning(true);
+                            }
+                          })
+                          .catch((error) => {
+                            if (
+                              error instanceof ApiError &&
+                              error.kind === "unauthorized"
+                            )
+                              onRevoked();
+                            setLogError(true);
+                          })
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      <fieldset>
+                        <legend>What did you do?</legend>
+                        <div className="activity-plates">
+                          {(
+                            [
+                              "strength",
+                              "cardio",
+                              "class",
+                              "sport",
+                              "mixed",
+                            ] as const
+                          ).map((activity) => (
+                            <button
+                              type="button"
+                              key={activity}
+                              className={`activity-plate activity-${activity}`}
+                              aria-pressed={activityType === activity}
+                              disabled={busy}
+                              onClick={() => setActivityType(activity)}
+                            >
+                              {activity[0].toUpperCase() + activity.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                      <fieldset>
+                        <legend>How long?</legend>
+                        <div className="choice-chips">
+                          {[20, 30, 45, 60, 90].map((minutes) => (
+                            <button
+                              type="button"
+                              key={minutes}
+                              aria-pressed={
+                                !otherDuration && duration === String(minutes)
+                              }
+                              disabled={busy}
+                              onClick={() => {
+                                setOtherDuration(false);
+                                setDuration(String(minutes));
+                              }}
+                            >
+                              {minutes} min
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            aria-pressed={otherDuration}
+                            disabled={busy}
+                            onClick={() => {
+                              setOtherDuration(true);
+                              setDuration("");
+                            }}
+                          >
+                            Other
+                          </button>
+                        </div>
+                      </fieldset>
+                      {otherDuration && (
+                        <label>
+                          Duration in minutes
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            step="1"
+                            value={duration}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setDuration(event.target.value)
+                            }
+                          />
+                        </label>
+                      )}
+                      <fieldset>
+                        <legend>How hard did it feel?</legend>
+                        <div className="intensity-control">
+                          {(["low", "moderate", "high"] as const).map(
+                            (level) => (
+                              <button
+                                type="button"
+                                key={level}
+                                aria-pressed={intensity === level}
+                                disabled={busy}
+                                onClick={() => setIntensity(level)}
+                              >
+                                {level[0].toUpperCase() + level.slice(1)}
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </fieldset>
+                      <label className="check-label">
+                        <input
+                          type="checkbox"
+                          checked={attested}
+                          onChange={(event) =>
+                            setAttested(event.target.checked)
+                          }
+                          disabled={busy}
+                        />
+                        I did this workout. It's my own self-report.
+                      </label>
+                      <button type="submit" disabled={busy || !logReady}>
+                        {busy ? "Logging…" : "Log workout"}
+                      </button>
+                      {!logReady && (
+                        <p className="sheet-hint">
+                          Pick an activity and a time to log it.
+                        </p>
+                      )}
+                      {logError && (
+                        <p className="result error" role="alert">
+                          Couldn't log it — the connection dropped. Your choices
+                          are kept; try again.
+                        </p>
+                      )}
+                    </form>
+                  </Sheet>
+                </>
               )}
               {refreshWarning && (
                 <button type="button" onClick={refreshCount} disabled={busy}>
