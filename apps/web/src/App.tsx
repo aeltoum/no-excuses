@@ -35,6 +35,53 @@ const memberRoutes: Array<[Route, string]> = [
 ];
 const currentPath = () => window.location.pathname.replace(/\/+$/, "") || "/";
 
+function TabIcon({ route }: { route: Route }) {
+  const shape =
+    route === "/home" ? (
+      <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    ) : route === "/group" ? (
+      <>
+        <circle cx="9" cy="8.5" r="3.3" />
+        <path d="M2.8 20c.8-3.4 3.3-5.3 6.2-5.3s5.4 1.9 6.2 5.3" />
+        <circle cx="17" cy="9.5" r="2.4" />
+        <path d="M16.6 14.7c2.4.3 4 2 4.6 4.8" />
+      </>
+    ) : route === "/target" ? (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4.5" />
+        <circle cx="12" cy="12" r="1" />
+      </>
+    ) : route === "/history" ? (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2" />
+      </>
+    ) : (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 20.5c1-4 4.2-6 8-6s7 2 8 6" />
+      </>
+    );
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="tab-icon"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.9"
+      viewBox="0 0 24 24"
+      width="24"
+    >
+      {shape}
+    </svg>
+  );
+}
+
 function Result({ notice }: { notice: Notice }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -328,7 +375,7 @@ export function App({
           <span aria-hidden="true" /> Private PWA
         </span>
       </header>
-      <main id="main-content">
+      <main className="route-content" id="main-content" key={route ?? path}>
         {!route ? (
           <Page
             eyebrow="Route unavailable"
@@ -894,7 +941,7 @@ export function App({
         )}
       </main>
       {access === "signed-in" && (
-        <nav aria-label="Member destinations">
+        <nav aria-label="Member destinations" className="member-nav">
           {memberRoutes.map(([destination, label]) => (
             <a
               aria-current={route === destination ? "page" : undefined}
@@ -902,9 +949,24 @@ export function App({
               key={destination}
               onClick={(e) => navigate(e, destination)}
             >
-              {label}
+              <TabIcon route={destination} />
+              <span>{label}</span>
             </a>
           ))}
+          <span
+            aria-hidden="true"
+            className="tab-indicator"
+            style={{
+              transform: `translateX(${
+                Math.max(
+                  0,
+                  memberRoutes.findIndex(
+                    ([destination]) => destination === route,
+                  ),
+                ) * 100
+              }%)`,
+            }}
+          />
         </nav>
       )}
     </div>

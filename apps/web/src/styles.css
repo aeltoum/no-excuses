@@ -130,8 +130,7 @@ select:focus-visible {
 }
 .wordmark,
 .eyebrow,
-.status,
-nav a {
+.status {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -486,7 +485,7 @@ button:disabled {
 .install-help p {
   margin: 8px 0;
 }
-nav {
+.member-nav {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -495,27 +494,43 @@ nav {
   background: var(--ground);
   border-top: 1px solid var(--rule);
 }
-nav a {
+.member-nav a {
   min-width: 0;
-  min-height: 56px;
+  min-height: 64px;
   display: grid;
+  grid-template-rows: 24px auto;
   place-items: center;
+  gap: 3px;
   padding: 8px 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
   text-align: center;
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-nav a[aria-current="page"] {
-  background: var(--safety);
-  color: var(--ink-on-safety);
+.member-nav a[aria-current="page"] {
+  color: var(--chalk);
+}
+.tab-icon {
+  display: block;
+}
+.tab-indicator {
+  width: 20%;
+  height: 3px;
+  position: absolute;
+  top: -1px;
+  left: 0;
+  background: var(--chalk);
+  pointer-events: none;
 }
 @media (max-width: 420px) {
   .form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  nav a {
+  .member-nav a {
     font-size: 0.62rem;
-    letter-spacing: 0.04em;
   }
 }
 @media (max-width: 240px) {
@@ -532,9 +547,8 @@ nav a[aria-current="page"] {
     padding-inline: 4px;
     font-size: 0.875rem;
   }
-  nav {
+  .member-nav {
     position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .home-header {
     align-items: flex-start;
@@ -551,17 +565,26 @@ nav a[aria-current="page"] {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .hero {
-    animation: reveal 240ms ease-out;
+  .route-content > .hero {
+    animation: route-in 220ms ease-out;
   }
-  @keyframes reveal {
+  .tab-indicator {
+    transition: transform 280ms cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  @keyframes route-in {
     from {
-      transform: translateY(8px);
+      opacity: 0;
+      transform: translateY(12px);
     }
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
+  }
+  .route-content > .hero,
+  .tab-indicator {
+    animation: none;
+    transition: none;
   }
 }
