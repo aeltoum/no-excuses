@@ -244,9 +244,7 @@ export function Weekly({
                     )
                     .map((item) => (
                       <li key={item.membershipId}>
-                        <strong title={`Member ${item.membershipId}`}>
-                          Member {item.membershipId.slice(0, 8)}
-                        </strong>
+                        <strong>{item.displayName}</strong>
                         <Barbell
                           count={item.completedWorkoutCount}
                           target={item.lockedTarget}
@@ -509,7 +507,7 @@ export function Weekly({
                         <strong>
                           {item.membershipId === membership.membershipId
                             ? "You"
-                            : `Member ${item.membershipId.slice(0, 8)}`}
+                            : item.displayName}
                         </strong>
                         <br />
                         <time dateTime={item.startsAt}>

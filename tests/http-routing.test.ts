@@ -16,6 +16,8 @@ function setup(overrides: Partial<V1HttpHandlers> = {}) {
   };
   const handlers: V1HttpHandlers = {
     deleteAccount: operation("deleteAccount"),
+    getAccountDisplayName: operation("getAccountDisplayName"),
+    setAccountDisplayName: operation("setAccountDisplayName"),
     submitWorkoutCheckin: operation("submitWorkoutCheckin"),
     createGroup: operation("createGroup"),
     issueGroupInvitation: operation("issueGroupInvitation"),
@@ -53,6 +55,8 @@ describe("version 1 HTTP routing", () => {
     const { calls, route } = setup();
     const cases = [
       ["DELETE", "/v1/account", "deleteAccount"],
+      ["GET", "/v1/account/display-name", "getAccountDisplayName"],
+      ["PUT", "/v1/account/display-name", "setAccountDisplayName"],
       ["POST", "/v1/workout-check-ins", "submitWorkoutCheckin"],
       ["POST", "/v1/groups", "createGroup"],
       ["POST", "/v1/group-invitations", "issueGroupInvitation"],

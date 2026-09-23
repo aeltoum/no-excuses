@@ -4,6 +4,8 @@ type HttpHandler = (request: ApiRequest) => Promise<ApiResponse>;
 
 export type V1HttpHandlers = Readonly<{
   deleteAccount: HttpHandler;
+  getAccountDisplayName: HttpHandler;
+  setAccountDisplayName: HttpHandler;
   submitWorkoutCheckin: HttpHandler;
   createGroup: HttpHandler;
   issueGroupInvitation: HttpHandler;
@@ -29,6 +31,18 @@ type Route = Readonly<{
 }>;
 
 const routes: readonly Route[] = [
+  {
+    method: "GET",
+    pattern: /^\/v1\/account\/display-name$/,
+    parameters: [],
+    handler: "getAccountDisplayName",
+  },
+  {
+    method: "PUT",
+    pattern: /^\/v1\/account\/display-name$/,
+    parameters: [],
+    handler: "setAccountDisplayName",
+  },
   {
     method: "DELETE",
     pattern: /^\/v1\/account$/,

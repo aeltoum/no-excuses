@@ -175,6 +175,12 @@ describe("True-MVP weekly settlement", () => {
 
   it("returns finalized Group history only to current Group members", async () => {
     const db = await database();
+    await db.exec(`update app_private.accounts set display_name = 'Akrum'
+      where account_id = '20000000-0000-4000-8000-000000000001';
+      update app_private.accounts set display_name = 'Private name'
+      where account_id = '20000000-0000-4000-8000-000000000002';
+      update app_private.accounts set status = 'deleted'
+      where account_id = '20000000-0000-4000-8000-000000000002';`);
     await db.exec("set role service_role");
     await db.query(
       "select app_private.finalize_ended_member_weeks('2026-03-09Z')",
@@ -194,6 +200,7 @@ describe("True-MVP weekly settlement", () => {
     ).toEqual([
       {
         membership_id: "40000000-0000-4000-8000-000000000001",
+        display_name: "Akrum",
         starts_at: new Date("2026-03-02T00:00:00.000Z"),
         ends_at: new Date("2026-03-09T00:00:00.000Z"),
         locked_target: 2,
@@ -202,6 +209,7 @@ describe("True-MVP weekly settlement", () => {
       },
       {
         membership_id: "40000000-0000-4000-8000-000000000002",
+        display_name: "Former member",
         starts_at: new Date("2026-03-02T00:00:00.000Z"),
         ends_at: new Date("2026-03-09T00:00:00.000Z"),
         locked_target: 2,

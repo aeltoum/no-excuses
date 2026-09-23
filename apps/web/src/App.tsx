@@ -78,6 +78,8 @@ export function App({
     "idle" | "review" | "code-sent" | "ready"
   >("idle");
   const [deletionCode, setDeletionCode] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const deletionKey = useRef<string>(undefined);
   const commandDrafts = useRef(
     new Map<string, { signature: string; key: string; entityId: string }>(),
@@ -193,6 +195,31 @@ export function App({
     window.history.replaceState(null, "", destination);
     setPath(destination);
   }, [access, membership, path]);
+  useEffect(() => {
+    if (access !== "signed-in" || path !== "/account" || !session) return;
+    let active = true;
+    setDisplayNameLoaded(false);
+    void api
+      .displayName(session.access_token)
+      .then((response) => {
+        if (!active) return;
+        setDisplayName(response.data.displayName ?? "");
+        setDisplayNameLoaded(true);
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.kind === "unauthorized") {
+          setSession(null);
+          setMembership(null);
+          setAccess("revoked");
+        } else {
+          setNotice({ kind: "error", text: "Couldn’t load your name." });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [access, api, path, session]);
 
   const act = async (
     work: () => Promise<string>,
@@ -696,6 +723,41 @@ export function App({
             title="Your Account"
             lead="Sign out here or permanently delete this Account."
           >
+            <form
+              onSubmit={submit(async () => {
+                const name = displayName.trim();
+                if (!name || name.length > 40)
+                  throw new WebAuthError(
+                    "invalid",
+                    "Name must be 1 to 40 characters.",
+                  );
+                const draft = commandDraft("display-name", name);
+                const response = await api.setDisplayName(
+                  token(),
+                  name,
+                  draft.key,
+                );
+                commandDrafts.current.delete("display-name");
+                setDisplayName(response.data.displayName ?? "");
+                return "Name saved.";
+              })}
+            >
+              <label>
+                Name
+                <input
+                  name="displayName"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  minLength={1}
+                  maxLength={40}
+                  required
+                  disabled={busy || !displayNameLoaded}
+                />
+              </label>
+              <button type="submit" disabled={busy || !displayNameLoaded}>
+                {busy ? "Saving…" : "Save name"}
+              </button>
+            </form>
             <button
               type="button"
               onClick={() =>

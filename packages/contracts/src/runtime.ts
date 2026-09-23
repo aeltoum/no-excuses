@@ -95,6 +95,10 @@ export const deleteAccountRequestSchema = z
   })
   .strict();
 
+export const setDisplayNameRequestSchema = z
+  .object({ displayName: boundedTextSchema(40) })
+  .strict();
+
 export const enrollmentRequestSchema = z
   .object({ email: z.email().max(254), token: boundedTextSchema(256) })
   .strict();
@@ -230,6 +234,9 @@ export const weeklyTargetResultSchema = z
 export const deletedAccountResultSchema = z
   .object({ accountId: uuidSchema })
   .strict();
+export const accountDisplayNameResultSchema = z
+  .object({ displayName: boundedTextSchema(40).nullable() })
+  .strict();
 export const socialInteractionResultSchema = z
   .object({ interactionId: uuidSchema })
   .strict();
@@ -262,6 +269,9 @@ export const weeklyTargetResponseSchema = commandResponse(
 export const deletedAccountResponseSchema = commandResponse(
   deletedAccountResultSchema,
 );
+export const accountDisplayNameResponseSchema = commandResponse(
+  accountDisplayNameResultSchema,
+);
 export const pendingAccountDeletionResponseSchema = commandResponse(
   z
     .object({ accountId: uuidSchema, authDeletion: z.literal("pending") })
@@ -291,6 +301,7 @@ export const workoutCheckinResultSchema = z
 export const currentWeekProgressItemSchema = z
   .object({
     membershipId: uuidSchema,
+    displayName: boundedTextSchema(40),
     lockedTarget: positiveIntegerSchema,
     completedWorkoutCount: z.number().int().nonnegative(),
   })
@@ -299,6 +310,7 @@ export const currentWeekProgressItemSchema = z
 export const finalizedWeeklyHistoryItemSchema = z
   .object({
     membershipId: uuidSchema,
+    displayName: boundedTextSchema(40),
     startsAt: utcInstantSchema,
     endsAt: utcInstantSchema,
     lockedTarget: positiveIntegerSchema,
@@ -371,6 +383,7 @@ export type SetWeeklyTargetRequest = z.infer<
   typeof setWeeklyTargetRequestSchema
 >;
 export type DeleteAccountRequest = z.infer<typeof deleteAccountRequestSchema>;
+export type SetDisplayNameRequest = z.infer<typeof setDisplayNameRequestSchema>;
 export type CreateSocialInteractionRequest = z.infer<
   typeof createSocialInteractionRequestSchema
 >;

@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/account/display-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAccountDisplayName"];
+        put: operations["setAccountDisplayName"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workout-check-ins": {
         parameters: {
             query?: never;
@@ -391,6 +407,16 @@ export interface components {
             /** @description Fresh email code required by active PWA API */
             otpCode: string;
         };
+        SetDisplayNameRequest: {
+            displayName: string;
+        };
+        AccountDisplayNameResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: {
+                displayName: string | null;
+            };
+        };
         EnrollmentRequest: {
             /** Format: email */
             email: string;
@@ -601,6 +627,7 @@ export interface components {
         CurrentWeekProgressItem: {
             /** Format: uuid */
             membershipId: string;
+            displayName: string;
             lockedTarget: number;
             completedWorkoutCount: number;
         };
@@ -612,6 +639,7 @@ export interface components {
         FinalizedWeeklyHistoryItem: {
             /** Format: uuid */
             membershipId: string;
+            displayName: string;
             startsAt: components["schemas"]["UtcInstant"];
             endsAt: components["schemas"]["UtcInstant"];
             lockedTarget: number;
@@ -772,6 +800,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PendingAccountDeletionResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getAccountDisplayName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Account display name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDisplayNameResponse"];
+                };
+            };
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    setAccountDisplayName: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDisplayNameRequest"];
+            };
+        };
+        responses: {
+            /** @description Account display name saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDisplayNameResponse"];
                 };
             };
             400: components["responses"]["ApiError"];

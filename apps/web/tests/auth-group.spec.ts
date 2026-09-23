@@ -63,10 +63,20 @@ async function mockSignedOut(page: Page) {
 }
 
 async function mockApi(page: Page, member: boolean) {
+  let displayName: string | null = "Akrum";
   await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
     expect(request.headers().authorization).toBe("Bearer live-access");
     const path = new URL(request.url()).pathname;
+    if (path === "/v1/account/display-name") {
+      if (request.method() === "PUT") {
+        displayName = request.postDataJSON().displayName;
+      }
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { displayName } },
+      });
+    }
     if (path === "/v1/group-memberships/current")
       return route.fulfill({
         status: 200,
@@ -81,7 +91,14 @@ async function mockApi(page: Page, member: boolean) {
         headers: { "access-control-allow-origin": "*" },
         json: {
           contractVersion: 1,
-          data: [{ membershipId, lockedTarget: 3, completedWorkoutCount: 0 }],
+          data: [
+            {
+              membershipId,
+              displayName: "Akrum",
+              lockedTarget: 3,
+              completedWorkoutCount: 0,
+            },
+          ],
         },
       });
     if (path === "/v1/account") {
@@ -112,6 +129,23 @@ async function mockApi(page: Page, member: boolean) {
     });
   });
 }
+
+test("Account Name row loads and confirms a saved edit", async ({ page }) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByRole("link", { name: "Account" }).click();
+  const name = page.getByLabel("Name");
+  await expect(name).toHaveValue("Akrum");
+  await name.fill("Akrum Eltoum");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByRole("status")).toHaveText("Name saved.");
+  await expect(name).toHaveValue("Akrum Eltoum");
+});
 
 test("invitation token enrolls before email code request", async ({ page }) => {
   await mockSignedOut(page);
