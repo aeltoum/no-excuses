@@ -102,6 +102,9 @@ export const setDisplayNameRequestSchema = z
 export const enrollmentRequestSchema = z
   .object({ email: z.email().max(254), token: boundedTextSchema(256) })
   .strict();
+export const invitationPreviewRequestSchema = z
+  .object({ token: boundedTextSchema(256) })
+  .strict();
 export const consentRequestSchema = z
   .object({
     adult: z.literal(true),
@@ -237,6 +240,13 @@ export const deletedAccountResultSchema = z
 export const accountDisplayNameResultSchema = z
   .object({ displayName: boundedTextSchema(40).nullable() })
   .strict();
+export const invitationPreviewResultSchema = z
+  .object({
+    groupName: boundedTextSchema(80),
+    memberCount: positiveIntegerSchema,
+    weekEndsAt: utcInstantSchema,
+  })
+  .strict();
 export const socialInteractionResultSchema = z
   .object({ interactionId: uuidSchema })
   .strict();
@@ -271,6 +281,9 @@ export const deletedAccountResponseSchema = commandResponse(
 );
 export const accountDisplayNameResponseSchema = commandResponse(
   accountDisplayNameResultSchema,
+);
+export const invitationPreviewResponseSchema = commandResponse(
+  invitationPreviewResultSchema,
 );
 export const pendingAccountDeletionResponseSchema = commandResponse(
   z
@@ -366,6 +379,9 @@ export type GroupRequest = z.infer<typeof groupRequestSchema>;
 export type CreateGroupRequest = z.infer<typeof createGroupRequestSchema>;
 export type IssueGroupInvitationRequest = z.infer<
   typeof issueGroupInvitationRequestSchema
+>;
+export type InvitationPreviewResult = z.infer<
+  typeof invitationPreviewResultSchema
 >;
 export type RevokeGroupInvitationRequest = z.infer<
   typeof revokeGroupInvitationRequestSchema

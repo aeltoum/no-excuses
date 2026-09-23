@@ -82,6 +82,11 @@ async function mockApi(page: Page, member: boolean) {
         json: { contractVersion: 1, data: { displayName } },
       });
     }
+    if (path === "/v1/consent")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { accepted: true } },
+      });
     if (path === "/v1/group-memberships/current")
       return route.fulfill({
         status: 200,
@@ -90,6 +95,27 @@ async function mockApi(page: Page, member: boolean) {
           data: { membership: member ? { groupId, membershipId } : null },
         },
       });
+    if (path === "/v1/group-invitations/preview") {
+      if (new URL(request.url()).searchParams.get("token") === "expired")
+        return route.fulfill({
+          status: 403,
+          json: {
+            contractVersion: 1,
+            error: { code: "denied", message: "unavailable", retryable: false },
+          },
+        });
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            groupName: "6AM Crew",
+            memberCount: 5,
+            weekEndsAt: "2026-09-28T05:00:00.000Z",
+          },
+        },
+      });
+    }
     if (path === `/v1/groups/${groupId}/current-week-progress`)
       return route.fulfill({
         status: 200,
@@ -270,6 +296,79 @@ test("generic email OTP then live API authorization restores Group entry", async
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
 });
 
+test("no-Group onboarding saves About you then starts a crew", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, false);
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+
+  await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
+  const continueButton = page.getByRole("button", { name: "Continue" });
+  await expect(continueButton).toBeDisabled();
+  await page.getByLabel("What should your crew call you?").fill("Akrum");
+  await page.getByLabel("I’m 18 or older").check();
+  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I agree to the terms and how my data is used").check();
+  await continueButton.click();
+  await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await page.getByLabel("Crew name").fill("6AM Crew");
+  await Promise.all([
+    page.getByRole("button", { name: "Saving…" }).waitFor(),
+    page.getByRole("button", { name: "Continue" }).click(),
+  ]);
+  await expect(page.getByText("Step 3 of 3 · Your target")).toBeVisible();
+  await expect(
+    page.getByText(
+      "We suggest at least 2. You can change it for any future week.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Decrease weekly target" }).click();
+  await expect(page.getByText("1 workouts")).toBeVisible();
+  await page.getByRole("button", { name: "Start 6AM Crew" }).click();
+  await expect(page.getByRole("status")).toHaveText("Group created.");
+});
+
+test("join onboarding previews eligible crew and rejects unavailable code", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, false);
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByLabel("I’m 18 or older").check();
+  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I agree to the terms and how my data is used").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "I have a code" }).click();
+  await page.getByLabel("Invitation code").fill("expired");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByText("That code has expired. Ask your friend for a new one."),
+  ).toBeVisible();
+  findings.get(page)?.console.splice(0);
+  await page.getByLabel("Invitation code").fill("eligible");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("Step 3 of 3 · Your target")).toBeVisible();
+  await expect(page.getByText("6AM Crew", { exact: true })).toBeVisible();
+  await expect(page.getByText(/5 members\. This week ends/)).toBeVisible();
+  await expect(page.getByText("This week (starting today)")).toBeVisible();
+  await expect(page.getByText("Every week after")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Join 6AM Crew" }),
+  ).toBeVisible();
+});
+
 test("ineligible OTP request has same observable result", async ({ page }) => {
   await page.route("http://127.0.0.1:54321/auth/v1/**", (route) =>
     route.fulfill({ status: 400, json: { message: "unknown" } }),
@@ -417,10 +516,21 @@ test("Group conflict retains draft and retries same idempotency key", async ({
   let creates = 0;
   await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
-    if (new URL(request.url()).pathname === "/v1/group-memberships/current")
+    const path = new URL(request.url()).pathname;
+    if (path === "/v1/group-memberships/current")
       return route.fulfill({
         status: 200,
         json: { contractVersion: 1, data: { membership: null } },
+      });
+    if (path === "/v1/account/display-name")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { displayName: "Akrum" } },
+      });
+    if (path === "/v1/consent")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: { accepted: true } },
       });
     keys.push(request.headers()["idempotency-key"] ?? "");
     creates += 1;
@@ -448,15 +558,20 @@ test("Group conflict retains draft and retries same idempotency key", async ({
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
-  await page.getByLabel("Group name").fill("Morning crew");
-  await page.getByLabel("Weekly target").first().fill("3");
-  await page.getByRole("button", { name: "Create Group" }).click();
+  await page.getByLabel("I’m 18 or older").check();
+  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I agree to the terms and how my data is used").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel("Crew name").fill("Morning crew");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Increase weekly target" }).click();
+  await page.getByRole("button", { name: "Start Morning crew" }).click();
   await expect(page.getByRole("alert")).toHaveText(
     "Action conflicts with current Group state.",
   );
-  await expect(page.getByLabel("Group name")).toHaveValue("Morning crew");
+  await expect(page.getByText("3 workouts")).toBeVisible();
   findings.get(page)?.console.splice(0);
-  await page.getByRole("button", { name: "Create Group" }).click();
+  await page.getByRole("button", { name: "Start Morning crew" }).click();
   await expect(page.getByRole("status")).toHaveText("Group created.");
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);

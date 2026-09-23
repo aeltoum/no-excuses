@@ -9,6 +9,7 @@ import {
   deleteAccountRequestSchema,
   enrollmentRequestSchema,
   groupRequestSchema,
+  invitationPreviewRequestSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
   removeGroupMemberRequestSchema,
@@ -395,6 +396,22 @@ const handlers = {
     ],
     membership,
     acceptGroupInvitationRequestSchema,
+  ),
+  previewGroupInvitation: read(
+    "select g.name as group_name, count(m.membership_id)::integer as member_count, b.ends_at as week_ends_at from app_private.group_invitations i join app_private.groups g on g.group_id=i.group_id left join app_private.memberships m on m.group_id=g.group_id and m.ended_at is null cross join lateral app_private.accountability_week_bounds(now(),g.time_zone,g.week_starts) b where i.email=(select email from app_private.accounts where auth_user_id=current_setting('app.auth_user_id')::uuid) and i.token_digest=$1 and i.status='issued' and i.expires_at>now() and g.status<>'closed' group by g.name,b.ends_at",
+    (body) => [tokenDigest(String(body.token))],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Invitation unavailable"), {
+          code: "42501",
+        });
+      return {
+        groupName: rows[0].group_name,
+        memberCount: rows[0].member_count,
+        weekEndsAt: new Date(String(rows[0].week_ends_at)).toISOString(),
+      };
+    },
+    invitationPreviewRequestSchema,
   ),
   leaveGroup: command(
     "select app_private.leave_group_command($1,$2,$3,$4) as id",

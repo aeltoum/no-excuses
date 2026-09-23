@@ -133,6 +133,23 @@ export function App({
   const [deletionCode, setDeletionCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
+  const [crewChoice, setCrewChoice] = useState<"start" | "join">("start");
+  const [crewName, setCrewName] = useState("");
+  const [invitationCode, setInvitationCode] = useState("");
+  const [invitationError, setInvitationError] = useState("");
+  const [invitationPreview, setInvitationPreview] = useState<{
+    groupName: string;
+    memberCount: number;
+    weekEndsAt: string;
+  } | null>(null);
+  const [recurringTarget, setRecurringTarget] = useState(2);
+  const [currentTarget, setCurrentTarget] = useState(1);
+  const [onboardingConsents, setOnboardingConsents] = useState({
+    adult: false,
+    pilot: false,
+    product: false,
+  });
   const deletionKey = useRef<string>(undefined);
   const commandDrafts = useRef(
     new Map<string, { signature: string; key: string; entityId: string }>(),
@@ -249,7 +266,12 @@ export function App({
     setPath(destination);
   }, [access, membership, path]);
   useEffect(() => {
-    if (access !== "signed-in" || path !== "/account" || !session) return;
+    if (
+      access !== "signed-in" ||
+      (path !== "/account" && (path !== "/group" || membership)) ||
+      !session
+    )
+      return;
     let active = true;
     setDisplayNameLoaded(false);
     void api
@@ -272,7 +294,7 @@ export function App({
     return () => {
       active = false;
     };
-  }, [access, api, path, session]);
+  }, [access, api, membership, path, session]);
   useEffect(() => {
     if (codeSent) codeInputs.current[0]?.focus();
     else if (signInDoor) emailInput.current?.focus();
@@ -328,8 +350,6 @@ export function App({
   };
   const field = (form: FormData, name: string) =>
     String(form.get(name) ?? "").trim();
-  const number = (form: FormData, name: string) =>
-    Number.parseInt(field(form, name), 10);
   const submit =
     (
       fn: (form: FormData) => Promise<string>,
@@ -599,168 +619,387 @@ export function App({
             }
           >
             {!membership && (
-              <form
-                onSubmit={submit(async (f) => {
-                  if (
-                    f.get("adult") !== "on" ||
-                    f.get("pilot") !== "on" ||
-                    f.get("product") !== "on"
-                  )
-                    throw new ApiError(
-                      "failure",
-                      "Confirm age and both consents before Group action.",
-                    );
-                  await api.consent(token());
-                  return "Age and consent recorded. You can create or join a Group.";
-                })}
+              <section
+                className="onboarding"
+                aria-labelledby="onboarding-title"
               >
-                <h2>Before Group participation</h2>
-                <label>
-                  <input
-                    type="checkbox"
-                    name="adult"
-                    required
+                {onboardingStep > 1 && (
+                  <button
+                    className="back-button"
+                    type="button"
+                    aria-label="Back"
                     disabled={busy}
-                  />{" "}
-                  I am 18 or older.
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    name="pilot"
-                    required
-                    disabled={busy}
-                  />{" "}
-                  I consent to this private pilot.
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    name="product"
-                    required
-                    disabled={busy}
-                  />{" "}
-                  I consent to product terms and data use.
-                </label>
-                <button type="submit" disabled={busy}>
-                  Confirm age and consent
-                </button>
-              </form>
-            )}
-            {!membership && (
-              <div className="form-grid">
-                <form
-                  onSubmit={submit(
-                    async (f) => {
-                      const name = field(f, "name");
-                      const weeklyTarget = number(f, "weeklyTarget");
-                      const draft = commandDraft(
-                        "create",
-                        `${name}:${weeklyTarget}`,
-                      );
-                      await api.create(
-                        token(),
-                        {
-                          groupId: draft.entityId,
-                          membershipId: draft.key,
-                          name,
-                          timeZone:
-                            Intl.DateTimeFormat().resolvedOptions().timeZone,
-                          weeklyTarget,
-                        },
-                        draft.key,
-                      );
-                      commandDrafts.current.delete("create");
-                      return "Group created.";
-                    },
-                    { refreshMembership: true },
-                  )}
-                >
-                  <h2>Create Group</h2>
-                  <label>
-                    Group name
-                    <input
-                      name="name"
-                      maxLength={80}
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <label>
-                    Weekly target
-                    <input
-                      name="weeklyTarget"
-                      type="number"
-                      min="1"
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <button type="submit" disabled={busy}>
-                    {busy ? "Creating…" : "Create Group"}
+                    onClick={() => {
+                      setNotice(null);
+                      setInvitationError("");
+                      setOnboardingStep((onboardingStep - 1) as 1 | 2);
+                    }}
+                  >
+                    ←
                   </button>
-                </form>
-                <form
-                  onSubmit={submit(
-                    async (f) => {
-                      const invitationToken = field(f, "invitationToken");
-                      const recurringTarget = number(f, "recurringTarget");
-                      const currentTarget = number(f, "currentTarget");
-                      const draft = commandDraft(
-                        "join",
-                        `${invitationToken}:${recurringTarget}:${currentTarget}`,
-                      );
-                      await api.join(
-                        token(),
-                        {
-                          token: invitationToken,
-                          membershipId: draft.entityId,
-                          recurringTarget,
-                          currentTarget,
+                )}
+                <p className="step-indicator">
+                  Step {onboardingStep} of 3 ·{" "}
+                  {onboardingStep === 1
+                    ? "About you"
+                    : onboardingStep === 2
+                      ? "Your crew"
+                      : "Your target"}
+                </p>
+                {onboardingStep === 1 && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const form = new FormData(event.currentTarget);
+                      if (
+                        !displayName.trim() ||
+                        ["adult", "pilot", "product"].some(
+                          (name) => form.get(name) !== "on",
+                        )
+                      )
+                        return;
+                      void act(async () => {
+                        const draft = commandDraft(
+                          "onboarding-name",
+                          displayName.trim(),
+                        );
+                        const saved = await api.setDisplayName(
+                          token(),
+                          displayName.trim(),
+                          draft.key,
+                        );
+                        commandDrafts.current.delete("onboarding-name");
+                        setDisplayName(saved.data.displayName ?? "");
+                        await api.consent(token());
+                        setOnboardingStep(2);
+                        return "About you saved.";
+                      });
+                    }}
+                  >
+                    <h2 id="onboarding-title">Before you join a crew</h2>
+                    <label>
+                      What should your crew call you?
+                      <input
+                        value={displayName}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                        maxLength={40}
+                        required
+                        disabled={busy || !displayNameLoaded}
+                      />
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="adult"
+                        checked={onboardingConsents.adult}
+                        onChange={(event) =>
+                          setOnboardingConsents({
+                            ...onboardingConsents,
+                            adult: event.target.checked,
+                          })
+                        }
+                        required
+                        disabled={busy}
+                      />{" "}
+                      I’m 18 or older
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="pilot"
+                        checked={onboardingConsents.pilot}
+                        onChange={(event) =>
+                          setOnboardingConsents({
+                            ...onboardingConsents,
+                            pilot: event.target.checked,
+                          })
+                        }
+                        required
+                        disabled={busy}
+                      />{" "}
+                      I’m joining this private pilot
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="product"
+                        checked={onboardingConsents.product}
+                        onChange={(event) =>
+                          setOnboardingConsents({
+                            ...onboardingConsents,
+                            product: event.target.checked,
+                          })
+                        }
+                        required
+                        disabled={busy}
+                      />{" "}
+                      I agree to the terms and how my data is used
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={
+                        busy ||
+                        !displayNameLoaded ||
+                        !displayName.trim() ||
+                        !Object.values(onboardingConsents).every(Boolean)
+                      }
+                    >
+                      {busy ? "Saving…" : "Continue"}
+                    </button>
+                    <p className="hint">
+                      Add your name and tick all three to continue.
+                    </p>
+                  </form>
+                )}
+                {onboardingStep === 2 && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (crewChoice === "start") {
+                        if (crewName.trim()) {
+                          setBusy(true);
+                          window.setTimeout(() => {
+                            setOnboardingStep(3);
+                            setBusy(false);
+                          }, 150);
+                        }
+                        return;
+                      }
+                      if (!invitationCode.trim()) return;
+                      setBusy(true);
+                      setInvitationError("");
+                      setNotice(null);
+                      void api
+                        .previewInvitation(token(), invitationCode.trim())
+                        .then((response) => {
+                          setInvitationPreview(response.data);
+                          setOnboardingStep(3);
+                        })
+                        .catch(() =>
+                          setInvitationError(
+                            "That code has expired. Ask your friend for a new one.",
+                          ),
+                        )
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    <h2 id="onboarding-title">Start a crew or join one?</h2>
+                    <fieldset className="crew-choice" aria-label="Crew choice">
+                      <button
+                        className="target-button"
+                        type="button"
+                        aria-pressed={crewChoice === "start"}
+                        onClick={() => setCrewChoice("start")}
+                      >
+                        Start a crew
+                      </button>
+                      <button
+                        className="target-button"
+                        type="button"
+                        aria-pressed={crewChoice === "join"}
+                        onClick={() => setCrewChoice("join")}
+                      >
+                        I have a code
+                      </button>
+                    </fieldset>
+                    {crewChoice === "start" ? (
+                      <label>
+                        Crew name
+                        <input
+                          value={crewName}
+                          onChange={(event) => setCrewName(event.target.value)}
+                          maxLength={80}
+                          required
+                          disabled={busy}
+                        />
+                        <span className="hint">Only members see it.</span>
+                      </label>
+                    ) : (
+                      <label>
+                        Invitation code
+                        <input
+                          value={invitationCode}
+                          onChange={(event) => {
+                            setInvitationCode(event.target.value);
+                            setInvitationError("");
+                          }}
+                          maxLength={256}
+                          required
+                          disabled={busy}
+                          aria-invalid={Boolean(invitationError)}
+                          aria-describedby={
+                            invitationError ? "invitation-error" : undefined
+                          }
+                        />
+                        {invitationError && (
+                          <span className="field-error" id="invitation-error">
+                            {invitationError}
+                          </span>
+                        )}
+                      </label>
+                    )}
+                    <button type="submit" disabled={busy}>
+                      {busy ? "Saving…" : "Continue"}
+                    </button>
+                  </form>
+                )}
+                {onboardingStep === 3 && crewChoice === "start" && (
+                  <form
+                    onSubmit={submit(
+                      async () => {
+                        const draft = commandDraft(
+                          "create",
+                          `${crewName}:${recurringTarget}`,
+                        );
+                        await api.create(
+                          token(),
+                          {
+                            groupId: draft.entityId,
+                            membershipId: draft.key,
+                            name: crewName,
+                            timeZone:
+                              Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            weeklyTarget: recurringTarget,
+                          },
+                          draft.key,
+                        );
+                        commandDrafts.current.delete("create");
+                        return "Group created.";
+                      },
+                      { refreshMembership: true },
+                    )}
+                  >
+                    <h2 id="onboarding-title">Your weekly target</h2>
+                    <div className="target-stepper">
+                      <button
+                        type="button"
+                        aria-label="Decrease weekly target"
+                        onClick={() =>
+                          setRecurringTarget(Math.max(1, recurringTarget - 1))
+                        }
+                      >
+                        −
+                      </button>
+                      <strong>{recurringTarget} workouts</strong>
+                      <button
+                        type="button"
+                        aria-label="Increase weekly target"
+                        onClick={() => setRecurringTarget(recurringTarget + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="hint">
+                      We suggest at least 2. You can change it for any future
+                      week.
+                    </p>
+                    <button type="submit" disabled={busy}>
+                      {busy ? "Saving…" : `Start ${crewName}`}
+                    </button>
+                  </form>
+                )}
+                {onboardingStep === 3 &&
+                  crewChoice === "join" &&
+                  invitationPreview && (
+                    <form
+                      onSubmit={submit(
+                        async () => {
+                          const draft = commandDraft(
+                            "join",
+                            `${invitationCode}:${recurringTarget}:${currentTarget}`,
+                          );
+                          await api.join(
+                            token(),
+                            {
+                              token: invitationCode,
+                              membershipId: draft.entityId,
+                              recurringTarget,
+                              currentTarget,
+                            },
+                            draft.key,
+                          );
+                          commandDrafts.current.delete("join");
+                          return "Invitation accepted. Group joined.";
                         },
-                        draft.key,
-                      );
-                      commandDrafts.current.delete("join");
-                      return "Invitation accepted. Group joined.";
-                    },
-                    { refreshMembership: true },
+                        { refreshMembership: true },
+                      )}
+                    >
+                      <h2 id="onboarding-title">
+                        Join {invitationPreview.groupName}
+                      </h2>
+                      <div className="crew-preview">
+                        <strong>{invitationPreview.groupName}</strong>
+                        <span>
+                          {invitationPreview.memberCount} members. This week
+                          ends{" "}
+                          {new Intl.DateTimeFormat(undefined, {
+                            weekday: "long",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          }).format(new Date(invitationPreview.weekEndsAt))}
+                          .
+                        </span>
+                      </div>
+                      <p>This week (starting today)</p>
+                      <div className="target-stepper">
+                        <button
+                          className="target-button"
+                          type="button"
+                          aria-label="Decrease this week’s target"
+                          onClick={() =>
+                            setCurrentTarget(Math.max(1, currentTarget - 1))
+                          }
+                        >
+                          −
+                        </button>
+                        <strong>{currentTarget} workouts</strong>
+                        <button
+                          className="target-button"
+                          type="button"
+                          aria-label="Increase this week’s target"
+                          onClick={() =>
+                            setCurrentTarget(
+                              Math.min(recurringTarget, currentTarget + 1),
+                            )
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p>Every week after</p>
+                      <div className="target-stepper">
+                        <button
+                          className="target-button"
+                          type="button"
+                          aria-label="Decrease recurring target"
+                          onClick={() => {
+                            const next = Math.max(1, recurringTarget - 1);
+                            setRecurringTarget(next);
+                            setCurrentTarget(Math.min(currentTarget, next));
+                          }}
+                        >
+                          −
+                        </button>
+                        <strong>{recurringTarget} workouts</strong>
+                        <button
+                          className="target-button"
+                          type="button"
+                          aria-label="Increase recurring target"
+                          onClick={() =>
+                            setRecurringTarget(recurringTarget + 1)
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button type="submit" disabled={busy}>
+                        {busy
+                          ? "Saving…"
+                          : `Join ${invitationPreview.groupName}`}
+                      </button>
+                    </form>
                   )}
-                >
-                  <h2>Join Group</h2>
-                  <label>
-                    Invitation token
-                    <input
-                      name="invitationToken"
-                      maxLength={256}
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <label>
-                    Weekly target
-                    <input
-                      name="recurringTarget"
-                      type="number"
-                      min="1"
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <label>
-                    Current target
-                    <input
-                      name="currentTarget"
-                      type="number"
-                      min="1"
-                      required
-                      disabled={busy}
-                    />
-                  </label>
-                  <button type="submit" disabled={busy}>
-                    {busy ? "Joining…" : "Join Group"}
-                  </button>
-                </form>
-              </div>
+              </section>
             )}
             {membership && (
               <div className="form-grid">

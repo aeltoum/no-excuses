@@ -180,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/group-invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["previewGroupInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/group-memberships/leave": {
         parameters: {
             query?: never;
@@ -397,6 +413,16 @@ export interface components {
             membershipId: string;
             recurringTarget: number;
             currentTarget: number;
+        };
+        InvitationPreviewResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: {
+                groupName: string;
+                memberCount: number;
+                /** Format: date-time */
+                weekEndsAt: string;
+            };
         };
         SetWeeklyTargetRequest: {
             weeklyTarget: number;
@@ -1014,6 +1040,32 @@ export interface operations {
             401: components["responses"]["ApiError"];
             403: components["responses"]["ApiError"];
             409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    previewGroupInvitation: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Eligible invitation preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreviewResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

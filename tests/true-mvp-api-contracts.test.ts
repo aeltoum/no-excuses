@@ -12,6 +12,8 @@ import {
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
   groupRequestSchema,
+  invitationPreviewRequestSchema,
+  invitationPreviewResponseSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
   removeGroupMemberRequestSchema,
@@ -175,6 +177,19 @@ describe("True-MVP API runtime contracts", () => {
         membershipId,
         recurringTarget: 3,
         currentTarget: 2,
+      }),
+    ).toBeTruthy();
+    expect(
+      invitationPreviewRequestSchema.parse({ token: "opaque-token" }),
+    ).toEqual({ token: "opaque-token" });
+    expect(
+      invitationPreviewResponseSchema.parse({
+        contractVersion: 1,
+        data: {
+          groupName: "6AM Crew",
+          memberCount: 5,
+          weekEndsAt: "2026-09-28T05:00:00.000Z",
+        },
       }),
     ).toBeTruthy();
     expect(

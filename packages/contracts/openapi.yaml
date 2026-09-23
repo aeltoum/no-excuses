@@ -177,6 +177,21 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/group-invitations/preview:
+    get:
+      operationId: previewGroupInvitation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 256 }
+      responses:
+        "200": { description: Eligible invitation preview, content: { application/json: { schema: { $ref: "#/components/schemas/InvitationPreviewResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/group-memberships/leave:
     post:
       operationId: leaveGroup
@@ -427,6 +442,20 @@ components:
         membershipId: { type: string, format: uuid }
         recurringTarget: { type: integer, minimum: 1 }
         currentTarget: { type: integer, minimum: 1 }
+    InvitationPreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: object
+          additionalProperties: false
+          required: [groupName, memberCount, weekEndsAt]
+          properties:
+            groupName: { type: string, minLength: 1, maxLength: 80 }
+            memberCount: { type: integer, minimum: 1 }
+            weekEndsAt: { type: string, format: date-time }
     SetWeeklyTargetRequest:
       type: object
       additionalProperties: false
