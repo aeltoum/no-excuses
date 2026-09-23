@@ -27,6 +27,8 @@ function setup(overrides: Partial<V1HttpHandlers> = {}) {
     leaveGroup: operation("leaveGroup"),
     setWeeklyTarget: operation("setWeeklyTarget"),
     removeGroupMember: operation("removeGroupMember"),
+    listGroupMembers: operation("listGroupMembers"),
+    listPendingGroupInvitations: operation("listPendingGroupInvitations"),
     getCurrentGroupMembership: operation("getCurrentGroupMembership"),
     getMemberHome: operation("getMemberHome"),
     getNotifications: operation("getNotifications"),
@@ -87,6 +89,12 @@ describe("version 1 HTTP routing", () => {
         "POST",
         `/v1/groups/${groupId}/members/${membershipId}/remove`,
         "removeGroupMember",
+      ],
+      ["GET", `/v1/groups/${groupId}/members`, "listGroupMembers"],
+      [
+        "GET",
+        `/v1/groups/${groupId}/pending-invitations`,
+        "listPendingGroupInvitations",
       ],
       [
         "GET",

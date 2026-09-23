@@ -67,7 +67,7 @@ async function fillCode(page: Page, code: string) {
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
 }
 
-async function mockApi(page: Page, member: boolean) {
+async function mockApi(page: Page, member: boolean, denyInvite = true) {
   let displayName: string | null = "Akrum";
   await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
@@ -133,6 +133,44 @@ async function mockApi(page: Page, member: boolean) {
           ],
         },
       });
+    if (path === `/v1/groups/${groupId}/members`)
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            groupName: "6AM Crew",
+            members: [
+              {
+                membershipId,
+                displayName: "Akrum Eltoum",
+                weeklyTarget: 4,
+                creator: true,
+              },
+              {
+                membershipId: "30000000-0000-4000-8000-000000000002",
+                displayName: "Jordan Park",
+                weeklyTarget: 3,
+                creator: false,
+              },
+            ],
+          },
+        },
+      });
+    if (path === `/v1/groups/${groupId}/pending-invitations`)
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: [
+            {
+              invitationId: "50000000-0000-4000-8000-000000000001",
+              email: "pending@example.test",
+              expiresAt: "2026-09-30T12:00:00.000Z",
+            },
+          ],
+        },
+      });
     if (path === "/v1/account") {
       expect(request.postDataJSON()).toEqual({
         confirmation: true,
@@ -143,7 +181,7 @@ async function mockApi(page: Page, member: boolean) {
         json: { contractVersion: 1, data: { accountId: userId } },
       });
     }
-    if (path === "/v1/group-invitations")
+    if (path === "/v1/group-invitations" && denyInvite)
       return route.fulfill({
         status: 403,
         json: {
@@ -152,6 +190,29 @@ async function mockApi(page: Page, member: boolean) {
             code: "denied",
             message: "private detail",
             retryable: false,
+          },
+        },
+      });
+    if (path === "/v1/group-invitations")
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            invitationId: "50000000-0000-4000-8000-000000000002",
+            token: "NX-7Q4K-2M9P",
+            expiresAt: "2026-09-30T12:00:00.000Z",
+          },
+        },
+      });
+    if (path.endsWith("/revoke"))
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            invitationId: "50000000-0000-4000-8000-000000000001",
+            status: "revoked",
           },
         },
       });
@@ -405,10 +466,137 @@ test("invalid code retains email and denied Group action hides private detail", 
   await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
   await page.goto("/group");
   await page.getByLabel("Friend email").fill("friend@example.test");
-  await page.getByRole("button", { name: "Create invitation" }).click();
+  await page.getByRole("button", { name: "Invite a friend" }).click();
   await expect(page.getByRole("alert")).toHaveText("Action denied.");
   await expect(page.getByText("private detail")).toHaveCount(0);
   findings.get(page)?.console.splice(0);
+});
+
+test("Group roster, invitation card, and creator Manage use row actions without IDs", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true, false);
+  const mutations: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST")
+      mutations.push(new URL(request.url()).pathname);
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByRole("link", { name: "Group" }).click();
+
+  await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
+  await expect(page.getByText("2 members")).toBeVisible();
+  await expect(page.getByText("Akrum Eltoum")).toBeVisible();
+  await expect(page.getByText("4 a week")).toBeVisible();
+  await expect(page.getByLabel("Invitation ID")).toHaveCount(0);
+  await expect(page.getByLabel("Membership ID")).toHaveCount(0);
+
+  await page.getByLabel("Friend email").fill("friend@example.test");
+  await page.getByRole("button", { name: "Invite a friend" }).click();
+  await expect(page.getByText("NX-7Q4K-2M9P")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy code" })).toBeVisible();
+  await expect(
+    page.getByText("Send it privately. It works once and expires in 7 days."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Manage" }).click();
+  await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(1);
+  await expect(page.getByText("pending@example.test")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Revoke" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Leave 6AM Crew" }),
+  ).toBeVisible();
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(
+    page.getByText("Member removed.", { exact: true }),
+  ).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Revoke" }).click();
+  await expect(
+    page.getByText("Invitation revoked.", { exact: true }),
+  ).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Leave 6AM Crew" }).click();
+  await expect(
+    page.getByText("You left 6AM Crew.", { exact: true }),
+  ).toBeVisible();
+  expect(mutations).toEqual(
+    expect.arrayContaining([
+      `/v1/groups/${groupId}/members/30000000-0000-4000-8000-000000000002/remove`,
+      "/v1/group-invitations/50000000-0000-4000-8000-000000000001/revoke",
+      "/v1/group-memberships/leave",
+    ]),
+  );
+});
+
+test("failed Group load retries into ten-member scroll above tab bar", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  let attempts = 0;
+  await page.route(
+    `http://127.0.0.1:8787/v1/groups/${groupId}/members`,
+    (route) => {
+      attempts += 1;
+      if (attempts === 1)
+        return route.fulfill({
+          status: 500,
+          json: {
+            contractVersion: 1,
+            error: {
+              code: "domain_failure",
+              message: "hidden",
+              retryable: true,
+            },
+          },
+        });
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            groupName: "10AM Crew",
+            members: Array.from({ length: 10 }, (_, index) => ({
+              membershipId:
+                index === 0
+                  ? membershipId
+                  : `30000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+              displayName: `Member ${index + 1}`,
+              weeklyTarget: index + 1,
+              creator: index === 0,
+            })),
+          },
+        },
+      });
+    },
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByRole("link", { name: "Group" }).click();
+  await expect(page.getByText("Couldn’t load your crew.")).toBeVisible();
+  findings.get(page)?.console.splice(0);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByText("10 members")).toBeVisible();
+  await page.getByText("Member 10").scrollIntoViewIfNeeded();
+  await expect(page.getByText("Member 10")).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Member destinations" }),
+  ).toBeVisible();
 });
 
 test("exact Account deletion confirmation cuts off browser session", async ({

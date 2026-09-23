@@ -500,6 +500,40 @@ const handlers = {
     (rows) => rows[0]?.data,
     currentGroupMembershipRequestSchema,
   ),
+  listGroupMembers: read(
+    "select g.name as group_name, m.membership_id, coalesce(a.display_name, 'Member ' || left(m.membership_id::text,8)) as display_name, m.recurring_target as weekly_target, ga.membership_id is not null as creator from app_private.groups g join app_private.memberships m on m.group_id=g.group_id and m.ended_at is null join app_private.accounts a on a.account_id=m.account_id left join app_private.group_admins ga on ga.membership_id=m.membership_id where g.group_id=$1 and app_private.can_group_action(g.group_id,'group_read') order by (ga.membership_id is not null) desc,m.joined_at,m.membership_id",
+    (body) => [body.groupId],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return {
+        groupName: rows[0].group_name,
+        members: rows.map((row) => ({
+          membershipId: row.membership_id,
+          displayName: row.display_name,
+          weeklyTarget: row.weekly_target,
+          creator: row.creator,
+        })),
+      };
+    },
+    groupRequestSchema,
+  ),
+  listPendingGroupInvitations: read(
+    "with actor_group as (select m.group_id from app_private.memberships m join app_private.group_admins ga on ga.membership_id=m.membership_id where m.account_id=app_private.actor_account_id() and m.group_id=$1 and m.ended_at is null) select i.invitation_id,i.email,i.expires_at from actor_group ag left join app_private.group_invitations i on i.group_id=ag.group_id and i.status='issued' and i.expires_at>now() order by i.issued_at,i.invitation_id",
+    (body) => [body.groupId],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return rows
+        .filter((row) => row.invitation_id)
+        .map((row) => ({
+          invitationId: row.invitation_id,
+          email: row.email,
+          expiresAt: new Date(String(row.expires_at)).toISOString(),
+        }));
+    },
+    groupRequestSchema,
+  ),
   getCurrentWeekProgress: read(
     "select * from app_private.current_week_progress($1,now())",
     (body) => [body.groupId],

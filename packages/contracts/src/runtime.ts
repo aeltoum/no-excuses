@@ -247,6 +247,28 @@ export const invitationPreviewResultSchema = z
     weekEndsAt: utcInstantSchema,
   })
   .strict();
+export const groupRosterResultSchema = z
+  .object({
+    groupName: boundedTextSchema(80),
+    members: z.array(
+      z
+        .object({
+          membershipId: uuidSchema,
+          displayName: boundedTextSchema(40),
+          weeklyTarget: positiveIntegerSchema,
+          creator: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export const pendingGroupInvitationSchema = z
+  .object({
+    invitationId: uuidSchema,
+    email: z.email().max(254),
+    expiresAt: utcInstantSchema,
+  })
+  .strict();
 export const socialInteractionResultSchema = z
   .object({ interactionId: uuidSchema })
   .strict();
@@ -284,6 +306,12 @@ export const accountDisplayNameResponseSchema = commandResponse(
 );
 export const invitationPreviewResponseSchema = commandResponse(
   invitationPreviewResultSchema,
+);
+export const groupRosterResponseSchema = commandResponse(
+  groupRosterResultSchema,
+);
+export const pendingGroupInvitationsResponseSchema = commandResponse(
+  z.array(pendingGroupInvitationSchema),
 );
 export const pendingAccountDeletionResponseSchema = commandResponse(
   z
@@ -382,6 +410,10 @@ export type IssueGroupInvitationRequest = z.infer<
 >;
 export type InvitationPreviewResult = z.infer<
   typeof invitationPreviewResultSchema
+>;
+export type GroupRosterResult = z.infer<typeof groupRosterResultSchema>;
+export type PendingGroupInvitation = z.infer<
+  typeof pendingGroupInvitationSchema
 >;
 export type RevokeGroupInvitationRequest = z.infer<
   typeof revokeGroupInvitationRequestSchema

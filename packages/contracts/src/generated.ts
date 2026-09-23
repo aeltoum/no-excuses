@@ -324,6 +324,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/groups/{groupId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listGroupMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{groupId}/pending-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPendingGroupInvitations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{groupId}/current-week-progress": {
         parameters: {
             query?: never;
@@ -634,6 +666,34 @@ export interface components {
             invitationId: string;
             /** @constant */
             status: "revoked";
+        };
+        GroupRosterResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["GroupRosterResult"];
+        };
+        GroupRosterResult: {
+            groupName: string;
+            members: components["schemas"]["GroupRosterMember"][];
+        };
+        GroupRosterMember: {
+            /** Format: uuid */
+            membershipId: string;
+            displayName: string;
+            weeklyTarget: number;
+            creator: boolean;
+        };
+        PendingGroupInvitationsResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["PendingGroupInvitation"][];
+        };
+        PendingGroupInvitation: {
+            /** Format: uuid */
+            invitationId: string;
+            /** Format: email */
+            email: string;
+            expiresAt: components["schemas"]["UtcInstant"];
         };
         SubmitWorkoutCheckinResponse: {
             /** @constant */
@@ -1283,6 +1343,58 @@ export interface operations {
             401: components["responses"]["ApiError"];
             403: components["responses"]["ApiError"];
             409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    listGroupMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Group roster visible to current members */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupRosterResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    listPendingGroupInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending invitations visible to Group creator */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingGroupInvitationsResponse"];
+                };
+            };
+            400: components["responses"]["ApiError"];
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };

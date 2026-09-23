@@ -218,6 +218,9 @@ export const handleSubmitWorkoutCheckin = groupCommandHandler(
   submitWorkoutCheckinRequestSchema,
 );
 export const handleCurrentWeekProgress = groupReadHandler(groupRequestSchema);
+export const handleGroupMembers = groupReadHandler(groupRequestSchema);
+export const handlePendingGroupInvitations =
+  groupReadHandler(groupRequestSchema);
 export const handleCurrentGroupMembership = groupReadHandler(
   currentGroupMembershipRequestSchema,
 );

@@ -12,10 +12,12 @@ import {
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
   groupRequestSchema,
+  groupRosterResponseSchema,
   invitationPreviewRequestSchema,
   invitationPreviewResponseSchema,
   issueGroupInvitationRequestSchema,
   leaveGroupRequestSchema,
+  pendingGroupInvitationsResponseSchema,
   removeGroupMemberRequestSchema,
   revokedGroupInvitationResponseSchema,
   revokeGroupInvitationRequestSchema,
@@ -269,6 +271,37 @@ describe("True-MVP API runtime contracts", () => {
         data: { membershipId, weeklyTarget: 4 },
       }),
     ).toBeTruthy();
+  });
+
+  it("validates narrow Group roster and pending invitation reads", () => {
+    expect(
+      groupRosterResponseSchema.parse({
+        contractVersion: 1,
+        data: {
+          groupName: "6AM Crew",
+          members: [
+            {
+              membershipId,
+              displayName: "Akrum",
+              weeklyTarget: 4,
+              creator: true,
+            },
+          ],
+        },
+      }).data.members[0]?.creator,
+    ).toBe(true);
+    expect(
+      pendingGroupInvitationsResponseSchema.parse({
+        contractVersion: 1,
+        data: [
+          {
+            invitationId: checkinId,
+            email: "friend@example.test",
+            expiresAt: "2026-03-12T10:00:00.000Z",
+          },
+        ],
+      }).data,
+    ).toHaveLength(1);
   });
 
   it("strictly validates structured check-ins", () => {
