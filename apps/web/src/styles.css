@@ -1,16 +1,77 @@
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Big Shoulders Display";
+  src: url("/fonts/big-shoulders-display-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Big Shoulders Display";
+  src: url("/fonts/big-shoulders-display-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Big Shoulders Display";
+  src: url("/fonts/big-shoulders-display-900.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
-  color: #e8e8e8;
-  background: #0a0a0a;
-  font-family: Archivo, Inter, system-ui, sans-serif;
+  color: #f2f2ee;
+  background: #1a1b1d;
+  font-family: Archivo, system-ui, sans-serif;
   font-synthesis: none;
   line-height: 1.5;
-  --ground: #0a0a0a;
-  --surface: #111111;
-  --ink: #e8e8e8;
-  --safety: #ffd400;
-  --ink-on-safety: #0a0a0a;
-  --muted: #898989;
-  --rule: #2a2a2a;
+  --rubber: #1a1b1d;
+  --chalk: #f2f2ee;
+  --muted: #8c8f93;
+  --rule: #2c2e31;
+  --surface: #232427;
+  --error: #e5484d;
+  --strength: #d63a2f;
+  --cardio: #2f6fd6;
+  --class: #e8c22e;
+  --sport: #2e9e55;
+  --mixed: #e9e9e4;
+  --ground: var(--rubber);
+  --ink: var(--chalk);
+  --safety: var(--chalk);
+  --ink-on-safety: var(--rubber);
+  --bar: #9b9ea3;
+  --bar-grip: #b4b7bb;
+  --bar-collar: #c9cccf;
+  --empty-slot: #55585c;
 }
 * {
   box-sizing: border-box;
@@ -22,6 +83,16 @@ body {
   margin: 0;
   min-width: 0;
   overflow-x: hidden;
+  background-color: var(--rubber);
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.4px),
+    radial-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1.4px);
+  background-position:
+    0 0,
+    4px 6px;
+  background-size:
+    9px 9px,
+    13px 13px;
 }
 a {
   color: inherit;
@@ -95,9 +166,9 @@ main {
 h1 {
   max-width: 12ch;
   margin: 0;
-  font-family: Impact, "Arial Narrow", sans-serif;
+  font-family: "Big Shoulders Display", sans-serif;
   font-size: clamp(3rem, 12vw, 8rem);
-  font-weight: 400;
+  font-weight: 900;
   letter-spacing: 0.005em;
   line-height: 0.92;
   text-transform: uppercase;
@@ -197,14 +268,14 @@ button:disabled {
 }
 .danger,
 .danger-zone button {
-  background: #ff766d;
+  background: var(--error);
 }
 .danger-zone {
   display: grid;
   gap: 16px;
   margin-top: 48px;
   padding: 20px;
-  border-color: #ff766d;
+  border-color: var(--error);
 }
 .result {
   max-width: 42rem;
@@ -213,7 +284,143 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 .result.error {
-  border-color: #ff766d;
+  border-color: var(--error);
+}
+.home-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.home-header h1 {
+  font-size: clamp(2.75rem, 11vw, 4rem);
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: none;
+  overflow-wrap: normal;
+}
+.home-header span {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.own-progress {
+  min-width: 0;
+}
+.barbell {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+.barbell-big {
+  width: min(100%, 350px);
+  height: auto;
+  margin-inline: auto;
+}
+.barbell-mini {
+  width: 100%;
+  height: 30px;
+}
+.home-count {
+  margin: 6px 0 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: clamp(2.5rem, 11vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1;
+}
+.home form {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+  padding-inline: 0;
+}
+.friend-progress {
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.friend-progress li {
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(64px, 96px) minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--rule);
+}
+.friend-progress strong {
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-progress li > span {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.solo-week {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+.solo-week h2,
+.solo-week p {
+  margin: 0;
+}
+.solo-week h2,
+.home-load-error strong {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.solo-week p,
+.home-load-error-message {
+  color: var(--muted);
+}
+.home-skeleton {
+  display: grid;
+  gap: 12px;
+  padding-top: 18px;
+}
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: var(--surface);
+  animation: skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+.skeleton-bar {
+  height: 132px;
+}
+.skeleton-line {
+  width: 64%;
+  height: 46px;
+}
+.skeleton-button {
+  height: 48px;
+}
+.skeleton-row {
+  height: 52px;
+  border-top: 1px solid var(--rule);
+}
+.home-load-error {
+  display: grid;
+  gap: 20px;
+  padding-top: 26px;
+}
+.home-load-error div {
+  display: grid;
+  gap: 8px;
+}
+@keyframes skeleton-pulse {
+  to {
+    opacity: 0.55;
+  }
 }
 .primary-action {
   min-height: 48px;
@@ -289,6 +496,11 @@ nav a[aria-current="page"] {
     position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .home-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
 }
 @media (orientation: landscape) and (max-height: 500px) {
   main {
@@ -306,5 +518,10 @@ nav a[aria-current="page"] {
     from {
       transform: translateY(8px);
     }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
   }
 }

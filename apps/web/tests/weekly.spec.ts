@@ -255,7 +255,11 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
-  await expect(page.getByText("0 / 3").first()).toBeVisible();
+  await expect(page.getByText("0 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "0 of 3 workouts" }),
+  ).toBeVisible();
+  await expect(page.getByText("Every rep counts.")).toHaveCount(0);
   await page.getByLabel("Duration in minutes").fill("45");
   await page
     .getByLabel("I completed this workout. This is my self-report.")
@@ -268,7 +272,10 @@ test("weekly loop: self-report, target, finalized result", async ({
   );
   expect(keys).toHaveLength(2);
   await page.getByRole("button", { name: "Refresh count" }).click();
-  await expect(page.getByText("1 / 3").first()).toBeVisible();
+  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "1 of 3 workouts" }),
+  ).toBeVisible();
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
   await page.getByRole("link", { name: "Target" }).click();

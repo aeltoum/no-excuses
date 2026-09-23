@@ -150,6 +150,8 @@ test("manifest exposes install metadata and icons", async ({ request }) => {
     name: "No Excuses",
     start_url: "/",
     display: "standalone",
+    background_color: "#1A1B1D",
+    theme_color: "#1A1B1D",
   });
   for (const icon of manifest.icons)
     expect((await request.get(`http://127.0.0.1:4174${icon.src}`)).ok()).toBe(
