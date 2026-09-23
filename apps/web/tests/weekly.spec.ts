@@ -81,9 +81,11 @@ test("one-member Group pauses workouts until a second member joins", async ({
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
 
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
@@ -264,9 +266,11 @@ test("weekly loop: self-report, target, finalized result", async ({
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByText("2 of 4 this week")).toBeVisible();

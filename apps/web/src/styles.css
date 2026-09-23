@@ -205,6 +205,35 @@ form h2,
 form p {
   margin: 0 0 4px;
 }
+.sign-in-doors {
+  display: grid;
+  gap: 16px;
+  margin: 28px 0;
+}
+.sign-in-doors div,
+.sign-in-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.sign-in-doors p {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--muted);
+}
+.otp-fields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.otp-fields legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
 label {
   min-width: 0;
   display: grid;
@@ -269,6 +298,20 @@ button {
 button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+.otp-fields input {
+  padding-inline: 4px;
+  font-size: clamp(1.1rem, 5vw, 1.5rem);
+  font-weight: 700;
+  text-align: center;
+}
+.otp-fields input.invalid {
+  border-color: var(--error);
+  box-shadow: inset 0 0 0 1px var(--error);
+}
+.sign-in-secondary-actions button {
+  background: transparent;
+  color: var(--chalk);
 }
 .danger,
 .danger-zone button {
@@ -668,6 +711,10 @@ button:disabled {
   }
   .member-nav a {
     font-size: 0.62rem;
+  }
+  .sign-in-doors div,
+  .sign-in-secondary-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 240px) {

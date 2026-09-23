@@ -62,6 +62,11 @@ async function mockSignedOut(page: Page) {
   });
 }
 
+async function fillCode(page: Page, code: string) {
+  for (const [index, digit] of [...code].entries())
+    await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
+}
+
 async function mockApi(page: Page, member: boolean) {
   let displayName: string | null = "Akrum";
   await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
@@ -135,9 +140,10 @@ test("Account Name row loads and confirms a saved edit", async ({ page }) => {
   await mockSignedOut(page);
   await mockApi(page, true);
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.getByRole("link", { name: "Account" }).click();
   const name = page.getByLabel("Name");
@@ -162,10 +168,9 @@ test("invitation token enrolls before email code request", async ({ page }) => {
     });
   });
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I was invited" }).click();
   await page.getByLabel("Email address").fill("Invited@Example.Test");
-  await page
-    .getByLabel("Invitation token for first sign-in (optional)")
-    .fill("invitation-secret");
+  await page.getByLabel("Invitation code").fill("invitation-secret");
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(
     page.getByText("If this account is eligible, a code was sent."),
@@ -176,18 +181,88 @@ test("invitation token enrolls before email code request", async ({ page }) => {
   });
 });
 
+test("two doors expose only their fields and preserve enrollment order", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await page.goto("/sign-in");
+  await expect(
+    page.getByText(
+      "First time here? Use I was invited — the other door can’t create an account.",
+    ),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await expect(page.getByLabel("Email address")).toBeFocused();
+  await expect(page.getByLabel("Invitation code")).toHaveCount(0);
+  await page.reload();
+
+  await page.getByRole("button", { name: "I was invited" }).click();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await expect(page.getByLabel("Invitation code")).toBeVisible();
+});
+
+test("six code boxes support paste, focus movement, actions, and rejection", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await page.route("http://127.0.0.1:54321/auth/v1/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/verify"))
+      return route.fulfill({ status: 400, json: { message: "expired" } });
+    return route.fallback();
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  const digits = page.getByLabel(/^Code digit /);
+  await expect(digits).toHaveCount(6);
+  await expect(digits.first()).toHaveAttribute("autocomplete", "one-time-code");
+  await expect(digits.first()).toBeFocused();
+  await expect(
+    page.getByText(
+      "We sent a 6-digit code to member@example.test. It expires in 1 hour.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Send a new code" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Use another email" }),
+  ).toBeVisible();
+
+  await digits.first().evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text", "123456");
+    input.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, clipboardData: data }),
+    );
+  });
+  for (const [index, digit] of [..."123456"].entries())
+    await expect(digits.nth(index)).toHaveValue(digit);
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "That code didn't match. Check the latest email, or send a new code.",
+  );
+  for (const digit of await digits.all())
+    await expect(digit).toHaveClass("invalid");
+  findings.get(page)?.console.splice(0);
+});
+
 test("generic email OTP then live API authorization restores Group entry", async ({
   page,
 }) => {
   await mockSignedOut(page);
   await mockApi(page, false);
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByRole("status")).toHaveText(
     "If this account is eligible, a code was sent.",
   );
-  await page.getByLabel("Six-digit code").fill("123456");
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/group");
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
@@ -200,6 +275,7 @@ test("ineligible OTP request has same observable result", async ({ page }) => {
     route.fulfill({ status: 400, json: { message: "unknown" } }),
   );
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("unknown@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByRole("status")).toHaveText(
@@ -214,15 +290,18 @@ test("invalid code retains email and denied Group action hides private detail", 
   await mockSignedOut(page);
   await mockApi(page, true);
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("12345");
+  await fillCode(page, "12345");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByRole("alert")).toHaveText("Enter the six-digit code.");
-  await expect(page.getByLabel("Email address")).toHaveValue(
-    "member@example.test",
-  );
-  await page.getByLabel("Six-digit code").fill("123456");
+  await expect(page.getByLabel("Code digit 6")).toBeFocused();
+  await expect(
+    page.getByText(
+      "We sent a 6-digit code to member@example.test. It expires in 1 hour.",
+    ),
+  ).toBeVisible();
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
   await page.goto("/group");
@@ -239,9 +318,10 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await mockSignedOut(page);
   await mockApi(page, true);
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
@@ -297,9 +377,10 @@ test("pending Auth deletion still ends browser access", async ({ page }) => {
     }),
   );
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
@@ -361,9 +442,10 @@ test("Group conflict retains draft and retries same idempotency key", async ({
         });
   });
   await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("Six-digit code").fill("123456");
+  await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
   await page.getByLabel("Group name").fill("Morning crew");

@@ -64,15 +64,19 @@ async function readCode(email: string) {
 
 async function signIn(page: Page, email: string, enrollmentToken?: string) {
   await page.goto(`${root}/sign-in`);
+  await page
+    .getByRole("button", {
+      name: enrollmentToken ? "I was invited" : "I already have an account",
+    })
+    .click();
   await page.getByLabel("Email address").fill(email);
   if (enrollmentToken) {
-    await page
-      .getByLabel("Invitation token for first sign-in (optional)")
-      .fill(enrollmentToken);
+    await page.getByLabel("Invitation code").fill(enrollmentToken);
   }
   await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByLabel("Six-digit code")).toBeVisible();
-  await page.getByLabel("Six-digit code").fill(await readCode(email));
+  await expect(page.getByLabel("Code digit 1")).toBeVisible();
+  for (const [index, digit] of [...(await readCode(email))].entries())
+    await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
 }

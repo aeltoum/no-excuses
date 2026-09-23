@@ -71,7 +71,7 @@ export async function verifyOtp(
         error && unavailable(error.status) ? "unavailable" : "rejected",
         error && unavailable(error.status)
           ? "Sign-in service unavailable. Try again."
-          : "Code rejected. Check it and try again.",
+          : "That code didn't match. Check the latest email, or send a new code.",
       );
     return data.session;
   } catch (error) {
