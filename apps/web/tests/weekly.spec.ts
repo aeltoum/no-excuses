@@ -26,6 +26,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
 }, testInfo) => {
   const failures: string[] = [];
   let workoutPostCount = 0;
+  let soloTargetSaveCount = 0;
   page.on("pageerror", (error) => failures.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") failures.push(message.text());
@@ -40,7 +41,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
       return route.fulfill({ status: 200, json: session.user });
     return route.fulfill({ status: 401, json: { message: "no session" } });
   });
-  await page.route("http://127.0.0.1:8787/v1/**", (route) => {
+  await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
     expect(request.headers().authorization).toBe("Bearer live-access");
     const path = new URL(request.url()).pathname;
@@ -57,6 +58,34 @@ test("one-member Group pauses workouts until a second member joins", async ({
         status: 200,
         json: { contractVersion: 1, data: [] },
       });
+    if (path.endsWith("/weekly-target") && request.method() === "GET")
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            membershipId,
+            recurringTarget: 3,
+            lockedTarget: null,
+            nextWeekStartsAt: null,
+            memberCount: 1,
+            timeZone: "America/Chicago",
+          },
+        },
+      });
+    if (path.endsWith("/weekly-target") && request.method() === "PUT") {
+      soloTargetSaveCount++;
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            membershipId,
+            weeklyTarget: request.postDataJSON().weeklyTarget,
+          },
+        },
+      });
+    }
     if (path.endsWith("/finalized-weekly-history"))
       return route.fulfill({
         status: 200,
@@ -104,6 +133,18 @@ test("one-member Group pauses workouts until a second member joins", async ({
   await expect(logWorkout).toHaveCount(0);
   await expect(page.getByText("Action denied.")).toHaveCount(0);
   expect(workoutPostCount).toBe(0);
+  await page.getByRole("link", { name: "Target" }).click();
+  await expect(
+    page.getByText(
+      "Your week starts when a friend joins. This becomes your first target.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Increase weekly target" }).click();
+  await page.getByRole("button", { name: "Save for next week" }).click();
+  await expect(
+    page.getByText("Saved. This becomes your first target.", { exact: true }),
+  ).toBeVisible();
+  expect(soloTargetSaveCount).toBe(1);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -144,8 +185,9 @@ test("weekly loop: self-report, target, finalized result", async ({
   let targetProgressFailed = false;
   const keys: string[] = [];
   const targetKeys: string[] = [];
+  let targetLoadFailures = 0;
   let emptyHistory = false;
-  await page.route("http://127.0.0.1:8787/v1/**", (route) => {
+  await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
     expect(request.headers().authorization).toBe("Bearer live-access");
     const path = new URL(request.url()).pathname;
@@ -242,6 +284,30 @@ test("weekly loop: self-report, target, finalized result", async ({
       return respond({
         workoutCheckinId: body.workoutCheckinId,
         currentWeekCount: count,
+      });
+    }
+    if (path.endsWith("/weekly-target") && request.method() === "GET") {
+      if (targetLoadFailures > 0) {
+        targetLoadFailures--;
+        return route.fulfill({
+          status: 500,
+          json: {
+            contractVersion: 1,
+            error: {
+              code: "domain_failure",
+              message: "private detail",
+              retryable: true,
+            },
+          },
+        });
+      }
+      return respond({
+        membershipId,
+        recurringTarget: 4,
+        lockedTarget: 4,
+        nextWeekStartsAt: "2026-09-28T05:00:00.000Z",
+        memberCount: 2,
+        timeZone: "America/Chicago",
       });
     }
     if (path.endsWith("/weekly-target")) {
@@ -375,32 +441,66 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByRole("button", { name: "Refresh count" }).click();
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
-  await page.getByRole("link", { name: "Target" }).click();
-  await page.getByLabel("Workouts per week").fill("4");
-  await page.getByRole("button", { name: "Save target" }).click();
+  const targetLink = page.getByRole("link", {
+    name: "3 of 4 workouts. Change weekly target.",
+  });
+  await expect(targetLink).toBeVisible();
+  targetLoadFailures = 2;
+  await targetLink.click();
+  await expect(
+    page.getByRole("button", { name: "Retry loading" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Retry loading" }).click();
+  await expect(
+    page.getByText(
+      "This week is locked at 4. Changes start next week, Mon Sep 28.",
+    ),
+  ).toBeVisible();
+  const decreaseTarget = page.getByRole("button", {
+    name: "Decrease weekly target",
+  });
+  const increaseTarget = page.getByRole("button", {
+    name: "Increase weekly target",
+  });
+  await decreaseTarget.click();
+  await decreaseTarget.click();
+  await decreaseTarget.click();
+  await expect(decreaseTarget).toBeDisabled();
+  for (let target = 1; target < 7; target++) await increaseTarget.click();
+  await expect(page.getByText("workouts a week")).toBeVisible();
+  await expect(
+    page.getByText(/unusually high target or a sharp jump/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "We suggest at least 2. There’s no reward for a higher number.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(page.getByRole("alert")).toHaveText(
     "Action conflicts with current Group state.",
   );
   await expect(page.getByRole("alert")).toBeFocused();
-  await page.getByRole("button", { name: "Save target" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Weekly target set to 4. Current progress unavailable",
-  );
-  await page.getByLabel("Workouts per week").fill("5");
-  await page.getByRole("button", { name: "Refresh progress" }).click();
-  await expect(page.getByRole("status")).toHaveText(
-    "Progress refreshed. Review current locked target above.",
-  );
-  await expect(page.getByLabel("Workouts per week")).toHaveValue("5");
+  await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(
-    page.getByText("Weekly target set to 5", { exact: false }),
+    page.getByText("Saved. From Sep 28 your target is 7.", { exact: true }),
+  ).toBeVisible();
+  await increaseTarget.click();
+  await page.getByRole("button", { name: "Refresh progress" }).click();
+  await expect(
+    page.getByText("Progress refreshed. Review current locked target above.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Saved. From Sep 28 your target is 8.", { exact: false }),
   ).toHaveCount(0);
   expect(targetKeys).toHaveLength(2);
   expect(targetKeys[0]).toBe(targetKeys[1]);
   await page.getByRole("link", { name: "History" }).click();
   await expect(page.getByText("Missed · 2 / 3")).toBeVisible();
   await expect(
-    page.getByText("Weekly target set to 4", { exact: false }),
+    page.getByText("Saved. From Sep 28", { exact: false }),
   ).toHaveCount(0);
   emptyHistory = true;
   await page.getByRole("link", { name: "Home" }).click();
@@ -411,7 +511,7 @@ test("weekly loop: self-report, target, finalized result", async ({
   for (const width of [195, 160]) {
     await page.setViewportSize({ width, height: width === 195 ? 422 : 284 });
     for (const route of ["Home", "Target", "History"]) {
-      await page.getByRole("link", { name: route }).click();
+      await page.getByRole("link", { name: route, exact: true }).click();
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await page.evaluate(() => window.scrollTo(0, 0));
       const geometry = await page.evaluate(() => {
@@ -469,6 +569,8 @@ test("weekly loop: self-report, target, finalized result", async ({
   ).toEqual([]);
   expect(failures.sort()).toEqual(
     [
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 409 (Conflict)",

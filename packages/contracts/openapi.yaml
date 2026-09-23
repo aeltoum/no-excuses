@@ -205,6 +205,14 @@ paths:
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
   /v1/group-memberships/weekly-target:
+    get:
+      operationId: getWeeklyTarget
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Current member target and authoritative next week boundary, content: { application/json: { schema: { $ref: "#/components/schemas/WeeklyTargetContextResponse" } } } }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
     put:
       operationId: setWeeklyTarget
       security: [{ bearerAuth: [] }]
@@ -631,6 +639,24 @@ components:
       properties:
         membershipId: { type: string, format: uuid }
         weeklyTarget: { type: integer, minimum: 1 }
+    WeeklyTargetContextResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/WeeklyTargetContext" }
+    WeeklyTargetContext:
+      type: object
+      additionalProperties: false
+      required: [membershipId, recurringTarget, lockedTarget, nextWeekStartsAt, memberCount, timeZone]
+      properties:
+        membershipId: { type: string, format: uuid }
+        recurringTarget: { type: integer, minimum: 1 }
+        lockedTarget: { type: [integer, "null"], minimum: 1 }
+        nextWeekStartsAt: { anyOf: [{ $ref: "#/components/schemas/UtcInstant" }, { type: "null" }] }
+        memberCount: { type: integer, minimum: 1 }
+        timeZone: { type: string, minLength: 1 }
     GroupMembershipResponse:
       type: object
       additionalProperties: false

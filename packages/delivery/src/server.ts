@@ -435,6 +435,25 @@ const handlers = {
     setWeeklyTargetRequestSchema,
     false,
   ),
+  getWeeklyTarget: read(
+    "select * from app_private.weekly_target_context(now())",
+    () => [],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return {
+        membershipId: rows[0].membership_id,
+        recurringTarget: rows[0].recurring_target,
+        lockedTarget: rows[0].locked_target,
+        nextWeekStartsAt: rows[0].next_week_starts_at
+          ? new Date(String(rows[0].next_week_starts_at)).toISOString()
+          : null,
+        memberCount: rows[0].member_count,
+        timeZone: rows[0].time_zone,
+      };
+    },
+    currentGroupMembershipRequestSchema,
+  ),
   submitWorkoutCheckin: command(
     "select * from app_private.submit_workout_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
     (body) => [

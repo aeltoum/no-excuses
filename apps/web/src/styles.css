@@ -934,3 +934,83 @@ button:disabled {
   min-height: 3rem;
   font-size: 1.5rem;
 }
+
+.own-target-link {
+  display: block;
+  color: inherit;
+}
+
+.target-lock-copy {
+  margin: 10px 0 28px;
+  color: var(--muted);
+}
+
+.target-form {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.target-control {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.target-control legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.target-adjust {
+  width: 64px;
+  min-height: 64px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--chalk);
+  font-size: 1.875rem;
+}
+
+.target-control output {
+  min-width: 0;
+  text-align: center;
+}
+
+.target-control output strong {
+  display: block;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: clamp(5rem, 28vw, 6.875rem);
+  font-weight: 900;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.target-control output span,
+.target-guidance {
+  color: var(--muted);
+}
+
+.target-warning {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e8c22e;
+  color: #e8c22e;
+}
+
+.target-guidance {
+  margin: -8px 0 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
