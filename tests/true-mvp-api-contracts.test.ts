@@ -25,6 +25,7 @@ import {
   setWeeklyTargetRequestSchema,
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
+  weeklyTargetContextResponseSchema,
   weeklyTargetResponseSchema,
 } from "../packages/contracts/src/runtime.js";
 import {
@@ -271,6 +272,33 @@ describe("True-MVP API runtime contracts", () => {
         data: { membershipId, weeklyTarget: 4 },
       }),
     ).toBeTruthy();
+    expect(
+      weeklyTargetContextResponseSchema.parse({
+        contractVersion: 1,
+        data: {
+          membershipId,
+          recurringTarget: 4,
+          lockedTarget: 3,
+          nextWeekStartsAt: "2026-09-28T05:00:00.000Z",
+          memberCount: 2,
+          timeZone: "America/Chicago",
+        },
+      }),
+    ).toBeTruthy();
+    expect(
+      weeklyTargetContextResponseSchema.safeParse({
+        contractVersion: 1,
+        data: {
+          membershipId,
+          recurringTarget: 4,
+          lockedTarget: null,
+          nextWeekStartsAt: null,
+          memberCount: 1,
+          timeZone: "America/Chicago",
+          privateField: true,
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("validates narrow Group roster and pending invitation reads", () => {

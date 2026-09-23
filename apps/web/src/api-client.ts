@@ -15,6 +15,7 @@ import {
   pendingGroupInvitationsResponseSchema,
   revokedGroupInvitationResponseSchema,
   submitWorkoutCheckinResponseSchema,
+  weeklyTargetContextResponseSchema,
   weeklyTargetResponseSchema,
 } from "@no-excuses/contracts";
 
@@ -194,6 +195,12 @@ export function createApiClient(
         { weeklyTarget },
         "PUT",
         key,
+      ),
+    target: (token: string) =>
+      request(
+        "/v1/group-memberships/weekly-target",
+        token,
+        weeklyTargetContextResponseSchema,
       ),
     checkIn: (
       token: string,

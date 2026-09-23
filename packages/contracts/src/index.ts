@@ -29,6 +29,7 @@ export type {
   SetWeeklyTargetRequest,
   SocialInteractionResult,
   SubmitWorkoutCheckinRequest,
+  WeeklyTargetContext,
   WeeklyTargetResult,
   WorkoutCheckinResult,
 } from "./runtime.js";
@@ -90,6 +91,8 @@ export {
   submitWorkoutCheckinRequestSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyOutcomeSchema,
+  weeklyTargetContextResponseSchema,
+  weeklyTargetContextSchema,
   weeklyTargetResponseSchema,
   weeklyTargetResultSchema,
   workoutActivityTypeSchema,

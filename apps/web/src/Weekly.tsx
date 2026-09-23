@@ -1,6 +1,7 @@
 import type {
   CurrentWeekProgressItem,
   FinalizedWeeklyHistoryItem,
+  WeeklyTargetContext,
 } from "@no-excuses/contracts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
@@ -32,6 +33,8 @@ export function Weekly({
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
   const [target, setTarget] = useState("");
+  const [targetContext, setTargetContext] =
+    useState<WeeklyTargetContext | null>(null);
   const [activityType, setActivityType] = useState<
     "strength" | "cardio" | "class" | "sport" | "mixed" | null
   >(null);
@@ -78,13 +81,34 @@ export function Weekly({
     const load =
       route === "/history"
         ? api.history(token, groupId)
-        : api.progress(token, groupId);
+        : route === "/target"
+          ? Promise.all([api.progress(token, groupId), api.target(token)])
+          : api.progress(token, groupId);
     void load
       .then((response) => {
         if (!active) return;
         if (route === "/history")
-          setHistory(response.data as FinalizedWeeklyHistoryItem[]);
-        else setProgress(response.data as CurrentWeekProgressItem[]);
+          setHistory(
+            (response as Awaited<ReturnType<Api["history"]>>)
+              .data as FinalizedWeeklyHistoryItem[],
+          );
+        else if (route === "/target") {
+          const [progressResponse, targetResponse] = response as [
+            Awaited<ReturnType<Api["progress"]>>,
+            Awaited<ReturnType<Api["target"]>>,
+          ];
+          setProgress(progressResponse.data);
+          setTargetContext(targetResponse.data as WeeklyTargetContext);
+          setTarget(
+            String(
+              (targetResponse.data as WeeklyTargetContext).recurringTarget,
+            ),
+          );
+        } else
+          setProgress(
+            (response as Awaited<ReturnType<Api["progress"]>>)
+              .data as CurrentWeekProgressItem[],
+          );
         setState("ready");
       })
       .catch((error) => {
@@ -159,6 +183,33 @@ export function Weekly({
     (item) => item.membershipId === membership.membershipId,
   );
   const home = route === "/home";
+  const boundary = targetContext?.nextWeekStartsAt
+    ? new Date(targetContext.nextWeekStartsAt)
+    : null;
+  const boundaryDate =
+    boundary && targetContext
+      ? new Intl.DateTimeFormat("en-US", {
+          timeZone: targetContext.timeZone,
+          month: "short",
+          day: "numeric",
+        }).format(boundary)
+      : null;
+  const boundaryWithWeekday =
+    boundary && targetContext && boundaryDate
+      ? `${new Intl.DateTimeFormat("en-US", {
+          timeZone: targetContext.timeZone,
+          weekday: "short",
+        }).format(boundary)} ${boundaryDate}`
+      : null;
+  const targetCount = Number(target);
+  const targetWarning =
+    Number.isSafeInteger(targetCount) &&
+    targetContext &&
+    (targetCount >= 10 || targetCount >= targetContext.recurringTarget + 3);
+  const savedTargetText = (weeklyTarget: number) =>
+    boundaryDate
+      ? `Saved. From ${boundaryDate} your target is ${weeklyTarget}.`
+      : "Saved. This becomes your first target.";
   const logReady =
     activityType !== null &&
     Number.isSafeInteger(Number(duration)) &&
@@ -226,12 +277,18 @@ export function Weekly({
             <>
               {own ? (
                 <div className="own-progress">
-                  <Barbell
-                    count={own.completedWorkoutCount}
-                    target={own.lockedTarget}
-                    size="big"
-                    activityTypes={own.activityTypes}
-                  />
+                  <a
+                    className="own-target-link"
+                    href="/target"
+                    aria-label={`${own.completedWorkoutCount} of ${own.lockedTarget} workouts. Change weekly target.`}
+                  >
+                    <Barbell
+                      count={own.completedWorkoutCount}
+                      target={own.lockedTarget}
+                      size="big"
+                      activityTypes={own.activityTypes}
+                    />
+                  </a>
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
@@ -537,18 +594,15 @@ export function Weekly({
           )}
           {route === "/target" && (
             <>
-              <p>
-                Current locked target:{" "}
-                <strong>
-                  {own ? `${own.lockedTarget} workouts` : "No active week"}
-                </strong>
-                .
-              </p>
-              <p>
-                Target changes are scheduled by Group rules. Current locked week
-                may stay unchanged.
+              <p className="target-lock-copy">
+                {targetContext?.memberCount === 1
+                  ? "Your week starts when a friend joins. This becomes your first target."
+                  : targetContext && boundaryWithWeekday
+                    ? `This week is locked at ${targetContext.lockedTarget}. Changes start next week, ${boundaryWithWeekday}.`
+                    : "Your target timing is unavailable."}
               </p>
               <form
+                className="target-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (busy) return;
@@ -584,7 +638,7 @@ export function Weekly({
                       targetDraft.current = null;
                       setNotice({
                         kind: "success",
-                        text: `Weekly target set to ${response.data.weeklyTarget}. Current locked week may stay unchanged.`,
+                        text: savedTargetText(response.data.weeklyTarget),
                       });
                       try {
                         setProgress(
@@ -600,7 +654,7 @@ export function Weekly({
                         setRefreshWarning(true);
                         setNotice({
                           kind: "success",
-                          text: `Weekly target set to ${response.data.weeklyTarget}. Current progress unavailable; refresh progress to see latest state.`,
+                          text: savedTargetText(response.data.weeklyTarget),
                         });
                       }
                     })
@@ -608,22 +662,46 @@ export function Weekly({
                     .finally(() => setBusy(false));
                 }}
               >
-                <h2>Set Weekly target</h2>
-                <label>
-                  Workouts per week
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    value={target}
-                    onChange={(e) => setTarget(e.target.value)}
+                <fieldset className="target-control">
+                  <legend>Weekly target</legend>
+                  <button
+                    className="target-adjust"
+                    type="button"
+                    aria-label="Decrease weekly target"
+                    disabled={busy || targetCount <= 1}
+                    onClick={() =>
+                      setTarget(String(Math.max(1, targetCount - 1)))
+                    }
+                  >
+                    −
+                  </button>
+                  <output aria-live="polite">
+                    <strong>{target}</strong>
+                    <span>workouts a week</span>
+                  </output>
+                  <button
+                    className="target-adjust"
+                    type="button"
+                    aria-label="Increase weekly target"
                     disabled={busy}
-                  />
-                </label>
+                    onClick={() => setTarget(String(targetCount + 1))}
+                  >
+                    +
+                  </button>
+                </fieldset>
+                {targetWarning && (
+                  <p className="target-warning" role="status">
+                    This is an unusually high target or a sharp jump. Choose
+                    what feels sustainable; you can lower it for any future
+                    week.
+                  </p>
+                )}
                 <button type="submit" disabled={busy}>
-                  {busy ? "Saving…" : "Save target"}
+                  {busy ? "Saving…" : "Save for next week"}
                 </button>
+                <p className="target-guidance">
+                  We suggest at least 2. There’s no reward for a higher number.
+                </p>
               </form>
               {refreshWarning && (
                 <button type="button" onClick={refreshCount} disabled={busy}>

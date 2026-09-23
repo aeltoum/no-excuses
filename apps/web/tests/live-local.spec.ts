@@ -255,11 +255,11 @@ test("private enrollment and live weekly PWA journey", async ({
     });
     await page.reload();
     await expect(page.getByText(/Your workouts:/)).toBeVisible();
-    await page.getByRole("link", { name: "Target" }).click();
-    await page.getByLabel("Workouts per week").fill("3");
-    await page.getByRole("button", { name: "Save target" }).click();
+    await page.getByRole("link", { name: "Target", exact: true }).click();
+    await page.getByRole("button", { name: "Increase weekly target" }).click();
+    await page.getByRole("button", { name: "Save for next week" }).click();
     await expect(
-      page.getByText("Weekly target set to 3", { exact: false }),
+      page.getByText(/Saved\. From .* your target is 3\./),
     ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("target.png"),

@@ -234,6 +234,17 @@ export const weeklyTargetResultSchema = z
   .object({ membershipId: uuidSchema, weeklyTarget: positiveIntegerSchema })
   .strict();
 
+export const weeklyTargetContextSchema = z
+  .object({
+    membershipId: uuidSchema,
+    recurringTarget: positiveIntegerSchema,
+    lockedTarget: positiveIntegerSchema.nullable(),
+    nextWeekStartsAt: utcInstantSchema.nullable(),
+    memberCount: positiveIntegerSchema,
+    timeZone: boundedTextSchema(100),
+  })
+  .strict();
+
 export const deletedAccountResultSchema = z
   .object({ accountId: uuidSchema })
   .strict();
@@ -297,6 +308,9 @@ export const revokedGroupInvitationResponseSchema = commandResponse(
 );
 export const weeklyTargetResponseSchema = commandResponse(
   weeklyTargetResultSchema,
+);
+export const weeklyTargetContextResponseSchema = commandResponse(
+  weeklyTargetContextSchema,
 );
 export const deletedAccountResponseSchema = commandResponse(
   deletedAccountResultSchema,
@@ -446,6 +460,7 @@ export type RevokedGroupInvitationResult = z.infer<
   typeof revokedGroupInvitationResultSchema
 >;
 export type WeeklyTargetResult = z.infer<typeof weeklyTargetResultSchema>;
+export type WeeklyTargetContext = z.infer<typeof weeklyTargetContextSchema>;
 export type DeletedAccountResult = z.infer<typeof deletedAccountResultSchema>;
 export type SocialInteractionResult = z.infer<
   typeof socialInteractionResultSchema

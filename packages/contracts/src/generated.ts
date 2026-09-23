@@ -219,7 +219,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getWeeklyTarget"];
         put: operations["setWeeklyTarget"];
         post?: never;
         delete?: never;
@@ -560,6 +560,20 @@ export interface components {
             /** Format: uuid */
             membershipId: string;
             weeklyTarget: number;
+        };
+        WeeklyTargetContextResponse: {
+            /** @constant */
+            contractVersion: 1;
+            data: components["schemas"]["WeeklyTargetContext"];
+        };
+        WeeklyTargetContext: {
+            /** Format: uuid */
+            membershipId: string;
+            recurringTarget: number;
+            lockedTarget: number | null;
+            nextWeekStartsAt: components["schemas"]["UtcInstant"] | null;
+            memberCount: number;
+            timeZone: string;
         };
         GroupMembershipResponse: {
             /** @constant */
@@ -1153,6 +1167,29 @@ export interface operations {
             401: components["responses"]["ApiError"];
             403: components["responses"]["ApiError"];
             409: components["responses"]["ApiError"];
+            500: components["responses"]["ApiError"];
+        };
+    };
+    getWeeklyTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current member target and authoritative next week boundary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyTargetContextResponse"];
+                };
+            };
+            401: components["responses"]["ApiError"];
+            403: components["responses"]["ApiError"];
             500: components["responses"]["ApiError"];
         };
     };
