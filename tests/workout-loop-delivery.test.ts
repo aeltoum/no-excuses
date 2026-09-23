@@ -136,6 +136,7 @@ describe("workout-loop delivery entrypoints", () => {
         displayName: "Akrum",
         lockedTarget: 3,
         completedWorkoutCount: 1,
+        activityTypes: ["cardio" as const],
       },
     ];
     const history = [

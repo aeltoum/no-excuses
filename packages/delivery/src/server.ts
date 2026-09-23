@@ -492,6 +492,7 @@ const handlers = {
         displayName: row.display_name,
         lockedTarget: row.locked_target,
         completedWorkoutCount: row.completed_workout_count,
+        activityTypes: row.activity_types ?? [],
       })),
     groupRequestSchema,
   ),
