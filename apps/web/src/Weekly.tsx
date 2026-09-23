@@ -45,8 +45,11 @@ export function Weekly({
   );
   const [attested, setAttested] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [historyLimit, setHistoryLimit] = useState(12);
   const [logError, setLogError] = useState(false);
   const resultRef = useRef<HTMLParagraphElement>(null);
+  const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
   const groupId = membership?.groupId;
@@ -78,21 +81,24 @@ export function Weekly({
       setState("ready");
       return;
     }
+    if (route === "/history") setHistoryLimit(12);
     const load =
       route === "/history"
-        ? api.history(token, groupId)
+        ? Promise.all([api.history(token, groupId), api.target(token)])
         : route === "/target"
           ? Promise.all([api.progress(token, groupId), api.target(token)])
           : api.progress(token, groupId);
     void load
       .then((response) => {
         if (!active) return;
-        if (route === "/history")
-          setHistory(
-            (response as Awaited<ReturnType<Api["history"]>>)
-              .data as FinalizedWeeklyHistoryItem[],
-          );
-        else if (route === "/target") {
+        if (route === "/history") {
+          const [historyResponse, targetResponse] = response as [
+            Awaited<ReturnType<Api["history"]>>,
+            Awaited<ReturnType<Api["target"]>>,
+          ];
+          setHistory(historyResponse.data as FinalizedWeeklyHistoryItem[]);
+          setTargetContext(targetResponse.data as WeeklyTargetContext);
+        } else if (route === "/target") {
           const [progressResponse, targetResponse] = response as [
             Awaited<ReturnType<Api["progress"]>>,
             Awaited<ReturnType<Api["target"]>>,
@@ -210,6 +216,68 @@ export function Weekly({
     boundaryDate
       ? `Saved. From ${boundaryDate} your target is ${weeklyTarget}.`
       : "Saved. This becomes your first target.";
+  const historyWeeks = [...new Set(history.map((item) => item.startsAt))].sort(
+    (left, right) => Date.parse(right) - Date.parse(left),
+  );
+  const selectedHistory = selectedWeek
+    ? history.filter((item) => item.startsAt === selectedWeek)
+    : [];
+  const ownHistory = (startsAt: string) =>
+    history.find(
+      (item) =>
+        item.startsAt === startsAt &&
+        item.membershipId === membership.membershipId,
+    );
+  const historyRange = (item: FinalizedWeeklyHistoryItem) => {
+    const timeZone = targetContext?.timeZone;
+    const start = new Date(item.startsAt);
+    const end = new Date(Date.parse(item.endsAt) - 1);
+    const startMonth = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      timeZone,
+    }).format(start);
+    const endMonth = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      timeZone,
+    }).format(end);
+    const startDay = new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      timeZone,
+    }).format(start);
+    const endDay = new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      timeZone,
+    }).format(end);
+    return startMonth === endMonth
+      ? `${startMonth} ${startDay} – ${endDay}`
+      : `${startMonth} ${startDay} – ${endMonth} ${endDay}`;
+  };
+  const nextWeekBoundary = targetContext?.nextWeekStartsAt
+    ? new Date(targetContext.nextWeekStartsAt)
+    : null;
+  const emptyHistoryClose =
+    nextWeekBoundary && targetContext
+      ? `${new Intl.DateTimeFormat("en-US", {
+          timeZone: targetContext.timeZone,
+          weekday: "long",
+        }).format(new Date(nextWeekBoundary.getTime() - 1))} at ${(() => {
+          const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: targetContext.timeZone,
+            hour: "numeric",
+            minute: "2-digit",
+            hourCycle: "h23",
+          }).formatToParts(nextWeekBoundary);
+          const hour = parts.find((part) => part.type === "hour")?.value;
+          const minute = parts.find((part) => part.type === "minute")?.value;
+          return hour === "00" && minute === "00"
+            ? "midnight"
+            : new Intl.DateTimeFormat("en-US", {
+                timeZone: targetContext.timeZone,
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(nextWeekBoundary);
+        })()}`
+      : null;
   const logReady =
     activityType !== null &&
     Number.isSafeInteger(Number(duration)) &&
@@ -245,10 +313,27 @@ export function Weekly({
             <span className="skeleton skeleton-row" />
             <span className="skeleton skeleton-row" />
           </div>
+        ) : route === "/history" ? (
+          <div
+            className="history-skeleton"
+            role="status"
+            aria-label="Loading history"
+          >
+            {[
+              "one",
+              "two",
+              "three",
+              "four",
+              "five",
+              "six",
+              "seven",
+              "eight",
+            ].map((key) => (
+              <span className="skeleton" key={key} />
+            ))}
+          </div>
         ) : (
-          <p role="status">
-            Loading {route === "/history" ? "history" : "weekly progress"}…
-          </p>
+          <p role="status">Loading weekly progress…</p>
         )
       ) : state === "error" ? (
         home ? (
@@ -259,6 +344,13 @@ export function Weekly({
                 Check your connection, then try again.
               </span>
             </div>
+            <button type="button" onClick={refresh}>
+              Try again
+            </button>
+          </div>
+        ) : route === "/history" ? (
+          <div className="history-load-error">
+            <p role="alert">Couldn&apos;t load your history.</p>
             <button type="button" onClick={refresh}>
               Try again
             </button>
@@ -712,38 +804,107 @@ export function Weekly({
           )}
           {route === "/history" && (
             <>
-              <h2>Finalized weeks</h2>
-              {history.length ? (
-                <ul className="progress-list">
-                  {history.map((item) => (
-                    <li key={`${item.membershipId}:${item.startsAt}`}>
-                      <div>
-                        <strong>
-                          {item.membershipId === membership.membershipId
-                            ? "You"
-                            : item.displayName}
-                        </strong>
-                        <br />
-                        <time dateTime={item.startsAt}>
-                          {new Date(item.startsAt).toLocaleDateString()}
-                        </time>{" "}
-                        –{" "}
-                        <time dateTime={item.endsAt}>
-                          {new Date(item.endsAt).toLocaleDateString()}
-                        </time>
-                      </div>
-                      <span>
-                        {item.outcome === "attained" ? "Met" : "Missed"} ·{" "}
-                        {item.completedWorkoutCount} / {item.lockedTarget}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <h2>The rack</h2>
+              {historyWeeks.length ? (
+                <>
+                  <ul className="history-rack" aria-label="Finalized weeks">
+                    {historyWeeks.slice(0, historyLimit).map((startsAt) => {
+                      const item = ownHistory(startsAt);
+                      if (!item) return null;
+                      const met = item.outcome === "attained";
+                      const range = historyRange(item);
+                      return (
+                        <li key={startsAt}>
+                          <button
+                            type="button"
+                            className={`history-plate${met ? " met" : " missed"}`}
+                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met ? "Met" : "Missed"}`}
+                            onClick={(event) => {
+                              historyOpenerRef.current = event.currentTarget;
+                              setSelectedWeek(startsAt);
+                            }}
+                          >
+                            <span
+                              className="history-plate-hole"
+                              aria-hidden="true"
+                            />
+                            <strong>
+                              {item.completedWorkoutCount}/{item.lockedTarget}
+                            </strong>
+                          </button>
+                          <span className="history-caption">
+                            {range}
+                            <strong className="history-outcome">
+                              {met ? "Met" : "Missed"}
+                            </strong>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {historyLimit < historyWeeks.length && (
+                    <button
+                      type="button"
+                      className="history-older"
+                      onClick={() => setHistoryLimit((limit) => limit + 12)}
+                    >
+                      Show older weeks
+                    </button>
+                  )}
+                  <Sheet
+                    open={Boolean(selectedHistory[0])}
+                    title={
+                      selectedHistory[0] ? historyRange(selectedHistory[0]) : ""
+                    }
+                    onDismiss={() => {
+                      setSelectedWeek(null);
+                      requestAnimationFrame(() =>
+                        historyOpenerRef.current?.focus(),
+                      );
+                    }}
+                  >
+                    {selectedHistory[0] && (
+                      <>
+                        {(() => {
+                          const item = selectedHistory.find(
+                            (week) =>
+                              week.membershipId === membership.membershipId,
+                          );
+                          return item ? (
+                            <p className="history-own-outcome">
+                              You{" "}
+                              {item.outcome === "attained"
+                                ? "met it"
+                                : "missed it"}
+                              : {item.completedWorkoutCount} of{" "}
+                              {item.lockedTarget}.
+                            </p>
+                          ) : null;
+                        })()}
+                        <ul className="history-detail">
+                          {selectedHistory.map((item) => (
+                            <li key={item.membershipId}>
+                              <span>{item.displayName}</span>
+                              <span>
+                                {item.completedWorkoutCount}/{item.lockedTarget}{" "}
+                                ·{" "}
+                                {item.outcome === "attained" ? "Met" : "Missed"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </Sheet>
+                </>
               ) : (
-                <p>
-                  No finalized weekly history yet. Results appear after a week
-                  closes.
-                </p>
+                <div className="history-empty">
+                  <h3>Nothing on the rack yet.</h3>
+                  <p>
+                    Your first week lands here when it closes
+                    {emptyHistoryClose ? ` on ${emptyHistoryClose}` : ""}.
+                  </p>
+                </div>
               )}
             </>
           )}
