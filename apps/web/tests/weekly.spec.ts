@@ -186,7 +186,37 @@ test("weekly loop: self-report, target, finalized result", async ({
   const keys: string[] = [];
   const targetKeys: string[] = [];
   let targetLoadFailures = 0;
+  let historyLoadFailures = 0;
   let emptyHistory = false;
+  const historyData = Array.from({ length: 13 }, (_, index) => {
+    const startsAt = new Date(
+      Date.parse("2026-09-14T05:00:00.000Z") - index * 7 * 24 * 60 * 60 * 1000,
+    );
+    const endsAt = new Date(startsAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const ownMet = index % 2 === 0;
+    return [
+      {
+        membershipId,
+        displayName: "Akrum",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        lockedTarget: 4,
+        completedWorkoutCount: ownMet ? 4 : 2,
+        outcome: ownMet ? "attained" : "missed",
+      },
+      {
+        membershipId: friendMembershipId,
+        displayName: "Maya",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        lockedTarget: 3,
+        completedWorkoutCount: index % 3 === 0 ? 2 : 3,
+        outcome: index % 3 === 0 ? "missed" : "attained",
+      },
+    ];
+  })
+    .flat()
+    .reverse();
   await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
     const request = route.request();
     expect(request.headers().authorization).toBe("Bearer live-access");
@@ -253,18 +283,22 @@ test("weekly loop: self-report, target, finalized result", async ({
       ]);
     if (path.endsWith("/finalized-weekly-history") && emptyHistory)
       return respond([]);
-    if (path.endsWith("/finalized-weekly-history"))
-      return respond([
-        {
-          membershipId,
-          displayName: "Akrum",
-          startsAt: "2026-09-01T00:00:00Z",
-          endsAt: "2026-09-08T00:00:00Z",
-          lockedTarget: 3,
-          completedWorkoutCount: 2,
-          outcome: "missed",
+    if (path.endsWith("/finalized-weekly-history") && historyLoadFailures > 0) {
+      historyLoadFailures--;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return route.fulfill({
+        status: 500,
+        json: {
+          contractVersion: 1,
+          error: {
+            code: "domain_failure",
+            message: "private detail",
+            retryable: true,
+          },
         },
-      ]);
+      });
+    }
+    if (path.endsWith("/finalized-weekly-history")) return respond(historyData);
     if (path.endsWith("/workout-check-ins")) {
       const body = request.postDataJSON();
       keys.push(request.headers()["idempotency-key"]);
@@ -497,8 +531,38 @@ test("weekly loop: self-report, target, finalized result", async ({
   ).toHaveCount(0);
   expect(targetKeys).toHaveLength(2);
   expect(targetKeys[0]).toBe(targetKeys[1]);
+  historyLoadFailures = 2;
   await page.getByRole("link", { name: "History" }).click();
-  await expect(page.getByText("Missed · 2 / 3")).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Loading history" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Couldn't load your history.",
+  );
+  await page.getByRole("button", { name: "Try again" }).click();
+  const rack = page.getByRole("list", { name: "Finalized weeks" });
+  await expect(rack.getByRole("button")).toHaveCount(12);
+  const latestPlate = rack.getByRole("button", {
+    name: "Sep 14 – 20: 4/4, Met",
+  });
+  await expect(latestPlate).toBeVisible();
+  await expect(rack.getByText("Jun 22 – 28")).toHaveCount(0);
+  await latestPlate.click();
+  const historySheet = page.getByRole("dialog", { name: "Sep 14 – 20" });
+  await expect(historySheet.getByRole("heading")).toBeFocused();
+  await expect(historySheet.getByText("You met it: 4 of 4.")).toBeVisible();
+  await expect(historySheet.getByText("Akrum")).toBeVisible();
+  await expect(historySheet.getByText("4/4 · Met")).toBeVisible();
+  await expect(historySheet.getByText("Maya")).toBeVisible();
+  await expect(historySheet.getByText("2/3 · Missed")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(historySheet).toHaveCount(0);
+  await expect(latestPlate).toBeFocused();
+  await page.getByRole("button", { name: "Show older weeks" }).click();
+  await expect(rack.getByRole("button")).toHaveCount(13);
+  await expect(
+    page.getByRole("button", { name: "Show older weeks" }),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Saved. From Sep 28", { exact: false }),
   ).toHaveCount(0);
@@ -506,7 +570,9 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByRole("link", { name: "Home" }).click();
   await page.getByRole("link", { name: "History" }).click();
   await expect(
-    page.getByText("No finalized weekly history yet.", { exact: false }),
+    page.getByText(
+      "Your first week lands here when it closes on Sunday at midnight.",
+    ),
   ).toBeVisible();
   for (const width of [195, 160]) {
     await page.setViewportSize({ width, height: width === 195 ? 422 : 284 });
@@ -574,6 +640,8 @@ test("weekly loop: self-report, target, finalized result", async ({
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 409 (Conflict)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
     ].sort(),
   );

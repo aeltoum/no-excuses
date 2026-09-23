@@ -792,6 +792,123 @@ button:disabled {
   display: grid;
   gap: 8px;
 }
+.history-skeleton,
+.history-rack {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 8px;
+}
+.history-skeleton {
+  padding-top: 24px;
+}
+.history-skeleton .skeleton {
+  width: min(100%, 80px);
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: 50%;
+}
+.history-rack {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.history-rack li {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.history-plate {
+  width: min(100%, 80px);
+  min-height: 0;
+  aspect-ratio: 1;
+  position: relative;
+  display: grid;
+  place-items: end center;
+  padding: 0 4px 11px;
+  border: 2px solid var(--empty-slot);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.history-plate.met {
+  border-color: var(--chalk);
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.history-plate-hole {
+  width: 10px;
+  height: 10px;
+  position: absolute;
+  top: 18px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: var(--rubber);
+}
+.history-plate strong {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: clamp(1rem, 5vw, 1.25rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.history-caption {
+  color: var(--muted);
+  font-size: clamp(0.62rem, 2.8vw, 0.75rem);
+  line-height: 1.2;
+  text-align: center;
+}
+.history-outcome {
+  display: block;
+  color: var(--chalk);
+}
+.history-older {
+  width: 100%;
+  margin-top: 18px;
+}
+.history-empty {
+  margin-top: 24px;
+}
+.history-empty h3 {
+  margin: 0 0 8px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.875rem;
+  line-height: 1;
+}
+.history-empty p,
+.history-own-outcome {
+  margin: 0;
+  color: var(--muted);
+}
+.history-load-error {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+.history-load-error p {
+  margin: 0;
+}
+.history-detail {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.history-detail li {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.history-detail li span:first-child {
+  overflow-wrap: anywhere;
+}
+.history-detail li span:last-child {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 @keyframes skeleton-pulse {
   to {
     opacity: 0.55;
