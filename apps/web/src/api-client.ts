@@ -9,8 +9,10 @@ import {
   finalizedWeeklyHistoryResponseSchema,
   groupInvitationResponseSchema,
   groupMembershipResponseSchema,
+  groupRosterResponseSchema,
   invitationPreviewResponseSchema,
   pendingAccountDeletionResponseSchema,
+  pendingGroupInvitationsResponseSchema,
   revokedGroupInvitationResponseSchema,
   submitWorkoutCheckinResponseSchema,
   weeklyTargetResponseSchema,
@@ -171,6 +173,18 @@ export function createApiClient(
         `/v1/groups/${encodeURIComponent(groupId)}/finalized-weekly-history`,
         token,
         finalizedWeeklyHistoryResponseSchema,
+      ),
+    roster: (token: string, groupId: string) =>
+      request(
+        `/v1/groups/${encodeURIComponent(groupId)}/members`,
+        token,
+        groupRosterResponseSchema,
+      ),
+    pendingInvitations: (token: string, groupId: string) =>
+      request(
+        `/v1/groups/${encodeURIComponent(groupId)}/pending-invitations`,
+        token,
+        pendingGroupInvitationsResponseSchema,
       ),
     setTarget: (token: string, weeklyTarget: number, key: string) =>
       command(

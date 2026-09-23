@@ -298,6 +298,28 @@ paths:
         "403": { $ref: "#/components/responses/ApiError" }
         "409": { $ref: "#/components/responses/ApiError" }
         "500": { $ref: "#/components/responses/ApiError" }
+  /v1/groups/{groupId}/members:
+    get:
+      operationId: listGroupMembers
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/GroupId" }]
+      responses:
+        "200": { description: Current Group roster visible to current members, content: { application/json: { schema: { $ref: "#/components/schemas/GroupRosterResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
+  /v1/groups/{groupId}/pending-invitations:
+    get:
+      operationId: listPendingGroupInvitations
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/GroupId" }]
+      responses:
+        "200": { description: Pending invitations visible to Group creator, content: { application/json: { schema: { $ref: "#/components/schemas/PendingGroupInvitationsResponse" } } } }
+        "400": { $ref: "#/components/responses/ApiError" }
+        "401": { $ref: "#/components/responses/ApiError" }
+        "403": { $ref: "#/components/responses/ApiError" }
+        "500": { $ref: "#/components/responses/ApiError" }
   /v1/groups/{groupId}/current-week-progress:
     get:
       operationId: getCurrentWeekProgress
@@ -759,6 +781,48 @@ components:
       properties:
         invitationId: { type: string, format: uuid }
         status: { type: string, const: revoked }
+    GroupRosterResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data: { $ref: "#/components/schemas/GroupRosterResult" }
+    GroupRosterResult:
+      type: object
+      additionalProperties: false
+      required: [groupName, members]
+      properties:
+        groupName: { type: string, minLength: 1, maxLength: 80 }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/GroupRosterMember" }
+    GroupRosterMember:
+      type: object
+      additionalProperties: false
+      required: [membershipId, displayName, weeklyTarget, creator]
+      properties:
+        membershipId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 40 }
+        weeklyTarget: { type: integer, minimum: 1 }
+        creator: { type: boolean }
+    PendingGroupInvitationsResponse:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, data]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/PendingGroupInvitation" }
+    PendingGroupInvitation:
+      type: object
+      additionalProperties: false
+      required: [invitationId, email, expiresAt]
+      properties:
+        invitationId: { type: string, format: uuid }
+        email: { type: string, format: email, maxLength: 254 }
+        expiresAt: { $ref: "#/components/schemas/UtcInstant" }
     SubmitWorkoutCheckinResponse:
       type: object
       additionalProperties: false

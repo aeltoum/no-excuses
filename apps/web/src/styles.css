@@ -253,11 +253,114 @@ form {
 .field-error {
   color: var(--error);
 }
-
 form h2,
 form p {
   margin: 0 0 4px;
 }
+.group-screen {
+  max-width: 42rem;
+}
+.group-heading {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 48px;
+}
+.text-button,
+.row-action {
+  width: auto;
+  min-height: 44px;
+  padding-inline: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--chalk);
+  text-decoration: underline;
+}
+.group-roster {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.group-roster li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  border-bottom: 1px solid var(--rule);
+}
+.group-avatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.group-member-copy {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+}
+.group-member-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-member-copy span,
+.pending-invitations h3 {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.danger-text {
+  color: #ff6b6f;
+}
+.pending-invitations {
+  margin-top: 24px;
+}
+.pending-invitations h3,
+.invite-form h3 {
+  margin-bottom: 4px;
+}
+.leave-group {
+  margin-top: 24px;
+}
+.invite-form {
+  margin-top: 24px;
+}
+.invite-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 18px;
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.invite-card code {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+.invite-card div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.invite-card p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.invite-card .secondary-button {
+  border-color: var(--rubber);
+  background: transparent;
+  color: var(--rubber);
+}
+
 .sign-in-doors {
   display: grid;
   gap: 16px;
