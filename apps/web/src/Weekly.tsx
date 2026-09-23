@@ -4,6 +4,7 @@ import type {
 } from "@no-excuses/contracts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
+import { Barbell } from "./Barbell";
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
@@ -153,68 +154,110 @@ export function Weekly({
   const own = progress.find(
     (item) => item.membershipId === membership.membershipId,
   );
+  const home = route === "/home";
   return (
-    <section className="hero">
-      <p className="eyebrow">True MVP · Self-reported</p>
-      <h1>
-        {route === "/home"
-          ? "Every rep counts."
-          : route === "/target"
-            ? "Weekly target"
-            : "Your history"}
-      </h1>
-      <p className="lead">
-        Workouts are self-reported. Friends see your count; nobody independently
-        verifies check-ins.
-      </p>
+    <section className={`hero${home ? " home" : ""}`}>
+      {home ? (
+        <header className="home-header">
+          <h1>Our week</h1>
+          <span>Self-reported</span>
+        </header>
+      ) : (
+        <>
+          <p className="eyebrow">True MVP · Self-reported</p>
+          <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
+          <p className="lead">
+            Workouts are self-reported. Friends see your count; nobody
+            independently verifies check-ins.
+          </p>
+        </>
+      )}
       {state === "loading" ? (
-        <p role="status">
-          Loading {route === "/history" ? "history" : "weekly progress"}…
-        </p>
+        home ? (
+          <div
+            className="home-skeleton"
+            role="status"
+            aria-label="Loading weekly progress"
+          >
+            <span className="skeleton skeleton-bar" />
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-button" />
+            <span className="skeleton skeleton-row" />
+            <span className="skeleton skeleton-row" />
+          </div>
+        ) : (
+          <p role="status">
+            Loading {route === "/history" ? "history" : "weekly progress"}…
+          </p>
+        )
       ) : state === "error" ? (
-        <div>
-          {result}
-          <button type="button" onClick={refresh}>
-            Retry loading
-          </button>
-        </div>
+        home ? (
+          <div className="home-load-error">
+            <div role="alert">
+              <strong>Couldn’t load this week.</strong>
+              <span className="home-load-error-message">
+                Check your connection, then try again.
+              </span>
+            </div>
+            <button type="button" onClick={refresh}>
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div>
+            {result}
+            <button type="button" onClick={refresh}>
+              Retry loading
+            </button>
+          </div>
+        )
       ) : (
         <>
           {route === "/home" && (
             <>
-              <h2>Current week</h2>
               {own ? (
-                <p className="count">
-                  Your workouts:{" "}
-                  <strong>
-                    {own.completedWorkoutCount} / {own.lockedTarget}
-                  </strong>
-                </p>
+                <div className="own-progress">
+                  <Barbell
+                    count={own.completedWorkoutCount}
+                    target={own.lockedTarget}
+                    size="big"
+                  />
+                  <p className="home-count">
+                    {own.completedWorkoutCount} of {own.lockedTarget} this week
+                  </p>
+                </div>
               ) : (
-                <p>
-                  Accountability and workouts begin once a second member joins
-                  your Group.
-                </p>
+                <div className="solo-week">
+                  <Barbell count={0} target={0} size="big" />
+                  <h2>Waiting for a second member</h2>
+                  <p>
+                    Accountability and workouts begin once a second member joins
+                    your Group.
+                  </p>
+                </div>
               )}
-              <h2>Group progress</h2>
-              {progress.length ? (
-                <ul className="progress-list">
-                  {progress.map((item) => (
-                    <li key={item.membershipId}>
-                      <strong>
-                        {item.membershipId === membership.membershipId
-                          ? "You"
-                          : `Member ${item.membershipId.slice(0, 8)}`}
-                      </strong>
-                      <span>
-                        {item.completedWorkoutCount} / {item.lockedTarget}{" "}
-                        workouts
-                      </span>
-                    </li>
-                  ))}
+              {own && progress.length > 1 && (
+                <ul className="friend-progress" aria-label="Friends this week">
+                  {progress
+                    .filter(
+                      (item) => item.membershipId !== membership.membershipId,
+                    )
+                    .map((item) => (
+                      <li key={item.membershipId}>
+                        <strong title={`Member ${item.membershipId}`}>
+                          Member {item.membershipId.slice(0, 8)}
+                        </strong>
+                        <Barbell
+                          count={item.completedWorkoutCount}
+                          target={item.lockedTarget}
+                          size="mini"
+                        />
+                        <span>
+                          {item.completedWorkoutCount}/{item.lockedTarget}
+                        </span>
+                      </li>
+                    ))}
                 </ul>
-              ) : (
-                <p>No current Group progress yet.</p>
               )}
               {own && (
                 <form

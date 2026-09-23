@@ -189,9 +189,7 @@ test("invalid code retains email and denied Group action hides private detail", 
   );
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Every rep counts." }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
   await page.goto("/group");
   await page.getByLabel("Friend email").fill("friend@example.test");
   await page.getByRole("button", { name: "Create invitation" }).click();
@@ -210,7 +208,7 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByText("0 / 3").first()).toBeVisible();
+  await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
   await page.getByRole("button", { name: "Review Account deletion" }).click();
   await expect(
@@ -268,7 +266,7 @@ test("pending Auth deletion still ends browser access", async ({ page }) => {
   await page.getByRole("button", { name: "Send code" }).click();
   await page.getByLabel("Six-digit code").fill("123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByText("0 / 3").first()).toBeVisible();
+  await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
   await page.getByRole("button", { name: "Review Account deletion" }).click();
   await page
