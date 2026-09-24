@@ -79,7 +79,9 @@ export function Sheet({
         aria-label="Close dialog"
         tabIndex={-1}
         disabled={!dismissible}
-        onClick={onDismiss}
+        onClick={() => {
+          if (dismissible) onDismiss();
+        }}
       />
       <div
         className="sheet"

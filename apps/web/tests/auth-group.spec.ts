@@ -233,12 +233,129 @@ test("Account Name row loads and confirms a saved edit", async ({ page }) => {
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.getByRole("link", { name: "Account" }).click();
+  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
+  await expect(page.getByLabel("Your identity")).toContainText("Akrum");
+  await expect(page.getByLabel("Your identity")).toContainText(
+    "member@example.test",
+  );
+  await expect(
+    page.getByRole("link", { name: /Crew.*6AM Crew/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Weekly target.*4 a week/ }),
+  ).toHaveAttribute("href", "/target");
+  await page
+    .getByRole("button", { name: /Install on your home screen/ })
+    .click();
+  await expect(page.getByText(/In Safari, tap Share/)).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   const name = page.getByLabel("Name");
   await expect(name).toHaveValue("Akrum");
   await name.fill("Akrum Eltoum");
   await page.getByRole("button", { name: "Save name" }).click();
   await expect(page.getByRole("status")).toHaveText("Name saved.");
   await expect(name).toHaveValue("Akrum Eltoum");
+});
+
+test("Account crew load failure is honest and retryable", async ({ page }) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  let failRoster = true;
+  await page.route(/\/v1\/groups\/[^/]+\/members$/, (route) => {
+    if (!failRoster) return route.fallback();
+    return route.fulfill({
+      status: 503,
+      json: {
+        contractVersion: 1,
+        error: { code: "unavailable", message: "unavailable", retryable: true },
+      },
+    });
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.goto("/account");
+  await expect(page.getByText("Couldn’t load your crew.")).toBeVisible();
+  await expect(page.getByText("Loading…")).toHaveCount(0);
+  failRoster = false;
+  findings.get(page)?.console.splice(0);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(
+    page.getByRole("link", { name: /Crew.*6AM Crew/ }),
+  ).toBeVisible();
+  findings.get(page)?.console.splice(0);
+  findings.get(page)?.page.splice(0);
+  findings.get(page)?.network.splice(0);
+});
+
+test("failed Account name load never shows the previous signed-in name", async ({
+  page,
+}) => {
+  let secondAccount = false;
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.route(/\/auth\/v1\/(verify|user)$/, (route) => {
+    const nextSession = {
+      ...session,
+      user: {
+        ...session.user,
+        email: secondAccount ? "second@example.test" : "first@example.test",
+      },
+    };
+    return route.fulfill({
+      status: 200,
+      json: route.request().url().endsWith("/user")
+        ? nextSession.user
+        : nextSession,
+    });
+  });
+  await page.route(/\/v1\/account\/display-name$/, (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    if (secondAccount)
+      return route.fulfill({
+        status: 503,
+        json: {
+          contractVersion: 1,
+          error: {
+            code: "unavailable",
+            message: "unavailable",
+            retryable: true,
+          },
+        },
+      });
+    return route.fulfill({
+      status: 200,
+      json: { contractVersion: 1, data: { displayName: "Account A" } },
+    });
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("first@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.goto("/account");
+  await expect(page.getByLabel("Your identity")).toContainText("Account A");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  secondAccount = true;
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("second@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.goto("/account");
+  await expect(page.getByRole("alert")).toHaveText("Couldn’t load your name.");
+  await expect(page.getByLabel("Your identity")).toContainText(
+    "second@example.test",
+  );
+  await expect(page.getByLabel("Your identity")).not.toContainText("Account A");
+  findings.get(page)?.console.splice(0);
+  findings.get(page)?.page.splice(0);
+  findings.get(page)?.network.splice(0);
 });
 
 test("invitation token enrolls before email code request", async ({ page }) => {
@@ -602,6 +719,7 @@ test("failed Group load retries into ten-member scroll above tab bar", async ({
 test("exact Account deletion confirmation cuts off browser session", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await mockSignedOut(page);
   await mockApi(page, true);
   await page.goto("/sign-in");
@@ -612,28 +730,34 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
-  await page.getByRole("button", { name: "Review Account deletion" }).click();
+  await page.getByRole("button", { name: "Delete account…" }).click();
+  const deletionSheet = page.getByRole("dialog", { name: "Delete account" });
   await expect(
-    page.getByText("current Group access ends immediately"),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Send fresh verification code" })
-    .click();
-  await page.getByLabel("Fresh six-digit code").fill("123456");
-  await page.getByRole("button", { name: "Reverify identity" }).click();
+    deletionSheet.getByRole("button", { name: "Close" }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(deletionSheet).toBeVisible();
+  const scrim = page.getByLabel("Close dialog");
+  await expect(scrim).toBeDisabled();
+  await scrim.dispatchEvent("click");
+  await expect(deletionSheet).toBeVisible();
+  await expect(deletionSheet.getByText("Step 1 of 3")).toBeVisible();
+  await expect(page.getByText("You leave 6AM Crew right away.")).toBeVisible();
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Deletion code digit ${index + 1}`).fill(digit);
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(
     page.getByText(
       "Code ready. Final confirmation will verify identity before deletion.",
     ),
   ).toBeVisible();
-  await page.getByLabel("Type DELETE MY ACCOUNT").fill("delete");
-  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
-  await expect(page.getByRole("alert")).toHaveText(
-    "Type DELETE MY ACCOUNT exactly.",
-  );
-  await expect(page.getByLabel("Type DELETE MY ACCOUNT")).toHaveValue("delete");
-  await page.getByLabel("Type DELETE MY ACCOUNT").fill("DELETE MY ACCOUNT");
-  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
+  await page.getByLabel("Confirmation").fill("delete");
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Type DELETE exactly.");
+  await expect(page.getByLabel("Confirmation")).toHaveValue("delete");
+  await page.getByLabel("Confirmation").fill("DELETE");
+  await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page.getByRole("status")).toHaveText(
     "Account deletion completed. Access ended immediately.",
   );
@@ -649,6 +773,50 @@ test("exact Account deletion confirmation cuts off browser session", async ({
     ),
   ).toBe(true);
   cutoffFindings?.network.splice(0);
+});
+
+test("Account deletion failure keeps account and exact retry guidance", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  await page.route(/\/v1\/account$/, (route) => {
+    return route.fulfill({
+      status: 503,
+      json: {
+        contractVersion: 1,
+        error: { code: "unavailable", message: "unavailable", retryable: true },
+      },
+    });
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.goto("/account");
+  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
+  findings.get(page)?.console.splice(0);
+  findings.get(page)?.page.splice(0);
+  findings.get(page)?.network.splice(0);
+  await page.getByRole("button", { name: "Delete account…" }).click();
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Deletion code digit ${index + 1}`).fill(digit);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel("Confirmation").fill("DELETE");
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Deletion didn't go through. Your account is unchanged — try again.",
+  );
+  await expect(
+    page.getByRole("dialog", { name: "Delete account" }),
+  ).toBeVisible();
+  findings.get(page)?.console.splice(0);
+  findings.get(page)?.network.splice(0);
+  await page.getByRole("button", { name: "Keep my account" }).click();
+  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
 });
 
 test("pending Auth deletion still ends browser access", async ({ page }) => {
@@ -671,14 +839,13 @@ test("pending Auth deletion still ends browser access", async ({ page }) => {
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByText("0 of 3 this week")).toBeVisible();
   await page.goto("/account");
-  await page.getByRole("button", { name: "Review Account deletion" }).click();
-  await page
-    .getByRole("button", { name: "Send fresh verification code" })
-    .click();
-  await page.getByLabel("Fresh six-digit code").fill("123456");
-  await page.getByRole("button", { name: "Reverify identity" }).click();
-  await page.getByLabel("Type DELETE MY ACCOUNT").fill("DELETE MY ACCOUNT");
-  await page.getByRole("button", { name: "Confirm Account deletion" }).click();
+  await page.getByRole("button", { name: "Delete account…" }).click();
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Deletion code digit ${index + 1}`).fill(digit);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel("Confirmation").fill("DELETE");
+  await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page.getByRole("status")).toHaveText(
     "Account deletion accepted. Access ended; Auth removal pending.",
   );

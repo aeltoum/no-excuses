@@ -8,6 +8,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { Sheet } from "./Sheet";
 import { Weekly } from "./Weekly";
 
 type Route =
@@ -151,6 +152,8 @@ export function App({
     "idle" | "review" | "code-sent" | "ready"
   >("idle");
   const [deletionCode, setDeletionCode] = useState("");
+  const deletionCodeInputs = useRef<Array<HTMLInputElement | null>>([]);
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
@@ -294,6 +297,7 @@ export function App({
       return;
     let active = true;
     setDisplayNameLoaded(false);
+    setDisplayName("");
     void api
       .displayName(session.access_token)
       .then((response) => {
@@ -317,7 +321,12 @@ export function App({
   }, [access, api, membership, path, session]);
   useEffect(() => {
     void groupRevision;
-    if (access !== "signed-in" || path !== "/group" || !membership || !session)
+    if (
+      access !== "signed-in" ||
+      (path !== "/group" && path !== "/account") ||
+      !membership ||
+      !session
+    )
       return;
     let active = true;
     setGroupLoad("loading");
@@ -326,6 +335,10 @@ export function App({
       .then(async (response) => {
         if (!active) return;
         setGroupRoster(response.data);
+        if (path === "/account") {
+          setGroupLoad("ready");
+          return;
+        }
         const creator = response.data.members.some(
           (member) =>
             member.membershipId === membership.membershipId && member.creator,
@@ -1328,72 +1341,199 @@ export function App({
           </Page>
         ) : route === "/account" ? (
           <Page
-            eyebrow="Account access"
-            title="Your Account"
-            lead="Sign out here or permanently delete this Account."
+            eyebrow="Account"
+            title="You"
+            lead="Your account and crew settings."
           >
-            <form
-              onSubmit={submit(async () => {
-                const name = displayName.trim();
-                if (!name || name.length > 40)
-                  throw new WebAuthError(
-                    "invalid",
-                    "Name must be 1 to 40 characters.",
+            <div className="account-page">
+              <section className="account-identity" aria-label="Your identity">
+                <span className="account-initials" aria-hidden="true">
+                  {(displayName || session?.user.email || "You")
+                    .split(/\s+|@/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase())
+                    .join("")}
+                </span>
+                <span>
+                  <strong>{displayName || "Name not set"}</strong>
+                  <small>{session?.user.email}</small>
+                </span>
+              </section>
+              <form
+                className="account-name-row"
+                onSubmit={submit(async () => {
+                  const name = displayName.trim();
+                  if (!name || name.length > 40)
+                    throw new WebAuthError(
+                      "invalid",
+                      "Name must be 1 to 40 characters.",
+                    );
+                  const draft = commandDraft("display-name", name);
+                  const response = await api.setDisplayName(
+                    token(),
+                    name,
+                    draft.key,
                   );
-                const draft = commandDraft("display-name", name);
-                const response = await api.setDisplayName(
-                  token(),
-                  name,
-                  draft.key,
-                );
-                commandDrafts.current.delete("display-name");
-                setDisplayName(response.data.displayName ?? "");
-                return "Name saved.";
-              })}
-            >
-              <label>
-                Name
-                <input
-                  name="displayName"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  minLength={1}
-                  maxLength={40}
-                  required
-                  disabled={busy || !displayNameLoaded}
-                />
-              </label>
-              <button type="submit" disabled={busy || !displayNameLoaded}>
-                {busy ? "Saving…" : "Save name"}
-              </button>
-            </form>
-            <button
-              type="button"
-              onClick={() =>
-                void act(async () => "Signed out.", { cutoff: true })
-              }
-              disabled={busy}
-            >
-              {busy ? "Signing out…" : "Sign out"}
-            </button>
-            <section className="danger-zone" aria-labelledby="delete-title">
-              <h2 id="delete-title">Delete Account</h2>
-              {deletionStep === "idle" ? (
+                  commandDrafts.current.delete("display-name");
+                  setDisplayName(response.data.displayName ?? "");
+                  return "Name saved.";
+                })}
+              >
+                <label>
+                  <span className="account-name-label">Name</span>
+                  <input
+                    name="displayName"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    minLength={1}
+                    maxLength={40}
+                    required
+                    disabled={busy || !displayNameLoaded}
+                  />
+                </label>
                 <button
-                  type="button"
-                  className="danger"
-                  onClick={() => setDeletionStep("review")}
+                  className="secondary-button"
+                  type="submit"
+                  disabled={busy || !displayNameLoaded}
                 >
-                  Review Account deletion
+                  {busy ? "Saving…" : "Save name"}
                 </button>
+              </form>
+              {groupLoad === "error" ? (
+                <div className="account-load-error" role="alert">
+                  <span>Couldn’t load your crew.</span>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setGroupRevision((value) => value + 1)}
+                  >
+                    Try again
+                  </button>
+                </div>
               ) : (
                 <>
-                  <p>
-                    <strong>Permanent effects:</strong> current Group access
-                    ends immediately; Account becomes unusable; included Account
-                    data enters deletion processing. This cannot be undone.
-                  </p>
-                  {deletionStep === "review" && (
+                  <a
+                    className="account-row"
+                    href="/group"
+                    onClick={(event) => navigate(event, "/group")}
+                  >
+                    <span>Crew</span>
+                    <span>
+                      {groupLoad === "ready"
+                        ? groupRoster?.groupName
+                        : "Loading…"}{" "}
+                      →
+                    </span>
+                  </a>
+                  <a
+                    className="account-row"
+                    href="/target"
+                    onClick={(event) => navigate(event, "/target")}
+                  >
+                    <span>Weekly target</span>
+                    <span>
+                      {groupLoad === "ready"
+                        ? `${groupRoster?.members.find((member) => member.membershipId === membership?.membershipId)?.weeklyTarget ?? "—"} a week`
+                        : "Loading…"}{" "}
+                      →
+                    </span>
+                  </a>
+                </>
+              )}
+              <button
+                className="account-row"
+                type="button"
+                onClick={() => setInstallHelpOpen(true)}
+              >
+                <span>Install on your home screen</span>
+                <span>→</span>
+              </button>
+              <button
+                className="secondary-button account-sign-out"
+                type="button"
+                onClick={() =>
+                  void act(async () => "Signed out.", { cutoff: true })
+                }
+                disabled={busy}
+              >
+                {busy ? "Signing out…" : "Sign out"}
+              </button>
+              <button
+                className="account-delete"
+                type="button"
+                onClick={() => setDeletionStep("review")}
+              >
+                Delete account…
+              </button>
+            </div>
+            <Sheet
+              open={installHelpOpen}
+              title="Install on your home screen"
+              onDismiss={() => setInstallHelpOpen(false)}
+            >
+              <div className="install-help">
+                <p>
+                  <strong>iPhone:</strong> In Safari, tap Share, then Add to
+                  Home Screen.
+                </p>
+                <p>
+                  <strong>Android:</strong> In Chrome, open menu, then tap
+                  Install app.
+                </p>
+                <p>Installation is optional. Every flow works in browser.</p>
+              </div>
+            </Sheet>
+            <Sheet
+              dismissible={false}
+              open={deletionStep !== "idle"}
+              title="Delete account"
+              onDismiss={() => undefined}
+            >
+              <div className="deletion-sheet">
+                <div className="deletion-progress" aria-hidden="true">
+                  {([1, 2, 3] as const).map((step) => (
+                    <span
+                      key={step}
+                      className={`deletion-progress-segment${
+                        step <=
+                        (
+                          deletionStep === "review"
+                            ? 1
+                            : deletionStep === "code-sent"
+                              ? 2
+                              : 3
+                        )
+                          ? " complete"
+                          : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="deletion-step">
+                  Step{" "}
+                  {deletionStep === "review"
+                    ? 1
+                    : deletionStep === "code-sent"
+                      ? 2
+                      : 3}{" "}
+                  of 3
+                </p>
+                {deletionStep === "review" && (
+                  <>
+                    <h2 tabIndex={-1}>What deleting does</h2>
+                    <ul>
+                      <li>
+                        You leave {groupRoster?.groupName ?? "your crew"} right
+                        away.
+                      </li>
+                      <li>You can’t sign in again with this account.</li>
+                      <li>
+                        Your finished weeks stay in the crew’s history as
+                        “Former member”.
+                      </li>
+                      <li>This can’t be undone.</li>
+                    </ul>
                     <button
                       type="button"
                       className="danger"
@@ -1412,80 +1552,127 @@ export function App({
                         })
                       }
                     >
-                      {busy ? "Sending…" : "Send fresh verification code"}
+                      {busy ? "Sending…" : "Email me a code"}
                     </button>
-                  )}
-                  {deletionStep === "code-sent" && (
-                    <form
-                      onSubmit={submit(async () => {
-                        normalizeOtp(deletionCode);
-                        setDeletionStep("ready");
-                        return "Code ready. Final confirmation will verify identity before deletion.";
-                      })}
-                    >
-                      <label>
-                        Fresh six-digit code
+                  </>
+                )}
+                {deletionStep === "code-sent" && (
+                  <form
+                    onSubmit={submit(async () => {
+                      normalizeOtp(deletionCode);
+                      setDeletionStep("ready");
+                      return "Code ready. Final confirmation will verify identity before deletion.";
+                    })}
+                  >
+                    <h2>Enter the code we sent</h2>
+                    <p>A fresh code went to {session?.user.email}.</p>
+                    <fieldset className="otp-fields">
+                      <legend>Fresh six-digit code</legend>
+                      {codePositions.map((position, index) => (
                         <input
+                          key={position}
+                          ref={(element) => {
+                            deletionCodeInputs.current[index] = element;
+                          }}
+                          aria-label={`Deletion code digit ${index + 1}`}
                           inputMode="numeric"
-                          autoComplete="one-time-code"
-                          maxLength={6}
+                          autoComplete={index === 0 ? "one-time-code" : "off"}
+                          maxLength={1}
                           required
-                          value={deletionCode}
-                          onChange={(event) =>
-                            setDeletionCode(
-                              event.target.value.replace(/\D/g, "").slice(0, 6),
-                            )
-                          }
+                          value={deletionCode[index] ?? ""}
                           disabled={busy}
+                          onChange={(event) => {
+                            const digit = event.target.value
+                              .replace(/\D/g, "")
+                              .slice(-1);
+                            const digits = deletionCode.padEnd(6).split("");
+                            digits[index] = digit;
+                            setDeletionCode(digits.join("").trimEnd());
+                            if (digit)
+                              deletionCodeInputs.current[index + 1]?.focus();
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key === "Backspace" &&
+                              !deletionCode[index] &&
+                              index > 0
+                            )
+                              deletionCodeInputs.current[index - 1]?.focus();
+                          }}
                         />
-                      </label>
-                      <button type="submit" className="danger" disabled={busy}>
-                        {busy ? "Checking…" : "Reverify identity"}
-                      </button>
-                    </form>
-                  )}
-                  {deletionStep === "ready" && (
-                    <form
-                      onSubmit={submit(
-                        async (f) => {
-                          if (field(f, "confirmation") !== "DELETE MY ACCOUNT")
-                            throw new WebAuthError(
-                              "invalid",
-                              "Type DELETE MY ACCOUNT exactly.",
-                            );
-                          deletionKey.current ??= crypto.randomUUID();
-                          const deletion = await api.deleteAccount(
+                      ))}
+                    </fieldset>
+                    <button type="submit" className="danger" disabled={busy}>
+                      {busy ? "Checking…" : "Continue"}
+                    </button>
+                  </form>
+                )}
+                {deletionStep === "ready" && (
+                  <form
+                    onSubmit={submit(
+                      async (f) => {
+                        if (field(f, "confirmation") !== "DELETE")
+                          throw new WebAuthError(
+                            "invalid",
+                            "Type DELETE exactly.",
+                          );
+                        deletionKey.current ??= crypto.randomUUID();
+                        const deletion = await api
+                          .deleteAccount(
                             token(),
                             deletionKey.current,
                             deletionCode,
-                          );
-                          setDeletionCode("");
-                          return "authDeletion" in deletion.data
-                            ? "Account deletion accepted. Access ended; Auth removal pending."
-                            : "Account deletion completed. Access ended immediately.";
-                        },
-                        { cutoff: true },
-                      )}
-                    >
-                      <h2>Delete Account</h2>
-                      <label>
-                        Type DELETE MY ACCOUNT
-                        <input
-                          name="confirmation"
-                          autoComplete="off"
-                          required
-                          disabled={busy}
-                        />
-                      </label>
-                      <button type="submit" className="danger" disabled={busy}>
-                        {busy ? "Deleting…" : "Confirm Account deletion"}
-                      </button>
-                    </form>
-                  )}
-                </>
-              )}
-            </section>
-            <Result notice={notice} />
+                          )
+                          .catch((error: unknown) => {
+                            if (
+                              error instanceof ApiError &&
+                              error.kind === "unauthorized"
+                            )
+                              throw error;
+                            throw new WebAuthError(
+                              "rejected",
+                              "Deletion didn't go through. Your account is unchanged — try again.",
+                            );
+                          });
+                        setDeletionCode("");
+                        return "authDeletion" in deletion.data
+                          ? "Account deletion accepted. Access ended; Auth removal pending."
+                          : "Account deletion completed. Access ended immediately.";
+                      },
+                      { cutoff: true },
+                    )}
+                  >
+                    <h2>Type DELETE to confirm</h2>
+                    <label>
+                      Confirmation
+                      <input
+                        name="confirmation"
+                        autoComplete="off"
+                        required
+                        disabled={busy}
+                      />
+                    </label>
+                    <button type="submit" className="danger" disabled={busy}>
+                      {busy ? "Deleting…" : "Delete my account"}
+                    </button>
+                  </form>
+                )}
+                <button
+                  className="keep-account"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setDeletionStep("idle");
+                    setDeletionCode("");
+                    setNotice(null);
+                  }}
+                >
+                  Keep my account
+                </button>
+                <Result notice={notice} />
+              </div>
+            </Sheet>
+            {deletionStep === "idle" && <Result notice={notice} />}
           </Page>
         ) : (
           <Weekly
