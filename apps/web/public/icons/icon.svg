@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title"><title id="title">No Excuses app icon</title><rect width="512" height="512" fill="#0a0a0a"/><rect x="56" y="56" width="400" height="400" fill="#ffd400"/><path d="M136 360V152h48l144 132V152h48v208h-48L184 228v132z" fill="#0a0a0a"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">No Excuses barbell</title>
+  <rect width="512" height="512" fill="#1A1B1D"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 256h304" stroke="#B4B7BB" stroke-width="22"/>
+    <path d="M205 256h102" stroke="#F2F2EE" stroke-width="30"/>
+    <path d="M150 181v150M362 181v150" stroke="#D63A2F" stroke-width="48"/>
+    <path d="M104 204v104M408 204v104" stroke="#2F6FD6" stroke-width="40"/>
+    <path d="M177 214v84M335 214v84" stroke="#C9CCCF" stroke-width="18"/>
+  </g>
+</svg>

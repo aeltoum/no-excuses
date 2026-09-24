@@ -109,6 +109,7 @@ export function App({
   apiBaseUrl: string;
 }) {
   const api = useRef(createApiClient(apiBaseUrl)).current;
+  const [launching, setLaunching] = useState(true);
   const [path, setPath] = useState(currentPath);
   const [access, setAccess] = useState<Access>("checking");
   const [session, setSession] = useState<Session | null>(null);
@@ -118,6 +119,11 @@ export function App({
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLaunching(false), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [email, setEmail] = useState("");
   const [enrollmentToken, setEnrollmentToken] = useState("");
   const [code, setCode] = useState("");
@@ -468,11 +474,26 @@ export function App({
     ? (path as Route)
     : null;
 
+  if (launching) {
+    return (
+      <main className="launch-screen" aria-live="polite" aria-busy="true">
+        <img src="/icons/icon.svg" alt="" width="160" height="160" />
+        <div>
+          <p className="launch-name">No Excuses</p>
+          <p className="launch-status" role="status">
+            Loading your crew
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="masthead">
         <a className="wordmark" href="/" onClick={(e) => navigate(e, "/")}>
-          No Excuses
+          <img src="/icons/icon.svg" alt="" width="32" height="32" />
+          <span>No Excuses</span>
         </a>
         <span className="status">
           <span aria-hidden="true" /> Private PWA
