@@ -38,6 +38,42 @@ test.afterEach(async ({ page }, testInfo) => {
   });
 });
 
+test("first launch shows the barbell brand once", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.getByRole("status")).toHaveText("Loading your crew");
+  await expect(
+    page.locator('.launch-screen img[src="/icons/icon.svg"]'),
+  ).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("launch-screen.png") });
+  await expect(
+    page.getByRole("heading", { name: "Sign in required" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByText("Loading your crew")).toHaveCount(0);
+});
+
+test("launch motion respects motion preference", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await expect(page.getByRole("status")).toBeVisible();
+  expect(
+    await page
+      .locator(".launch-screen img")
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("launch-lift");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page
+      .locator(".launch-screen img")
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("none");
+});
+
 for (const route of [
   "/",
   "/sign-in",
@@ -78,6 +114,7 @@ test("shell is keyboard reachable and has no serious axe findings", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const wordmark = page.getByRole("link", { name: "No Excuses" });
+  await expect(wordmark).toBeVisible();
   if (browserName === "chromium") await page.keyboard.press("Tab");
   else await wordmark.focus();
   await expect(wordmark).toBeFocused();
@@ -166,5 +203,11 @@ test("document favicon resolves from an explicit PWA icon", async ({
   await page.goto("/");
   const href = await page.locator('link[rel="icon"]').getAttribute("href");
   expect(href).toBe("/icons/icon.svg");
-  expect((await request.get(`http://127.0.0.1:4174${href}`)).ok()).toBe(true);
+  const icon = await request.get(`http://127.0.0.1:4174${href}`);
+  expect(icon.ok()).toBe(true);
+  const artwork = await icon.text();
+  expect(artwork).toContain("No Excuses barbell");
+  expect(artwork).toContain("#1A1B1D");
+  expect(artwork).toContain("#D63A2F");
+  expect(artwork).toContain("#2F6FD6");
 });
