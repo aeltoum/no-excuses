@@ -1,218 +1,207 @@
 # No Excuses visual system
 
-This is the visual design contract for future No Excuses website and member-app work. It records the direction approved from the supplied `ne-wall-accent.html` and `ne-wall-page.html` references without treating their sample copy, navigation, data, or interactions as product requirements.
+This document is the presentation contract for the No Excuses True MVP PWA. The
+[signed-off PWA spec](./no-excuses-spec.html) is the visual reference. Its locked barbell
+direction is the current visual authority.
+Prototype copy and sample data in that reference are illustrative, not product requirements.
 
-The implementation hierarchy is:
+The authority order remains:
 
-1. `CONTEXT.md`, accepted ADRs, and resolved product issues define behavior, privacy, safety, and terminology.
-2. `docs/implementation/screen-state-accessibility-contracts.md` defines app navigation, states, semantic order, and accessible interaction.
-3. This document defines presentation. Where a reference conflicts with either source above, preserve this visual language and replace the conflicting content or behavior.
+1. `CONTEXT.md`, accepted ADRs, and resolved product issues define behavior, privacy, safety,
+   and terminology.
+2. `docs/implementation/screen-state-accessibility-contracts.md` defines navigation, states,
+   semantic order, and accessible interaction.
+3. This document defines presentation. If the visual reference conflicts with either higher
+   authority, keep this visual language while following the authoritative behavior.
 
 ## Design thesis
 
-No Excuses should feel like a private training record made public to exactly the friends whose opinion matters: blunt, disciplined, competitive, and earned. It is not a wellness dashboard, lifestyle brand, or public social network.
+No Excuses should feel like a private crew training record: direct, sturdy, and earned, not a
+wellness dashboard or public social network. Every screen sits on a dark rubber gym floor.
+The signature is the **barbell**: each workout loads one plate on both sides of the bar; the
+same form appears on Home, in logging previews, for targets, in friend progress, and in chalk
+for count-only history.
 
-The signature is **the proof grid**: dense square imagery, hard status marks, and week dividers that make consistency visible at a glance. The grid presents authorized Verified Proof pairs during their bounded retention period and durable structured outcomes afterward, as described under [The Wall](#the-wall).
+## Colour
 
-## Core palette
-
-The approved accent is the **yellow scheme** from the accent reference. The source file calls that scheme `Signal`; this document uses the product-facing name **Safety yellow** because the requested direction identifies the yellow option as “Safety.” Do not use the orange scheme that the source file labels `Safety`.
-
-| Token | Value | Use |
+| Token | Value | Meaning |
 | --- | --- | --- |
-| `color.ground` | `#0A0A0A` | Page and app-shell background |
-| `color.surface` | `#111111` | Raised or grouped regions |
-| `color.ink` | `#E8E8E8` | Primary text and high-emphasis rules |
-| `color.safety` | `#FFD400` | Primary actions, current selection, progress, focus, and verified accents |
-| `color.inkOnSafety` | `#0A0A0A` | Text and icons on Safety yellow |
-| `color.muted` | `#898989` | Secondary text; verify contrast at the rendered size |
-| `color.quiet` | `#565656` | Decorative or disabled detail only; never essential copy |
-| `color.rule` | `#2A2A2A` | Borders, separators, and empty cells |
+| `rubber` | `#1A1B1D` | App background, with restrained rubber speckle |
+| `chalk` | `#F2F2EE` | Primary text, primary controls, active states, and count-only plates |
+| `muted` | `#8C8F93` | Secondary text; use only where rendered contrast remains AA |
+| `rule` | `#2C2E31` | Row dividers, quiet boundaries, and neutral details |
+| `surface` | `#232427` | Inputs, grouped controls, and sheets |
+| `error` | `#E5484D` | Error boundaries and error emphasis |
+| `bar` | `#9B9EA3` | Bar shaft |
+| `barGrip` | `#B4B7BB` | Central grip |
+| `barCollar` | `#C9CCCF` | Plate collars |
+| `emptySlot` | `#55585C` | Dashed, unfilled target slots |
 
-Safety yellow is an accent, not a wash. Use it for one dominant action or state cue in a region, then let charcoal, type, imagery, and spacing carry the rest. It must never be the only indication of status.
+Chalk is the primary high-contrast accent. Error and other semantic states retain explicit
+text and shape or icon cues; colour alone never communicates state.
 
-Semantic warning, destructive, safety, success, and pending states need their own accessible text and icon/shape treatment. Do not redefine them all as Safety yellow.
+### Activity plates
+
+| Activity | Value | Plate meaning |
+| --- | --- | --- |
+| Strength | `#D63A2F` | Self-reported strength workout |
+| Cardio | `#2F6FD6` | Self-reported cardio workout |
+| Class | `#E8C22E` | Self-reported class workout |
+| Sport | `#2E9E55` | Self-reported sport workout |
+| Mixed | `#E9E9E4` | Self-reported mixed workout |
+
+Plate colour describes activity type, not verification, quality, intensity, or outcome.
+Always expose the activity name in text or an accessible label. Where activity-type data is
+absent, render a chalk plate without changing layout; never infer a type from other data.
 
 ## Typography
 
-| Role | Family | Treatment |
-| --- | --- | --- |
-| Display | Anton, with a condensed system fallback | Uppercase, regular weight, tight line height (`0.86–0.94`), restrained tracking (`0–0.01em`) |
-| Body | Archivo, with system sans-serif fallback | Regular 400; 600 for emphasis; comfortable line height (`1.45–1.6`) |
-| Utility | Archivo | 700, uppercase, `0.10–0.14em` tracking for short labels, filters, dates, and status keys |
-| Numeric | Archivo tabular numerals | Counts, targets, dates, and standings; large display numbers may use Anton |
+Both families are self-hosted WOFF2 assets:
 
-Headlines are statements, not labels. Use the condensed display face for short, forceful phrases such as `EVERY REP COUNTS.` and `THE WALL REMEMBERS.` Do not set paragraphs, form fields, instructions, or long accessibility text in Anton or all caps.
+- **Archivo** 400, 500, 600, and 700 is the body, control, label, and utility face. Body copy
+  is `16px/1.5`; supporting copy is `15px`; field labels and row counts are `14px`; captions
+  and compact labels are `12–13px`. Use tabular numerals for aligned counts.
+- **Big Shoulders Display** 700, 800, and 900 is the display and numeric face. Screen titles
+  are 800 at `46px/0.95`; section and sheet titles use 800 at `26–34px/1`; compact count marks
+  use 800 at `20–30px`; the primary target number uses 900 at `110px/0.85`. Responsive
+  implementations may scale these steps down to preserve reflow, but must keep their hierarchy.
 
-Recommended responsive display steps are `clamp(3.5rem, 10vw, 9.5rem)` for page theses, `clamp(2.75rem, 7vw, 7rem)` for section statements, and `1.5–2.5rem` for card or week titles. Body copy starts at `1rem`; explanatory lead copy may use `1.125rem`.
+Use the display face for short headings and prominent counts, not paragraphs, instructions,
+fields, or long accessible text. Use system sans-serif fallbacks. Do not request fonts from
+Google Fonts or another third party: member visits and screen use must not leak through font
+requests. `font-display: swap` keeps text available during font loading.
 
-Google Fonts in the references are a prototype convenience, not permission to send member data to a third-party font service. Production must package or otherwise serve approved fonts through the selected privacy-safe delivery path and provide metric-compatible fallbacks.
+## Shape, rules, and spacing
 
-## Shape, rules, and elevation
+The system is compact, sturdy, and lightly rounded:
 
-- Default to square corners and one-pixel rules. The product should feel assembled, not cushioned.
-- Use a two-pixel border for selected filters and high-priority controls; use a three-pixel visible focus ring with at least three pixels of offset.
-- Avoid soft shadows, glass effects, glossy gradients, floating pills, and decorative rounded cards.
-- Keep imagery square unless a screen contract requires a different crop. Never crop away the meaning needed to review Proof.
-- Use dashed outlines for an unfilled slot and diagonal hatching for a pending state, always paired with visible status text.
-- Use grayscale or subdued image treatment only when it does not obscure reviewable evidence. A Proof detail view must present the source image clearly.
+- Controls and inputs use a `6px` radius.
+- Grouped cards and activity selectors use an `8px` radius.
+- Sheet top corners use `16px`; the sheet bottom meets the viewport edge.
+- Small indicators and the sheet grab handle may use `2px`; plates use a slight `3–5px`
+  rounding appropriate to their size. Avatars and history rack plates remain circular.
+- Rows and lists use a single bottom rule instead of enclosing boxes. Avoid ornamental card
+  borders, glossy gradients, glass effects, and broad soft shadows.
 
-## Spacing and responsive grid
+Use a four-pixel base with the practical sequence `4, 8, 12, 16, 20, 24, 32, 40, 64`.
+Member-app edge gutters are `20px`; dense internal gaps are `6–12px`; major sections are
+`24–40px` apart. Preserve one-column reflow and no horizontal overflow at large text and
+compact widths.
 
-Use a four-pixel base with a practical sequence of `4, 8, 12, 16, 24, 32, 40, 64, 80, 96` pixels.
+## Barbell
 
-- Website content: maximum width `1400px`; page gutters `40px` on wide screens, `20–24px` on compact screens.
-- Member app: edge gutters `16–20px`; dense internal gaps `6–12px`; major screen sections `24–40px` apart.
-- Long marketing sections use large vertical intervals (`64–96px`) separated by rules.
-- Two-column layouts collapse to one column when text, actions, or media would become cramped, not at one universal device width.
-- At roughly 200-percent text, the app follows the existing contract: one column, Activity photo before Member-presence photo, labeled-list standings, no clipped action or status.
+The SVG Barbell has big and mini presentations but one grammar:
 
-### Website composition
+- A workout adds one matching plate to each side. Plates load symmetrically from each collar
+  outward. The mirrored pair represents one workout, not two.
+- Render `max(count, target, 1)` slots per side so over-target workouts remain visible and a
+  zero target still has a stable bar. Shrink plate width and gaps as slot count grows rather
+  than wrapping, clipping, or making the page scroll horizontally.
+- Filled target slots precede unfilled slots. Unfilled target slots have a neutral dashed
+  outline and no fill. Never show a dashed slot as completed.
+- Use activity colours only when authoritative activity types are present. Missing activity
+  types fall back to chalk plates with no layout change. Count-only and finalized-history bars
+  are chalk.
+- The visible count and accessible name state progress as `2 of 4 workouts`; colour and plate
+  geometry are supplementary. When the Home bar links to Target, extend the accessible name
+  with the action, for example `2 of 4 workouts. Change weekly target`.
+- Keep shaft, grip, collars, filled plates, and empty slots visually distinct at both sizes.
+  The bar remains one row for long names, ten-member lists, targets above four, and over-target
+  counts.
 
-```text
-NO EXCUSES                     HOW IT WORKS  PROOF  THE WALL  RULES  LOG IN
-──────────────────────────────────────────────────────────────────────────
-NO EXCUSES.
-JUST PROOF.                         concise explanation + primary action
-──────────────────────────────────────────────────────────────────────────
-moving proof/accountability line (static when reduced motion is requested)
-──────────────────────────────────────────────────────────────────────────
-section thesis                    structured demonstration or real content
-```
+## Sheet
 
-The homepage hero is the thesis: oversized stacked display type, with the second line outlined in Safety yellow. Preserve a clear primary action and a quieter secondary action. Navigation and copy must reflect the actual website information architecture when that work is specified; the reference links are illustrative.
+The Sheet is the shared bottom-sheet dialog for workout logging, history detail, install help,
+and account deletion:
 
-### Member-app composition
+- Align it to the viewport bottom, cap its width on wide screens, use a surface background,
+  `16px` top corners, a quiet scrim, and an internal scroll region that respects safe areas.
+- Give it a visible grab handle, title, and—when dismissible—a labelled close control.
+- Use dialog semantics, an accessible title, initial focus inside the sheet, a focus trap, and
+  return focus to the opener after close.
+- A dismissible sheet closes through its close control, Escape, or scrim. A non-dismissible
+  destructive step disables Escape and scrim dismissal; its explicit safe exit is the only
+  way out. The visual grab handle does not promise swipe behavior.
+- Keep forms and lists unboxed inside the sheet. Use grouped controls and row rules, preserve
+  entered choices on retryable failure, and keep status/error messages perceivable.
 
-The visual layer does not change the accepted task-first semantic order:
+## Five-tab bar
 
-```text
-global status or pause banner
-screen thesis / current accountability week
-NEEDS YOU — one dominant action
-your weekly progress
-friend Proof feed
-compact Season standings
-HOME | GROUP | SEASON | YOU
-```
+Authenticated member navigation has exactly five destinations in this order:
 
-On wide layouts, the Proof feed may occupy the dominant column with standings in a narrow sticky rail. On compact layouts, preserve the semantic order above and remove stickiness.
+`Home | Group | Target | History | Account`
 
-## Component language
-
-### Buttons and links
-
-- Primary: Safety-yellow rectangle, black label, minimum `48×48px` target.
-- Secondary: transparent charcoal background, high-contrast one-pixel border, light label.
-- Tertiary: underlined text or a quiet rectangular action; never rely on a hidden hover affordance.
-- Destructive and safety actions use explicit wording and their defined semantic treatment, not the primary-action color by default.
-- Use sentence case for app actions. Marketing navigation may use short uppercase utility labels.
-
-### Status marks
-
-Every state combines text with a shape or icon:
-
-| State | Visual grammar | Example text |
-| --- | --- | --- |
-| Verified completion | Filled Safety-yellow square plus check | `Verified` |
-| Provisional or awaiting review | Hatched square plus clock/status icon | `Awaiting review` |
-| Questioned | Outlined square plus question mark | `Questioned` |
-| Unsupported or rejected | Distinct outlined/error mark | `Unsupported` or `Rejected` |
-| Target slot not completed | Dashed empty square | `Not completed` |
-| Not applicable or rest | No tile or a clearly labeled neutral state | `No workout planned` |
-
-Do not use `Never sent` as a general synonym for every empty outcome. Use the canonical state that authoritative data supports.
-
-### Proof presentation
-
-Every submitted Workout report contains exactly two photos:
-
-- The Activity photo is dominant.
-- The Member-presence photo is secondary but remains large enough to understand and review.
-- Each photo keeps its own factual description and role label.
-- Actions to react, motivate, verify, question, or recuse remain text-labeled and visually distinct; reaction is never presented as verification.
-- A feed card can be visually dense, but the detail route must expose complete structured report facts, image descriptions, times, status, and next action.
-
-The one-photo hero and optional-photo mosaic shown in older prototypes are superseded states and must not be implemented for submitted reports.
-
-### Tables, standings, and filters
-
-- Tables use horizontal rules, compact utility headings, tabular numerals, and no zebra-striping by default.
-- At large text or narrow widths, convert tables to labeled lists rather than horizontal scrolling when the existing screen contract requires it.
-- Filters are square chips with `aria-pressed` semantics on the web and the equivalent selected state in the app. Include a visible result count.
-- Sticky filter bars must not hide focused content and must remain operable with keyboard, switch, voice, and screen reader input.
-
-## The Wall
-
-The Wall is intended as the Group's chronological gallery and comparison surface: current Group members can move through accountability weeks and understand how the Group's participation and progress changed over time.
-
-The supplied Wall reference establishes this presentation direction:
-
-- a large `THE WALL / REMEMBERS.` thesis;
-- newest week first, grouped by week with date range and an outcome summary;
-- a dense responsive square grid;
-- filters for meaningful authoritative states;
-- progressively revealed older weeks with an explicit beginning-of-history state;
-- no public discovery, sharing, downloading, or cross-Group access.
-
-The Wall's data and privacy contract is bounded even though its chronology may span more time. Therefore:
-
-- A Verified Proof pair and its descriptions remain available for exactly 90 days from verification while every access and consent condition remains satisfied; the Wall is never a permanent photo archive.
-- Every current Group member, including a later joiner or rejoiner, may see authorized retained pairs. Other pre-membership activity remains hidden.
-- Consent withdrawal, the author's removal of the pair, departure or removal, Account deletion, service termination, Group closure, moderation removal, Unsupported, or Rejected revokes access and starts the approved early-deletion lifecycle.
-- A Content report immediately suppresses the pair during moderation. Clearance may restore it only for the remainder of its original retention period and never restarts the clock.
-- If deleted media is represented, use only the finalized structured outcome already allowed to remain; never retain or regenerate a thumbnail, blur, palette, embedding, caption, or other recoverable derivative to simulate the deleted photo.
-- Counts, gaps, filters, dates, and loading boundaries are computed after authorization and must not reveal hidden activity.
-
-[Issue #89](https://github.com/aeltoum/no-excuses/issues/89) records the resolved retention, consent, membership, moderation, deletion, and accessible-comparison decision. `CONTEXT.md` and the screen-state contract remain authoritative if this presentation guidance drifts from that decision.
+Each tab uses its approved inline icon and sentence-case label. The bar is fixed to the screen
+flow at the bottom, respects the bottom safe area, and retains usable labels at compact widths.
+The current tab uses chalk icon/text plus a single `3px` chalk indicator. Other tabs use muted
+icon/text. Expose the current destination semantically (`aria-current="page"` on web); never
+use colour or the moving indicator as its only cue. Every tab meets the `48×48px` target floor.
 
 ## Motion
 
-Spend motion on one choreographed moment per surface:
+Tab navigation owns the system's one choreographed navigation moment: the `3px` active-tab
+indicator glides to the selected tab with `transform 280ms cubic-bezier(.3,.7,.2,1)`, while
+the incoming page fades in and rises from `12px` over `220ms`. Do not add competing route
+wipes, cascades, or spatial background updates.
 
-- Website: headline rise, then copy/action reveal; the ticker may move continuously only when reduced motion is not requested.
-- App home: an authoritative state change may stamp into place after acknowledgement; background feed updates never steal focus or animate spatially across the screen.
-- Wall: a short stagger may introduce the first visible batch, capped to avoid long cascades. Loading older weeks should not replay the entire grid.
+After a workout is successfully logged, closing the sheet and showing the new plate are direct
+state feedback, not a second navigation choreography. Motion never carries unique meaning or
+moves focus. Under `prefers-reduced-motion: reduce`, remove movement and transition duration:
+the indicator, page, sheet, and new plate swap to their final states immediately; skeleton
+animation also stops.
 
-With reduced motion, show the final state immediately or use a subdued opacity change. Motion never communicates a unique status.
+## Media and privacy
 
-## Imagery and content
+Presentation never broadens media access or retention:
 
-- Prefer real, member-controlled exercise context over generic stock fitness imagery.
-- Preserve the Activity photo's informational content and the Member-presence photo's user-controlled framing.
-- Do not visually rank bodies, attractiveness, athletic ability, or intensity.
-- Avoid public-social conventions such as follower counts, share totals, trending badges, and infinite engagement prompts.
-- Website examples must be clearly illustrative and must use behavior consistent with current product decisions before publication.
+- A submitted Workout report has exactly two photos: the Activity photo is primary and the
+  Member-presence photo is secondary. Preserve each role, factual description, meaningful
+  crop, and complete detail-view facts.
+- A Verified Proof pair remains available for exactly 90 days from verification only while
+  every authorization, membership, consent, and moderation condition remains satisfied.
+- Consent withdrawal, author removal, departure or removal, Account deletion, service
+  termination, Group closure, moderation removal, Unsupported, or Rejected revokes access and
+  starts the approved early-deletion lifecycle. A Content report suppresses the pair while
+  moderation is pending; clearance never restarts the retention clock.
+- After media deletion, show only finalized structured outcomes already allowed to remain.
+  Never retain or regenerate thumbnails, blurs, palettes, embeddings, captions, or another
+  recoverable derivative. Counts, gaps, dates, filters, and loading boundaries must not reveal
+  hidden activity.
+- No public discovery, cross-Group access, download, or sharing treatment may be introduced by
+  presentation. Do not visually rank bodies, attractiveness, ability, or workout intensity.
 
-The reference files' sample claims are not approved copy. In particular, future work must not inherit `two friends confirm every workout`, `week closes Sunday`, `watch screen or class check-in as Proof`, or `every confirmed photo stays forever` without an approved product change.
+[Issue #89](https://github.com/aeltoum/no-excuses/issues/89) records the resolved media
+retention, consent, membership, moderation, deletion, and comparison rules. Higher-authority
+domain and screen-state documents control if this summary drifts.
 
 ## Accessibility floor
 
-This visual system inherits the full screen-state and accessibility contract. At minimum:
+This system inherits the complete screen-state and accessibility contract. At minimum:
 
-- Meet WCAG 2.2 AA contrast for text, controls, focus, and meaningful graphics.
-- Keep a visible focus treatment on every interactive element.
-- Preserve 48-by-48-pixel minimum app targets and an equivalent comfortable website target.
-- Expose headings, lists, tables, filters, counts, image roles, descriptions, and statuses semantically.
-- Never encode state using color, image treatment, position, sound, motion, or haptics alone.
-- Reflow at large text without losing actions, descriptions, week boundaries, or status labels.
-- Announce filter-result changes and appended Wall weeks without moving focus.
-- Decorative tickers are hidden from assistive technology; meaningful content is available elsewhere as static text.
+- Meet WCAG 2.2 AA contrast for text, controls, focus indicators, and meaningful graphics.
+- Keep a visible three-pixel focus ring with three pixels of offset on every interactive
+  element; focus must remain visible above sticky navigation and sheets.
+- Preserve `48×48px` minimum app targets.
+- Expose headings, lists, controls, counts, image roles and descriptions, and statuses
+  semantically. Announce meaningful async result changes without moving focus.
+- Never encode state using colour, plate shape, image treatment, position, sound, motion, or
+  haptics alone.
+- Reflow at roughly 200-percent text without clipping actions, descriptions, week boundaries,
+  tab labels, or status labels, and without horizontal page scrolling.
+- Keep loading, empty, failure, retry, disabled, focus, and reduced-motion states legible and
+  operable with keyboard, switch, voice, and screen-reader input.
 
-## Production checklist
+## Acceptance checklist
 
-Before a frontend change is accepted, verify that it:
+Before accepting frontend presentation work, verify that it:
 
-- uses the Safety-yellow token and charcoal system rather than introducing a competing accent;
-- preserves the approved navigation and semantic order for the surface;
-- uses canonical domain terms and authoritative statuses;
-- keeps two-photo Proof roles and descriptions intact;
-- does not promise or expose historical media beyond the approved retention and membership boundary;
-- includes loading, empty, stale, offline, denied, failure, conflict, pending, and acknowledged states where applicable;
-- reflows at roughly 200-percent text, supports reduced motion, and has visible keyboard/switch focus;
-- has no horizontal overflow at the supported compact width;
-- has been reviewed at compact and wide sizes with real-length content, not only ideal sample copy.
-
-## Reference status
-
-The supplied HTML files are visual source material and are not copied into the repository. They contain prototype-only controls, generated sample data, external font loading, and behavior that conflicts with settled product rules. This document is the durable bridge from their approved appearance to future implementation.
+- uses the rubber/chalk tokens and exact activity plate meanings above;
+- uses self-hosted Archivo and Big Shoulders Display at the approved hierarchy;
+- follows the radius, row-rule, Barbell, Sheet, and five-tab rules;
+- preserves authoritative navigation, semantic order, domain language, and status meanings;
+- keeps activity colour supplemental and uses chalk for absent type data;
+- preserves two-photo roles and the media privacy boundary;
+- covers applicable loading, empty, failure, retry, over-target, high-target, compact, large-
+  text, keyboard-focus, and reduced-motion states;
+- has no horizontal overflow and has been reviewed with real-length content at compact and
+  wide sizes.
