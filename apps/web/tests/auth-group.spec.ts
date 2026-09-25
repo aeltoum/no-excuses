@@ -496,6 +496,10 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   await continueButton.click();
   await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
   await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Start a crew" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Invitation code")).toHaveCount(0);
   await page.getByLabel("Crew name").fill("6AM Crew");
   await Promise.all([
     page.getByRole("button", { name: "Saving…" }).waitFor(),
@@ -511,6 +515,55 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   await expect(page.getByText("1 workouts")).toBeVisible();
   await page.getByRole("button", { name: "Start 6AM Crew" }).click();
   await expect(page.getByRole("status")).toHaveText("Group created.");
+});
+
+test("invited OTP preserves its code into no-Group onboarding", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, false);
+  const requests: string[] = [];
+  await page.route("http://127.0.0.1:8787/v1/enrollment", async (route) => {
+    requests.push("enrollment");
+    expect(route.request().postDataJSON()).toEqual({
+      email: "invited@example.test",
+      token: "invitation-secret",
+    });
+    await route.fulfill({
+      status: 200,
+      json: {
+        contractVersion: 1,
+        data: { message: "If invitation is eligible, request a sign-in code." },
+      },
+    });
+  });
+  await page.route("http://127.0.0.1:54321/auth/v1/otp", async (route) => {
+    requests.push("otp");
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I was invited" }).click();
+  await page.getByLabel("Email address").fill("Invited@Example.Test");
+  await page.getByLabel("Invitation code").fill("invitation-secret");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect.poll(() => requests).toEqual(["enrollment", "otp"]);
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+
+  await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
+  await page.getByLabel("I’m 18 or older").check();
+  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I agree to the terms and how my data is used").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "I have a code" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("Invitation code")).toHaveValue(
+    "invitation-secret",
+  );
 });
 
 test("join onboarding previews eligible crew and rejects unavailable code", async ({

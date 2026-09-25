@@ -611,6 +611,13 @@ export function App({
                 onSubmit={submit(
                   async () => {
                     await verifyOtp(auth, email, code);
+                    if (signInDoor === "invited") {
+                      setCrewChoice("join");
+                      setInvitationCode(enrollmentToken.trim());
+                    } else {
+                      setCrewChoice("start");
+                      setInvitationCode("");
+                    }
                     return "Code accepted. Confirming live access.";
                   },
                   { clearCode: true },
