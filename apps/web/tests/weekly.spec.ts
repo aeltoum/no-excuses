@@ -140,7 +140,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Increase weekly target" }).click();
-  await page.getByRole("button", { name: "Save for next week" }).click();
+  await page.getByRole("button", { name: "Save first target" }).click();
   await expect(
     page.getByText("Saved. This becomes your first target.", { exact: true }),
   ).toBeVisible();
@@ -407,7 +407,9 @@ test("weekly loop: self-report, target, finalized result", async ({
     }),
   ).toHaveCount(5);
   await expect(
-    dialog.getByText("Pick an activity and a time to log it."),
+    dialog.getByText(
+      "Pick an activity, a time, and confirm it's your own self-report.",
+    ),
   ).toBeVisible();
   await expect(
     dialog.getByRole("button", { name: "Log workout" }),
@@ -446,8 +448,26 @@ test("weekly loop: self-report, target, finalized result", async ({
   );
   await dialog.getByRole("button", { name: "Strength" }).click();
   await expect(dialog.getByText("This one makes 3 of 4.")).toBeVisible();
+  await expect(
+    dialog.getByText(
+      "Pick an activity, a time, and confirm it's your own self-report.",
+    ),
+  ).toBeVisible();
   await dialog.getByRole("button", { name: "45 min" }).click();
+  await expect(
+    dialog.getByText(
+      "Pick an activity, a time, and confirm it's your own self-report.",
+    ),
+  ).toBeVisible();
   await page.getByLabel("I did this workout. It's my own self-report.").check();
+  await expect(
+    dialog.getByText(
+      "Pick an activity, a time, and confirm it's your own self-report.",
+    ),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "Log workout" }),
+  ).toBeEnabled();
   await dialog.getByRole("button", { name: "Log workout" }).click();
   await expect(dialog.getByRole("alert")).toHaveText(
     "Couldn't log it — the connection dropped. Your choices are kept; try again.",
