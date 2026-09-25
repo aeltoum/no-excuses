@@ -674,6 +674,11 @@ test("Group roster, invitation card, and creator Manage use row actions without 
   await expect(
     page.getByText("Send it privately. It works once and expires in 7 days."),
   ).toBeVisible();
+  const mutationsBeforeReset = [...mutations];
+  await page.getByRole("button", { name: "Invite another friend" }).click();
+  await expect(page.getByLabel("Friend email")).toBeVisible();
+  await expect(page.getByLabel("Friend email")).toHaveValue("");
+  expect(mutations).toEqual(mutationsBeforeReset);
 
   await page.getByRole("button", { name: "Manage" }).click();
   await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
@@ -682,6 +687,9 @@ test("Group roster, invitation card, and creator Manage use row actions without 
   await expect(page.getByRole("button", { name: "Revoke" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Leave 6AM Crew" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Make another member an admin before you can leave."),
   ).toBeVisible();
 
   page.once("dialog", (dialog) => void dialog.accept());
@@ -694,18 +702,128 @@ test("Group roster, invitation card, and creator Manage use row actions without 
   await expect(
     page.getByText("Invitation revoked.", { exact: true }),
   ).toBeVisible();
+  expect(mutations).toEqual(
+    expect.arrayContaining([
+      `/v1/groups/${groupId}/members/30000000-0000-4000-8000-000000000002/remove`,
+      "/v1/group-invitations/50000000-0000-4000-8000-000000000001/revoke",
+    ]),
+  );
+  expect(mutations).not.toContain("/v1/group-memberships/leave");
+});
+
+test("Group members can leave without creator Manage controls", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  const mutations: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST")
+      mutations.push(new URL(request.url()).pathname);
+  });
+  await page.route(
+    `http://127.0.0.1:8787/v1/groups/${groupId}/members`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            groupName: "6AM Crew",
+            members: [
+              {
+                membershipId: "30000000-0000-4000-8000-000000000002",
+                displayName: "Jordan Park",
+                weeklyTarget: 3,
+                creator: true,
+              },
+              {
+                membershipId,
+                displayName: "Akrum Eltoum",
+                weeklyTarget: 4,
+                creator: false,
+              },
+            ],
+          },
+        },
+      }),
+  );
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByRole("link", { name: "Group" }).click();
+
+  await expect(page.getByRole("button", { name: "Manage" })).toHaveCount(0);
+  await expect(page.getByLabel("Friend email")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Invite a friend" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Leave 6AM Crew" }),
+  ).toBeVisible();
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Leave 6AM Crew" }).click();
   await expect(
     page.getByText("You left 6AM Crew.", { exact: true }),
   ).toBeVisible();
-  expect(mutations).toEqual(
-    expect.arrayContaining([
-      `/v1/groups/${groupId}/members/30000000-0000-4000-8000-000000000002/remove`,
-      "/v1/group-invitations/50000000-0000-4000-8000-000000000001/revoke",
-      "/v1/group-memberships/leave",
-    ]),
+  expect(mutations).toContain("/v1/group-memberships/leave");
+});
+
+test("sole Group admin can leave but multi-member sole admin must add another admin first", async ({
+  page,
+}) => {
+  await mockSignedOut(page);
+  await mockApi(page, true);
+  let members = [
+    {
+      membershipId,
+      displayName: "Akrum Eltoum",
+      weeklyTarget: 4,
+      creator: true,
+    },
+  ];
+  await page.route(
+    `http://127.0.0.1:8787/v1/groups/${groupId}/members`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: { groupName: "6AM Crew", members },
+        },
+      }),
   );
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  await fillCode(page, "123456");
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await page.getByRole("link", { name: "Group" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "Leave 6AM Crew" }),
+  ).toBeVisible();
+
+  members = [
+    ...members,
+    {
+      membershipId: "30000000-0000-4000-8000-000000000002",
+      displayName: "Jordan Park",
+      weeklyTarget: 3,
+      creator: false,
+    },
+  ];
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Leave 6AM Crew" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Make another member an admin before you can leave."),
+  ).toBeVisible();
 });
 
 test("failed Group load retries into ten-member scroll above tab bar", async ({

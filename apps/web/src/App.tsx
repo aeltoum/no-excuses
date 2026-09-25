@@ -473,6 +473,16 @@ export function App({
   ).includes(path)
     ? (path as Route)
     : null;
+  const currentMemberIsAdmin = Boolean(
+    membership &&
+      groupRoster?.members.some(
+        (member) =>
+          member.membershipId === membership.membershipId && member.creator,
+      ),
+  );
+  const canLeaveGroup = Boolean(
+    groupRoster && (!currentMemberIsAdmin || groupRoster.members.length === 1),
+  );
 
   if (launching) {
     return (
@@ -1259,33 +1269,8 @@ export function App({
                             ))}
                           </ul>
                         )}
-                        <button
-                          className="text-button danger-text leave-group"
-                          type="button"
-                          disabled={busy}
-                          onClick={() => {
-                            if (
-                              !window.confirm(`Leave ${groupRoster.groupName}?`)
-                            )
-                              return;
-                            void act(
-                              async () => {
-                                const draft = commandDraft(
-                                  "leave",
-                                  membership.membershipId,
-                                );
-                                await api.leave(token(), draft.key);
-                                commandDrafts.current.delete("leave");
-                                return `You left ${groupRoster.groupName}.`;
-                              },
-                              { refreshMembership: true },
-                            );
-                          }}
-                        >
-                          Leave {groupRoster.groupName}
-                        </button>
                       </section>
-                    ) : inviteReady ? (
+                    ) : !currentMemberIsAdmin ? null : inviteReady ? (
                       <section className="invite-card">
                         <strong>Invite ready for {inviteReady.email}</strong>
                         <code>{inviteReady.token}</code>
@@ -1318,6 +1303,13 @@ export function App({
                           Send it privately. It works once and expires in 7
                           days.
                         </p>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => setInviteReady(null)}
+                        >
+                          Invite another friend
+                        </button>
                       </section>
                     ) : (
                       <form
@@ -1360,6 +1352,37 @@ export function App({
                           {busy ? "Creating invite…" : "Invite a friend"}
                         </button>
                       </form>
+                    )}
+                    {canLeaveGroup ? (
+                      <button
+                        className="text-button danger-text leave-group"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            !window.confirm(`Leave ${groupRoster.groupName}?`)
+                          )
+                            return;
+                          void act(
+                            async () => {
+                              const draft = commandDraft(
+                                "leave",
+                                membership.membershipId,
+                              );
+                              await api.leave(token(), draft.key);
+                              commandDrafts.current.delete("leave");
+                              return `You left ${groupRoster.groupName}.`;
+                            },
+                            { refreshMembership: true },
+                          );
+                        }}
+                      >
+                        Leave {groupRoster.groupName}
+                      </button>
+                    ) : (
+                      <p className="hint">
+                        Make another member an admin before you can leave.
+                      </p>
                     )}
                   </>
                 )}
