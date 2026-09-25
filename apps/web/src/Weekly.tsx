@@ -664,7 +664,8 @@ export function Weekly({
                       </button>
                       {!logReady && (
                         <p className="sheet-hint">
-                          Pick an activity and a time to log it.
+                          Pick an activity, a time, and confirm it&apos;s your
+                          own self-report.
                         </p>
                       )}
                       {logError && (
@@ -789,7 +790,11 @@ export function Weekly({
                   </p>
                 )}
                 <button type="submit" disabled={busy}>
-                  {busy ? "Saving…" : "Save for next week"}
+                  {busy
+                    ? "Saving…"
+                    : targetContext?.memberCount === 1
+                      ? "Save first target"
+                      : "Save for next week"}
                 </button>
                 <p className="target-guidance">
                   We suggest at least 2. There’s no reward for a higher number.
