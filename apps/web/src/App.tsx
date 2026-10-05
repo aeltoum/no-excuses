@@ -185,7 +185,6 @@ export function App({
   } | null>(null);
   const groupScope = useRef("");
   const groupRosterRef = useRef<typeof groupRoster>(null);
-  const [groupSyncedAt, setGroupSyncedAt] = useState(0);
   const [groupRefreshing, setGroupRefreshing] = useState(false);
   const [groupStale, setGroupStale] = useState(false);
   const [groupChanged, setGroupChanged] = useState(false);
@@ -425,7 +424,6 @@ export function App({
             );
           }
         }
-        setGroupSyncedAt(Date.now());
         setGroupStale(false);
         if (path === "/account") {
           setGroupLoad("ready");
@@ -1264,28 +1262,25 @@ export function App({
                   groupScope.current ===
                     `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
                     <>
-                      <div className="data-freshness">
-                        <span>
-                          {groupStale
-                            ? "Showing saved data · "
-                            : "Last synced "}
-                          {new Date(groupSyncedAt).toLocaleString()}
-                        </span>
-                        {groupRefreshing && (
-                          <span role="status">Refreshing…</span>
-                        )}
-                        {groupStale && (
-                          <button
-                            className="data-retry"
-                            type="button"
-                            onClick={() =>
-                              setGroupRevision((value) => value + 1)
-                            }
-                          >
-                            Try again
-                          </button>
-                        )}
-                      </div>
+                      {(groupStale || groupRefreshing) && (
+                        <div className="data-freshness">
+                          {groupStale && <span>Showing saved data</span>}
+                          {groupRefreshing && (
+                            <span role="status">Refreshing…</span>
+                          )}
+                          {groupStale && (
+                            <button
+                              className="data-retry"
+                              type="button"
+                              onClick={() =>
+                                setGroupRevision((value) => value + 1)
+                              }
+                            >
+                              Try again
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <div className="group-heading">
                         {groupRoster.members.some(
                           (member) =>
@@ -1628,15 +1623,11 @@ export function App({
               ) : (
                 <>
                   {groupLoad === "ready" &&
+                    (groupStale || groupRefreshing) &&
                     groupScope.current ===
                       `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` && (
                       <div className="data-freshness">
-                        <span>
-                          {groupStale
-                            ? "Showing saved data · "
-                            : "Last synced "}
-                          {new Date(groupSyncedAt).toLocaleString()}
-                        </span>
+                        {groupStale && <span>Showing saved data</span>}
                         {groupRefreshing && (
                           <span role="status">Refreshing…</span>
                         )}

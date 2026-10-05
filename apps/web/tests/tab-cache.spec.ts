@@ -118,7 +118,7 @@ test("member tabs retain data while background refresh resolves", async ({
   await page.getByRole("link", { name: "Home" }).click();
   await page.getByRole("link", { name: "Target" }).click();
   await expect(
-    page.getByText("Showing saved data ·", { exact: false }),
+    page.getByText("Showing saved data", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("4", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Group" }).click();
