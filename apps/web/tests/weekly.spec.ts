@@ -374,6 +374,17 @@ test("weekly loop: self-report, target, finalized result", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await page.goto("/");
+  await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
+  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("heading", { name: "Your history" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText("Maya")).toBeVisible();
   const legend = page.getByRole("list", { name: "Activity colours" });
   await expect(legend.getByRole("listitem")).toHaveText([

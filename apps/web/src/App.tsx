@@ -108,7 +108,30 @@ export function App({
   auth: SupabaseClient;
   apiBaseUrl: string;
 }) {
-  const api = useRef(createApiClient(apiBaseUrl)).current;
+  const api = useRef(
+    createApiClient(apiBaseUrl, fetch, async () => {
+      let result: Awaited<ReturnType<typeof auth.auth.getSession>>;
+      try {
+        result = await auth.auth.getSession();
+      } catch {
+        throw new ApiError("failure", "Service unavailable. Try again.", true);
+      }
+      const { data, error } = result;
+      if (error) {
+        const unavailable = error.status === undefined || error.status >= 500;
+        throw new ApiError(
+          unavailable ? "failure" : "unauthorized",
+          unavailable
+            ? "Service unavailable. Try again."
+            : "Access ended. Sign in again.",
+          unavailable,
+        );
+      }
+      if (!data.session)
+        throw new ApiError("unauthorized", "Access ended. Sign in again.");
+      return data.session.access_token;
+    }),
+  ).current;
   const weeklyCache = useRef(new Map<string, WeeklySnapshot>()).current;
   const [launching, setLaunching] = useState(true);
   const [path, setPath] = useState(currentPath);
@@ -286,7 +309,8 @@ export function App({
         );
       }
     };
-    const listener = auth.auth.onAuthStateChange((_event, next) => {
+    const listener = auth.auth.onAuthStateChange((event, next) => {
+      if (event === "INITIAL_SESSION" && !next) return;
       const expected = ++revision;
       if (next?.user.id !== sessionUser.current) {
         setSession(null);
@@ -319,7 +343,7 @@ export function App({
     };
   }, [api, auth]);
   useEffect(() => {
-    if (access !== "signed-in" || path !== "/sign-in") return;
+    if (access !== "signed-in" || (path !== "/sign-in" && path !== "/")) return;
     const destination = membership ? "/home" : "/group";
     window.history.replaceState(null, "", destination);
     setPath(destination);
