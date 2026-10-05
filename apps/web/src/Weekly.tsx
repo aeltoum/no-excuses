@@ -11,6 +11,12 @@ import { Sheet } from "./Sheet";
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
 type Notice = { kind: "success" | "error"; text: string } | null;
+export type WeeklySnapshot = {
+  progress: CurrentWeekProgressItem[];
+  history: FinalizedWeeklyHistoryItem[];
+  targetContext: WeeklyTargetContext | null;
+  syncedAt: number;
+};
 
 export function Weekly({
   route,
@@ -18,23 +24,41 @@ export function Weekly({
   token,
   membership,
   onRevoked,
+  cache,
+  cacheKey,
 }: {
   route: Route;
   api: Api;
   token: string;
   membership: { groupId: string; membershipId: string } | null;
   onRevoked: () => void;
+  cache: Map<string, WeeklySnapshot>;
+  cacheKey: string;
 }) {
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [progress, setProgress] = useState<CurrentWeekProgressItem[]>([]);
-  const [history, setHistory] = useState<FinalizedWeeklyHistoryItem[]>([]);
+  const saved = cache.get(cacheKey);
+  const [state, setState] = useState<"loading" | "ready" | "error">(
+    saved ? "ready" : "loading",
+  );
+  const [progress, setProgress] = useState<CurrentWeekProgressItem[]>(
+    saved?.progress ?? [],
+  );
+  const [history, setHistory] = useState<FinalizedWeeklyHistoryItem[]>(
+    saved?.history ?? [],
+  );
+  const [syncedAt, setSyncedAt] = useState(saved?.syncedAt ?? 0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const changedTimer = useRef<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [target, setTarget] = useState("");
+  const [target, setTarget] = useState(
+    saved?.targetContext ? String(saved.targetContext.recurringTarget) : "",
+  );
   const [targetContext, setTargetContext] =
-    useState<WeeklyTargetContext | null>(null);
+    useState<WeeklyTargetContext | null>(saved?.targetContext ?? null);
   const [activityType, setActivityType] = useState<
     "strength" | "cardio" | "class" | "sport" | "mixed" | null
   >(null);
@@ -60,6 +84,12 @@ export function Weekly({
     completedAt: string;
   } | null>(null);
   const targetDraft = useRef<{ signature: string; key: string } | null>(null);
+  useEffect(() => {
+    if (state !== "ready") return;
+    const current = cache.get(cacheKey);
+    if (current)
+      cache.set(cacheKey, { ...current, progress, history, targetContext });
+  }, [cache, cacheKey, state, progress, history, targetContext]);
   const updateError = (error: unknown) => {
     if (error instanceof ApiError && error.kind === "unauthorized") onRevoked();
     setNotice({
@@ -74,14 +104,16 @@ export function Weekly({
   useEffect(() => {
     void retry;
     let active = true;
-    setState("loading");
+    const previous = cache.get(cacheKey);
+    if (previous) setRefreshing(true);
+    else setState("loading");
     if (!groupId) {
       setProgress([]);
       setHistory([]);
       setState("ready");
       return;
     }
-    if (route === "/history") setHistoryLimit(12);
+    if (!previous && route === "/history") setHistoryLimit(12);
     const load =
       route === "/history"
         ? Promise.all([api.history(token, groupId), api.target(token)])
@@ -91,49 +123,81 @@ export function Weekly({
     void load
       .then((response) => {
         if (!active) return;
+        const next: WeeklySnapshot = {
+          progress: previous?.progress ?? [],
+          history: previous?.history ?? [],
+          targetContext: previous?.targetContext ?? null,
+          syncedAt: Date.now(),
+        };
         if (route === "/history") {
           const [historyResponse, targetResponse] = response as [
             Awaited<ReturnType<Api["history"]>>,
             Awaited<ReturnType<Api["target"]>>,
           ];
-          setHistory(historyResponse.data as FinalizedWeeklyHistoryItem[]);
-          setTargetContext(targetResponse.data as WeeklyTargetContext);
+          next.history = historyResponse.data as FinalizedWeeklyHistoryItem[];
+          next.targetContext = targetResponse.data as WeeklyTargetContext;
         } else if (route === "/target") {
           const [progressResponse, targetResponse] = response as [
             Awaited<ReturnType<Api["progress"]>>,
             Awaited<ReturnType<Api["target"]>>,
           ];
-          setProgress(progressResponse.data);
-          setTargetContext(targetResponse.data as WeeklyTargetContext);
-          setTarget(
-            String(
-              (targetResponse.data as WeeklyTargetContext).recurringTarget,
-            ),
-          );
+          next.progress = progressResponse.data;
+          next.targetContext = targetResponse.data as WeeklyTargetContext;
         } else
-          setProgress(
-            (response as Awaited<ReturnType<Api["progress"]>>)
-              .data as CurrentWeekProgressItem[],
-          );
+          next.progress = (response as Awaited<ReturnType<Api["progress"]>>)
+            .data as CurrentWeekProgressItem[];
+        const differs =
+          !previous ||
+          JSON.stringify({ ...previous, syncedAt: 0 }) !==
+            JSON.stringify({ ...next, syncedAt: 0 });
+        cache.set(cacheKey, next);
+        if (differs) {
+          setProgress(next.progress);
+          setHistory(next.history);
+          setTargetContext(next.targetContext);
+          if (route === "/target" && next.targetContext)
+            setTarget((current) =>
+              !previous ||
+              current === String(previous.targetContext?.recurringTarget ?? "")
+                ? String(next.targetContext?.recurringTarget ?? "")
+                : current,
+            );
+          if (previous) {
+            setChanged(true);
+            window.clearTimeout(changedTimer.current);
+            changedTimer.current = window.setTimeout(
+              () => setChanged(false),
+              180,
+            );
+          }
+        }
+        setSyncedAt(next.syncedAt);
+        setStale(false);
+        setRefreshing(false);
         setState("ready");
       })
       .catch((error) => {
         if (!active) return;
-        setState("error");
+        if (previous) {
+          setStale(true);
+          setRefreshing(false);
+        } else setState("error");
         if (error instanceof ApiError && error.kind === "unauthorized")
           revokeRef.current();
-        setNotice({
-          kind: "error",
-          text:
-            error instanceof ApiError
-              ? error.message
-              : "Action failed. Try again.",
-        });
+        if (!previous)
+          setNotice({
+            kind: "error",
+            text:
+              error instanceof ApiError
+                ? error.message
+                : "Action failed. Try again.",
+          });
       });
     return () => {
       active = false;
+      window.clearTimeout(changedTimer.current);
     };
-  }, [api, token, groupId, route, retry]);
+  }, [api, token, groupId, route, retry, cache, cacheKey]);
   const refresh = () => {
     setNotice(null);
     setRefreshWarning(false);
@@ -284,7 +348,9 @@ export function Weekly({
     Number(duration) >= 1 &&
     attested;
   return (
-    <section className={`hero${home ? " home" : ""}`}>
+    <section
+      className={`hero${home ? " home" : ""}${saved ? " data-cached" : ""}${changed ? " data-updated" : ""}`}
+    >
       {home ? (
         <header className="home-header">
           <h1>Our week</h1>
@@ -299,6 +365,20 @@ export function Weekly({
             independently verifies check-ins.
           </p>
         </>
+      )}
+      {state === "ready" && syncedAt > 0 && (
+        <div className="data-freshness">
+          <span>
+            {stale ? "Showing saved data · " : "Last synced "}
+            {new Date(syncedAt).toLocaleString()}
+          </span>
+          {refreshing && <span role="status">Refreshing…</span>}
+          {stale && (
+            <button className="data-retry" type="button" onClick={refresh}>
+              Try again
+            </button>
+          )}
+        </div>
       )}
       {state === "loading" ? (
         home ? (

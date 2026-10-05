@@ -382,7 +382,9 @@ test("weekly loop: self-report, target, finalized result", async ({
     "aria-current",
     "page",
   );
-  await expect(page.getByRole("heading", { name: "Your history" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Your history" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText("Maya")).toBeVisible();
   const legend = page.getByRole("list", { name: "Activity colours" });
   await expect(legend.getByRole("listitem")).toHaveText([
