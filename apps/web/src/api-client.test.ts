@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApiClient } from "./api-client";
+import { ApiError, createApiClient } from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
 describe("browser API client", () => {
@@ -120,6 +120,36 @@ describe("browser API client", () => {
         }),
       }),
     );
+  });
+
+  it("uses current session token for commands and never sends a stale fallback on refresh failure", async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({ contractVersion: 1, data: { membershipId: uuid } }),
+    );
+    const getFreshToken = vi.fn(async () => "fresh-token");
+    const api = createApiClient(
+      "https://api.example.test",
+      fetcher as typeof fetch,
+      getFreshToken,
+    );
+    await api.leave("stale-token", uuid);
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/v1/group-memberships/leave",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: "Bearer fresh-token",
+          "idempotency-key": uuid,
+        }),
+      }),
+    );
+    getFreshToken.mockRejectedValueOnce(
+      new ApiError("failure", "Service unavailable. Try again.", true),
+    );
+    await expect(api.leave("stale-token", uuid)).rejects.toMatchObject({
+      kind: "failure",
+      retryable: true,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("maps denied/conflict without exposing server details", async () => {

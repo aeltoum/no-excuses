@@ -38,6 +38,7 @@ export class ApiError extends Error {
 export function createApiClient(
   baseUrl: string,
   fetcher: typeof fetch = fetch,
+  getFreshToken?: () => Promise<string>,
 ) {
   const root = baseUrl.replace(/\/$/, "");
   async function request<T>(
@@ -50,12 +51,13 @@ export function createApiClient(
       key: string;
     },
   ) {
+    const accessToken = getFreshToken ? await getFreshToken() : token;
     let response: Response;
     try {
       response = await fetcher(`${root}${path}`, {
         method: command?.method ?? "GET",
         headers: {
-          authorization: `Bearer ${token}`,
+          authorization: `Bearer ${accessToken}`,
           ...(command
             ? {
                 "content-type": "application/json",
