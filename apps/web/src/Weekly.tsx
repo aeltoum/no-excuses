@@ -45,7 +45,6 @@ export function Weekly({
   const [history, setHistory] = useState<FinalizedWeeklyHistoryItem[]>(
     saved?.history ?? [],
   );
-  const [syncedAt, setSyncedAt] = useState(saved?.syncedAt ?? 0);
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
   const [changed, setChanged] = useState(false);
@@ -171,7 +170,6 @@ export function Weekly({
             );
           }
         }
-        setSyncedAt(next.syncedAt);
         setStale(false);
         setRefreshing(false);
         setState("ready");
@@ -366,12 +364,9 @@ export function Weekly({
           </p>
         </>
       )}
-      {state === "ready" && syncedAt > 0 && (
+      {state === "ready" && (stale || refreshing) && (
         <div className="data-freshness">
-          <span>
-            {stale ? "Showing saved data · " : "Last synced "}
-            {new Date(syncedAt).toLocaleString()}
-          </span>
+          {stale && <span>Showing saved data</span>}
           {refreshing && <span role="status">Refreshing…</span>}
           {stale && (
             <button className="data-retry" type="button" onClick={refresh}>
