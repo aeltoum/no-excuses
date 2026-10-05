@@ -1198,6 +1198,17 @@ button:disabled {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .data-updated {
+    animation: data-refresh 150ms ease-out;
+  }
+  @keyframes data-refresh {
+    from {
+      opacity: 0.8;
+    }
+    to {
+      opacity: 1;
+    }
+  }
   .launch-screen img {
     animation: launch-lift 700ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
   }
@@ -1206,6 +1217,12 @@ button:disabled {
   }
   .route-content > .hero {
     animation: route-in 220ms ease-out;
+  }
+  .route-content > .hero.data-cached {
+    animation: none;
+  }
+  .route-content > .hero.data-updated {
+    animation: data-refresh 150ms ease-out;
   }
   .tab-indicator {
     transition: transform 280ms cubic-bezier(0.3, 0.7, 0.2, 1);
@@ -1227,6 +1244,21 @@ button:disabled {
       transform: scaleX(0);
     }
   }
+}
+.data-freshness {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.data-freshness button.data-retry {
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton {

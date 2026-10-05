@@ -9,7 +9,7 @@ import {
   WebAuthError,
 } from "./auth";
 import { Sheet } from "./Sheet";
-import { Weekly } from "./Weekly";
+import { Weekly, type WeeklySnapshot } from "./Weekly";
 
 type Route =
   | "/"
@@ -109,10 +109,13 @@ export function App({
   apiBaseUrl: string;
 }) {
   const api = useRef(createApiClient(apiBaseUrl)).current;
+  const weeklyCache = useRef(new Map<string, WeeklySnapshot>()).current;
   const [launching, setLaunching] = useState(true);
   const [path, setPath] = useState(currentPath);
   const [access, setAccess] = useState<Access>("checking");
   const [session, setSession] = useState<Session | null>(null);
+  const sessionUser = useRef<string | null>(null);
+  sessionUser.current = session?.user.id ?? null;
   const [membership, setMembership] = useState<{
     groupId: string;
     membershipId: string;
@@ -124,6 +127,17 @@ export function App({
     const timer = window.setTimeout(() => setLaunching(false), 700);
     return () => window.clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    if (access === "signed-in") return;
+    weeklyCache.clear();
+    groupScope.current = "";
+    groupRosterRef.current = null;
+    displayNameScope.current = "";
+    displayNameEdited.current = false;
+    setGroupRoster(null);
+    setDisplayName("");
+    setDisplayNameLoaded(false);
+  }, [access, weeklyCache]);
   const [email, setEmail] = useState("");
   const [enrollmentToken, setEnrollmentToken] = useState("");
   const [code, setCode] = useState("");
@@ -146,6 +160,13 @@ export function App({
       creator: boolean;
     }>;
   } | null>(null);
+  const groupScope = useRef("");
+  const groupRosterRef = useRef<typeof groupRoster>(null);
+  const [groupSyncedAt, setGroupSyncedAt] = useState(0);
+  const [groupRefreshing, setGroupRefreshing] = useState(false);
+  const [groupStale, setGroupStale] = useState(false);
+  const [groupChanged, setGroupChanged] = useState(false);
+  const groupChangedTimer = useRef<number | undefined>(undefined);
   const [pendingInvitations, setPendingInvitations] = useState<
     Array<{ invitationId: string; email: string; expiresAt: string }>
   >([]);
@@ -162,6 +183,8 @@ export function App({
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
+  const displayNameScope = useRef("");
+  const displayNameEdited = useRef(false);
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
   const [crewChoice, setCrewChoice] = useState<"start" | "join">("start");
   const [crewName, setCrewName] = useState("");
@@ -246,10 +269,12 @@ export function App({
       }
       try {
         const current = await api.current(next.access_token);
+        if (!active || revision !== expected) return;
         setSession(next);
         setMembership(current.data.membership);
         setAccess("signed-in");
       } catch (error) {
+        if (!active || revision !== expected) return;
         setSession(null);
         setMembership(null);
         setAccess(
@@ -263,6 +288,11 @@ export function App({
     };
     const listener = auth.auth.onAuthStateChange((_event, next) => {
       const expected = ++revision;
+      if (next?.user.id !== sessionUser.current) {
+        setSession(null);
+        setMembership(null);
+        setAccess("checking");
+      }
       void resolve(next, expected);
     });
     const expected = ++revision;
@@ -302,13 +332,19 @@ export function App({
     )
       return;
     let active = true;
-    setDisplayNameLoaded(false);
-    setDisplayName("");
+    const scope = session.user.id;
+    if (displayNameScope.current !== scope) {
+      displayNameScope.current = scope;
+      displayNameEdited.current = false;
+      setDisplayNameLoaded(false);
+      setDisplayName("");
+    }
     void api
       .displayName(session.access_token)
       .then((response) => {
         if (!active) return;
-        setDisplayName(response.data.displayName ?? "");
+        const next = response.data.displayName ?? "";
+        if (!displayNameEdited.current) setDisplayName(next);
         setDisplayNameLoaded(true);
       })
       .catch((error) => {
@@ -335,14 +371,41 @@ export function App({
     )
       return;
     let active = true;
-    setGroupLoad("loading");
+    const scope = `${session.user.id}:${membership.groupId}:${membership.membershipId}`;
+    const previousRoster = groupRosterRef.current;
+    const hasCache = groupScope.current === scope && previousRoster !== null;
+    if (hasCache) setGroupRefreshing(true);
+    else {
+      groupScope.current = scope;
+      groupRosterRef.current = null;
+      setGroupRoster(null);
+      setPendingInvitations([]);
+      setGroupLoad("loading");
+    }
     void api
       .roster(session.access_token, membership.groupId)
       .then(async (response) => {
         if (!active) return;
-        setGroupRoster(response.data);
+        if (
+          !hasCache ||
+          JSON.stringify(previousRoster) !== JSON.stringify(response.data)
+        ) {
+          setGroupRoster(response.data);
+          groupRosterRef.current = response.data;
+          if (hasCache) {
+            setGroupChanged(true);
+            window.clearTimeout(groupChangedTimer.current);
+            groupChangedTimer.current = window.setTimeout(
+              () => setGroupChanged(false),
+              180,
+            );
+          }
+        }
+        setGroupSyncedAt(Date.now());
+        setGroupStale(false);
         if (path === "/account") {
           setGroupLoad("ready");
+          setGroupRefreshing(false);
           return;
         }
         const creator = response.data.members.some(
@@ -356,9 +419,14 @@ export function App({
             )
           : null;
         if (!active) return;
-        setPendingInvitations(pending?.data ?? []);
+        setPendingInvitations((current) =>
+          JSON.stringify(current) === JSON.stringify(pending?.data ?? [])
+            ? current
+            : (pending?.data ?? []),
+        );
         setManageGroup((current) => current && creator);
         setGroupLoad("ready");
+        setGroupRefreshing(false);
       })
       .catch((error) => {
         if (!active) return;
@@ -368,10 +436,14 @@ export function App({
           setAccess("revoked");
           return;
         }
-        setGroupLoad("error");
+        if (hasCache) {
+          setGroupStale(true);
+          setGroupRefreshing(false);
+        } else setGroupLoad("error");
       });
     return () => {
       active = false;
+      window.clearTimeout(groupChangedTimer.current);
     };
   }, [access, api, groupRevision, membership, path, session]);
   useEffect(() => {
@@ -723,12 +795,20 @@ export function App({
           <Page
             eyebrow="Private membership"
             title={
-              membership && groupLoad === "ready" && groupRoster
+              membership &&
+              groupLoad === "ready" &&
+              groupRoster &&
+              groupScope.current ===
+                `${session?.user.id}:${membership.groupId}:${membership.membershipId}`
                 ? groupRoster.groupName
                 : "Your Group"
             }
             lead={
-              membership && groupLoad === "ready" && groupRoster
+              membership &&
+              groupLoad === "ready" &&
+              groupRoster &&
+              groupScope.current ===
+                `${session?.user.id}:${membership.groupId}:${membership.membershipId}`
                 ? `${groupRoster.members.length} members`
                 : membership
                   ? "Loading your crew."
@@ -786,6 +866,7 @@ export function App({
                           draft.key,
                         );
                         commandDrafts.current.delete("onboarding-name");
+                        displayNameEdited.current = false;
                         setDisplayName(saved.data.displayName ?? "");
                         await api.consent(token());
                         setOnboardingStep(2);
@@ -798,7 +879,10 @@ export function App({
                       What should your crew call you?
                       <input
                         value={displayName}
-                        onChange={(event) => setDisplayName(event.target.value)}
+                        onChange={(event) => {
+                          displayNameEdited.current = true;
+                          setDisplayName(event.target.value);
+                        }}
                         maxLength={40}
                         required
                         disabled={busy || !displayNameLoaded}
@@ -1119,8 +1203,13 @@ export function App({
               </section>
             )}
             {membership && (
-              <section className="group-screen" aria-live="polite">
-                {groupLoad === "loading" && (
+              <section
+                className={`group-screen${groupChanged ? " data-updated" : ""}`}
+                aria-live="polite"
+              >
+                {(groupLoad === "loading" ||
+                  groupScope.current !==
+                    `${session?.user.id}:${membership.groupId}:${membership.membershipId}`) && (
                   <div
                     className="home-skeleton"
                     role="status"
@@ -1131,261 +1220,289 @@ export function App({
                     <span className="skeleton skeleton-row" />
                   </div>
                 )}
-                {groupLoad === "error" && (
-                  <div className="home-load-error">
-                    <div>
-                      <h2>Couldn’t load your crew.</h2>
+                {groupLoad === "error" &&
+                  groupScope.current ===
+                    `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
+                    <div className="home-load-error">
+                      <div>
+                        <h2>Couldn’t load your crew.</h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setGroupRevision((value) => value + 1)}
+                      >
+                        Try again
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setGroupRevision((value) => value + 1)}
-                    >
-                      Try again
-                    </button>
-                  </div>
-                )}
-                {groupLoad === "ready" && groupRoster && (
-                  <>
-                    <div className="group-heading">
-                      {groupRoster.members.some(
-                        (member) =>
-                          member.membershipId === membership.membershipId &&
-                          member.creator,
-                      ) && (
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => setManageGroup(!manageGroup)}
-                        >
-                          {manageGroup ? "Done" : "Manage"}
-                        </button>
+                  )}
+                {groupLoad === "ready" &&
+                  groupRoster &&
+                  groupScope.current ===
+                    `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
+                    <>
+                      <div className="data-freshness">
+                        <span>
+                          {groupStale
+                            ? "Showing saved data · "
+                            : "Last synced "}
+                          {new Date(groupSyncedAt).toLocaleString()}
+                        </span>
+                        {groupRefreshing && (
+                          <span role="status">Refreshing…</span>
+                        )}
+                        {groupStale && (
+                          <button
+                            className="data-retry"
+                            type="button"
+                            onClick={() =>
+                              setGroupRevision((value) => value + 1)
+                            }
+                          >
+                            Try again
+                          </button>
+                        )}
+                      </div>
+                      <div className="group-heading">
+                        {groupRoster.members.some(
+                          (member) =>
+                            member.membershipId === membership.membershipId &&
+                            member.creator,
+                        ) && (
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => setManageGroup(!manageGroup)}
+                          >
+                            {manageGroup ? "Done" : "Manage"}
+                          </button>
+                        )}
+                      </div>
+                      {manageGroup && (
+                        <p className="hint">
+                          As the crew’s creator, you can remove members and
+                          revoke invites.
+                        </p>
                       )}
-                    </div>
-                    {manageGroup && (
-                      <p className="hint">
-                        As the crew’s creator, you can remove members and revoke
-                        invites.
-                      </p>
-                    )}
-                    <ul className="group-roster">
-                      {groupRoster.members.map((member) => (
-                        <li key={member.membershipId}>
-                          <span className="group-avatar" aria-hidden="true">
-                            {member.displayName
-                              .split(/\s+/)
-                              .slice(0, 2)
-                              .map((part) => part[0])
-                              .join("")
-                              .toUpperCase()}
-                          </span>
-                          <span className="group-member-copy">
-                            <strong>{member.displayName}</strong>
-                            <span>{member.weeklyTarget} a week</span>
-                          </span>
-                          {manageGroup &&
-                            member.membershipId !== membership.membershipId && (
-                              <button
-                                className="row-action danger-text"
-                                type="button"
-                                disabled={busy}
-                                onClick={() => {
-                                  if (
-                                    !window.confirm(
-                                      `Remove ${member.displayName} from ${groupRoster.groupName}?`,
-                                    )
-                                  )
-                                    return;
-                                  void act(async () => {
-                                    const draft = commandDraft(
-                                      "remove",
-                                      member.membershipId,
-                                    );
-                                    await api.remove(
-                                      token(),
-                                      membership.groupId,
-                                      member.membershipId,
-                                      draft.key,
-                                    );
-                                    commandDrafts.current.delete("remove");
-                                    setGroupRevision((value) => value + 1);
-                                    return "Member removed.";
-                                  });
-                                }}
-                              >
-                                Remove
-                              </button>
-                            )}
-                        </li>
-                      ))}
-                    </ul>
-                    {manageGroup ? (
-                      <section className="pending-invitations">
-                        <h3>Invited, not joined yet</h3>
-                        {pendingInvitations.length === 0 ? (
-                          <p className="hint">No pending invitations.</p>
-                        ) : (
-                          <ul className="group-roster">
-                            {pendingInvitations.map((invitation) => (
-                              <li key={invitation.invitationId}>
-                                <span className="group-member-copy">
-                                  <strong>{invitation.email}</strong>
-                                  <span>
-                                    Expires{" "}
-                                    {new Date(
-                                      invitation.expiresAt,
-                                    ).toLocaleDateString()}
-                                  </span>
-                                </span>
+                      <ul className="group-roster">
+                        {groupRoster.members.map((member) => (
+                          <li key={member.membershipId}>
+                            <span className="group-avatar" aria-hidden="true">
+                              {member.displayName
+                                .split(/\s+/)
+                                .slice(0, 2)
+                                .map((part) => part[0])
+                                .join("")
+                                .toUpperCase()}
+                            </span>
+                            <span className="group-member-copy">
+                              <strong>{member.displayName}</strong>
+                              <span>{member.weeklyTarget} a week</span>
+                            </span>
+                            {manageGroup &&
+                              member.membershipId !==
+                                membership.membershipId && (
                                 <button
-                                  className="row-action"
+                                  className="row-action danger-text"
                                   type="button"
                                   disabled={busy}
                                   onClick={() => {
                                     if (
                                       !window.confirm(
-                                        `Revoke invitation for ${invitation.email}?`,
+                                        `Remove ${member.displayName} from ${groupRoster.groupName}?`,
                                       )
                                     )
                                       return;
                                     void act(async () => {
                                       const draft = commandDraft(
-                                        "revoke",
-                                        invitation.invitationId,
+                                        "remove",
+                                        member.membershipId,
                                       );
-                                      await api.revoke(
+                                      await api.remove(
                                         token(),
-                                        invitation.invitationId,
+                                        membership.groupId,
+                                        member.membershipId,
                                         draft.key,
                                       );
-                                      commandDrafts.current.delete("revoke");
+                                      commandDrafts.current.delete("remove");
                                       setGroupRevision((value) => value + 1);
-                                      return "Invitation revoked.";
+                                      return "Member removed.";
                                     });
                                   }}
                                 >
-                                  Revoke
+                                  Remove
                                 </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </section>
-                    ) : !currentMemberIsAdmin ? null : inviteReady ? (
-                      <section className="invite-card">
-                        <strong>Invite ready for {inviteReady.email}</strong>
-                        <code>{inviteReady.token}</code>
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void navigator.clipboard.writeText(
-                                inviteReady.token,
-                              )
-                            }
-                          >
-                            Copy code
-                          </button>
-                          {navigator.share && (
+                              )}
+                          </li>
+                        ))}
+                      </ul>
+                      {manageGroup ? (
+                        <section className="pending-invitations">
+                          <h3>Invited, not joined yet</h3>
+                          {pendingInvitations.length === 0 ? (
+                            <p className="hint">No pending invitations.</p>
+                          ) : (
+                            <ul className="group-roster">
+                              {pendingInvitations.map((invitation) => (
+                                <li key={invitation.invitationId}>
+                                  <span className="group-member-copy">
+                                    <strong>{invitation.email}</strong>
+                                    <span>
+                                      Expires{" "}
+                                      {new Date(
+                                        invitation.expiresAt,
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  </span>
+                                  <button
+                                    className="row-action"
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          `Revoke invitation for ${invitation.email}?`,
+                                        )
+                                      )
+                                        return;
+                                      void act(async () => {
+                                        const draft = commandDraft(
+                                          "revoke",
+                                          invitation.invitationId,
+                                        );
+                                        await api.revoke(
+                                          token(),
+                                          invitation.invitationId,
+                                          draft.key,
+                                        );
+                                        commandDrafts.current.delete("revoke");
+                                        setGroupRevision((value) => value + 1);
+                                        return "Invitation revoked.";
+                                      });
+                                    }}
+                                  >
+                                    Revoke
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </section>
+                      ) : !currentMemberIsAdmin ? null : inviteReady ? (
+                        <section className="invite-card">
+                          <strong>Invite ready for {inviteReady.email}</strong>
+                          <code>{inviteReady.token}</code>
+                          <div>
                             <button
-                              className="secondary-button"
                               type="button"
                               onClick={() =>
-                                void navigator.share({
-                                  text: `Join ${groupRoster.groupName} with code ${inviteReady.token}`,
-                                })
+                                void navigator.clipboard.writeText(
+                                  inviteReady.token,
+                                )
                               }
                             >
-                              Share…
+                              Copy code
                             </button>
-                          )}
-                        </div>
-                        <p>
-                          Send it privately. It works once and expires in 7
-                          days.
-                        </p>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => setInviteReady(null)}
-                        >
-                          Invite another friend
-                        </button>
-                      </section>
-                    ) : (
-                      <form
-                        className="invite-form"
-                        onSubmit={submit(async (form) => {
-                          const inviteEmail = field(
-                            form,
-                            "inviteEmail",
-                          ).toLowerCase();
-                          const draft = commandDraft("invite", inviteEmail);
-                          const result = await api.invite(
-                            token(),
-                            {
-                              invitationId: draft.entityId,
+                            {navigator.share && (
+                              <button
+                                className="secondary-button"
+                                type="button"
+                                onClick={() =>
+                                  void navigator.share({
+                                    text: `Join ${groupRoster.groupName} with code ${inviteReady.token}`,
+                                  })
+                                }
+                              >
+                                Share…
+                              </button>
+                            )}
+                          </div>
+                          <p>
+                            Send it privately. It works once and expires in 7
+                            days.
+                          </p>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            onClick={() => setInviteReady(null)}
+                          >
+                            Invite another friend
+                          </button>
+                        </section>
+                      ) : (
+                        <form
+                          className="invite-form"
+                          onSubmit={submit(async (form) => {
+                            const inviteEmail = field(
+                              form,
+                              "inviteEmail",
+                            ).toLowerCase();
+                            const draft = commandDraft("invite", inviteEmail);
+                            const result = await api.invite(
+                              token(),
+                              {
+                                invitationId: draft.entityId,
+                                email: inviteEmail,
+                              },
+                              draft.key,
+                            );
+                            commandDrafts.current.delete("invite");
+                            setInviteReady({
                               email: inviteEmail,
-                            },
-                            draft.key,
-                          );
-                          commandDrafts.current.delete("invite");
-                          setInviteReady({
-                            email: inviteEmail,
-                            token: result.data.token,
-                          });
-                          setGroupRevision((value) => value + 1);
-                          return "Invitation created.";
-                        })}
-                      >
-                        <h3>Invite a friend</h3>
-                        <label>
-                          Friend email
-                          <input
-                            name="inviteEmail"
-                            type="email"
-                            maxLength={254}
-                            required
-                            disabled={busy}
-                          />
-                        </label>
-                        <button type="submit" disabled={busy}>
-                          {busy ? "Creating invite…" : "Invite a friend"}
+                              token: result.data.token,
+                            });
+                            setGroupRevision((value) => value + 1);
+                            return "Invitation created.";
+                          })}
+                        >
+                          <h3>Invite a friend</h3>
+                          <label>
+                            Friend email
+                            <input
+                              name="inviteEmail"
+                              type="email"
+                              maxLength={254}
+                              required
+                              disabled={busy}
+                            />
+                          </label>
+                          <button type="submit" disabled={busy}>
+                            {busy ? "Creating invite…" : "Invite a friend"}
+                          </button>
+                        </form>
+                      )}
+                      {canLeaveGroup ? (
+                        <button
+                          className="text-button danger-text leave-group"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            if (
+                              !window.confirm(`Leave ${groupRoster.groupName}?`)
+                            )
+                              return;
+                            void act(
+                              async () => {
+                                const draft = commandDraft(
+                                  "leave",
+                                  membership.membershipId,
+                                );
+                                await api.leave(token(), draft.key);
+                                commandDrafts.current.delete("leave");
+                                return `You left ${groupRoster.groupName}.`;
+                              },
+                              { refreshMembership: true },
+                            );
+                          }}
+                        >
+                          Leave {groupRoster.groupName}
                         </button>
-                      </form>
-                    )}
-                    {canLeaveGroup ? (
-                      <button
-                        className="text-button danger-text leave-group"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => {
-                          if (
-                            !window.confirm(`Leave ${groupRoster.groupName}?`)
-                          )
-                            return;
-                          void act(
-                            async () => {
-                              const draft = commandDraft(
-                                "leave",
-                                membership.membershipId,
-                              );
-                              await api.leave(token(), draft.key);
-                              commandDrafts.current.delete("leave");
-                              return `You left ${groupRoster.groupName}.`;
-                            },
-                            { refreshMembership: true },
-                          );
-                        }}
-                      >
-                        Leave {groupRoster.groupName}
-                      </button>
-                    ) : (
-                      <p className="hint">
-                        Make another member an admin before you can leave.
-                      </p>
-                    )}
-                  </>
-                )}
+                      ) : (
+                        <p className="hint">
+                          Make another member an admin before you can leave.
+                        </p>
+                      )}
+                    </>
+                  )}
               </section>
             )}
             <Result notice={notice} />
@@ -1407,7 +1524,11 @@ export function App({
                     .join("")}
                 </span>
                 <span>
-                  <strong>{displayName || "Name not set"}</strong>
+                  <strong>
+                    {displayNameScope.current === session?.user.id
+                      ? displayName || "Name not set"
+                      : "Loading…"}
+                  </strong>
                   <small>{session?.user.email}</small>
                 </span>
               </section>
@@ -1427,6 +1548,7 @@ export function App({
                     draft.key,
                   );
                   commandDrafts.current.delete("display-name");
+                  displayNameEdited.current = false;
                   setDisplayName(response.data.displayName ?? "");
                   return "Name saved.";
                 })}
@@ -1435,23 +1557,40 @@ export function App({
                   <span className="account-name-label">Name</span>
                   <input
                     name="displayName"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
+                    value={
+                      displayNameScope.current === session?.user.id
+                        ? displayName
+                        : ""
+                    }
+                    onChange={(event) => {
+                      displayNameEdited.current = true;
+                      setDisplayName(event.target.value);
+                    }}
                     minLength={1}
                     maxLength={40}
                     required
-                    disabled={busy || !displayNameLoaded}
+                    disabled={
+                      busy ||
+                      !displayNameLoaded ||
+                      displayNameScope.current !== session?.user.id
+                    }
                   />
                 </label>
                 <button
                   className="secondary-button"
                   type="submit"
-                  disabled={busy || !displayNameLoaded}
+                  disabled={
+                    busy ||
+                    !displayNameLoaded ||
+                    displayNameScope.current !== session?.user.id
+                  }
                 >
                   {busy ? "Saving…" : "Save name"}
                 </button>
               </form>
-              {groupLoad === "error" ? (
+              {groupLoad === "error" &&
+              groupScope.current ===
+                `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` ? (
                 <div className="account-load-error" role="alert">
                   <span>Couldn’t load your crew.</span>
                   <button
@@ -1464,6 +1603,32 @@ export function App({
                 </div>
               ) : (
                 <>
+                  {groupLoad === "ready" &&
+                    groupScope.current ===
+                      `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` && (
+                      <div className="data-freshness">
+                        <span>
+                          {groupStale
+                            ? "Showing saved data · "
+                            : "Last synced "}
+                          {new Date(groupSyncedAt).toLocaleString()}
+                        </span>
+                        {groupRefreshing && (
+                          <span role="status">Refreshing…</span>
+                        )}
+                        {groupStale && (
+                          <button
+                            className="data-retry"
+                            type="button"
+                            onClick={() =>
+                              setGroupRevision((value) => value + 1)
+                            }
+                          >
+                            Try again
+                          </button>
+                        )}
+                      </div>
+                    )}
                   <a
                     className="account-row"
                     href="/group"
@@ -1471,7 +1636,9 @@ export function App({
                   >
                     <span>Crew</span>
                     <span>
-                      {groupLoad === "ready"
+                      {groupLoad === "ready" &&
+                      groupScope.current ===
+                        `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}`
                         ? groupRoster?.groupName
                         : "Loading…"}{" "}
                       →
@@ -1484,7 +1651,9 @@ export function App({
                   >
                     <span>Weekly target</span>
                     <span>
-                      {groupLoad === "ready"
+                      {groupLoad === "ready" &&
+                      groupScope.current ===
+                        `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}`
                         ? `${groupRoster?.members.find((member) => member.membershipId === membership?.membershipId)?.weeklyTarget ?? "—"} a week`
                         : "Loading…"}{" "}
                       →
@@ -1727,11 +1896,13 @@ export function App({
           </Page>
         ) : (
           <Weekly
-            key={route}
+            key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}
             token={token()}
             membership={membership}
+            cache={weeklyCache}
+            cacheKey={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             onRevoked={() => {
               setSession(null);
               setMembership(null);
