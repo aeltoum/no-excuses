@@ -313,7 +313,7 @@ export function App({
     };
   }, [api, auth]);
   useEffect(() => {
-    if (access !== "signed-in" || path !== "/sign-in") return;
+    if (access !== "signed-in" || (path !== "/sign-in" && path !== "/")) return;
     const destination = membership ? "/home" : "/group";
     window.history.replaceState(null, "", destination);
     setPath(destination);
