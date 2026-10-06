@@ -6,11 +6,11 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
+import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
-type Notice = { kind: "success" | "error"; text: string } | null;
 export type WeeklySnapshot = {
   progress: CurrentWeekProgressItem[];
   history: FinalizedWeeklyHistoryItem[];
@@ -50,7 +50,7 @@ export function Weekly({
   const [changed, setChanged] = useState(false);
   const changedTimer = useRef<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useNotice();
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
   const [target, setTarget] = useState(
@@ -71,7 +71,6 @@ export function Weekly({
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
   const [logError, setLogError] = useState(false);
-  const resultRef = useRef<HTMLParagraphElement>(null);
   const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
@@ -97,9 +96,6 @@ export function Weekly({
         error instanceof ApiError ? error.message : "Action failed. Try again.",
     });
   };
-  useEffect(() => {
-    if (notice) resultRef.current?.focus();
-  }, [notice]);
   useEffect(() => {
     void retry;
     let active = true;
@@ -184,6 +180,7 @@ export function Weekly({
           revokeRef.current();
         if (!previous)
           setNotice({
+            persistent: true,
             kind: "error",
             text:
               error instanceof ApiError
@@ -195,7 +192,7 @@ export function Weekly({
       active = false;
       window.clearTimeout(changedTimer.current);
     };
-  }, [api, token, groupId, route, retry, cache, cacheKey]);
+  }, [api, token, groupId, route, retry, cache, cacheKey, setNotice]);
   const refresh = () => {
     setNotice(null);
     setRefreshWarning(false);
@@ -224,16 +221,7 @@ export function Weekly({
       })
       .finally(() => setBusy(false));
   };
-  const result = notice && (
-    <p
-      className={`result ${notice.kind}`}
-      role={notice.kind === "error" ? "alert" : "status"}
-      tabIndex={-1}
-      ref={resultRef}
-    >
-      {notice.text}
-    </p>
-  );
+  const result = <Result notice={notice} />;
   if (!membership)
     return (
       <section className="hero">

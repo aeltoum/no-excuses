@@ -223,7 +223,10 @@ async function mockApi(page: Page, member: boolean, denyInvite = true) {
   });
 }
 
-test("Account Name row loads and confirms a saved edit", async ({ page }) => {
+test("Account Name row loads and confirms a saved edit", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await mockSignedOut(page);
   await mockApi(page, true);
   await page.goto("/sign-in");
@@ -251,10 +254,60 @@ test("Account Name row loads and confirms a saved edit", async ({ page }) => {
   await page.getByRole("button", { name: "Close", exact: true }).click();
   const name = page.getByLabel("Name");
   await expect(name).toHaveValue("Akrum");
+  await page.clock.install();
   await name.fill("Akrum Eltoum");
   await page.getByRole("button", { name: "Save name" }).click();
   await expect(page.getByRole("status")).toHaveText("Name saved.");
   await expect(name).toHaveValue("Akrum Eltoum");
+  const save = page.getByRole("button", { name: "Save name" });
+  await expect(page.getByRole("status")).not.toBeFocused();
+  const assertNoticeInViewport = async () => {
+    const box = await page.getByRole("status").boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(box?.y).toBeGreaterThanOrEqual(0);
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+      viewport?.height ?? 0,
+    );
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+      viewport?.width ?? 0,
+    );
+  };
+  await assertNoticeInViewport();
+  await name.focus();
+  await page.screenshot({
+    path: testInfo.outputPath("notice-mobile.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await assertNoticeInViewport();
+  await page.screenshot({
+    path: testInfo.outputPath("notice-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.runFor(2000);
+  await name.fill("Akrum");
+  await save.click();
+  await expect(page.getByRole("status")).toHaveText("Name saved.");
+  await name.focus();
+  await page.clock.runFor(1100);
+  await expect(page.getByRole("status")).toHaveText("Name saved.");
+  await page.clock.runFor(1900);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(name).toBeFocused();
+  await page.screenshot({
+    path: testInfo.outputPath("notice-dismissed-mobile.png"),
+    fullPage: true,
+  });
+  await name.fill("Akrum Eltoum");
+  await save.click();
+  await expect(page.getByRole("status")).toHaveText("Name saved.");
+  await page.getByRole("link", { name: "Target", exact: true }).click();
+  await page.clock.runFor(3000);
+  await page.getByRole("link", { name: "Account", exact: true }).click();
+  await expect(page.getByText("Name saved.")).toHaveCount(0);
 });
 
 test("Account crew load failure is honest and retryable", async ({ page }) => {

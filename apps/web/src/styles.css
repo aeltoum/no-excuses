@@ -660,6 +660,25 @@ button:disabled {
 .result.error {
   border-color: var(--error);
 }
+.result.event-notice {
+  position: fixed;
+  z-index: 30;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  margin: 0;
+  pointer-events: none;
+  padding: 8px 12px;
+  border: 0;
+  border-left: 3px solid var(--safety);
+  background: var(--surface);
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+}
+.result.event-notice.error {
+  border-left-color: var(--error);
+}
 .home-header {
   display: flex;
   align-items: baseline;
