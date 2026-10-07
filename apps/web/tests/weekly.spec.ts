@@ -541,11 +541,21 @@ test("weekly loop: self-report, target, finalized result", async ({
       "We suggest at least 2. There’s no reward for a higher number.",
     ),
   ).toBeVisible();
+  await page.clock.install();
   await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(page.getByRole("alert")).toHaveText(
     "Action conflicts with current Group state.",
   );
-  await expect(page.getByRole("alert")).toBeFocused();
+  await expect(page.getByRole("alert")).not.toBeFocused();
+  const noticeBox = await page.getByRole("alert").boundingBox();
+  expect(noticeBox).not.toBeNull();
+  expect(noticeBox?.y).toBeGreaterThanOrEqual(0);
+  expect((noticeBox?.y ?? 0) + (noticeBox?.height ?? 0)).toBeLessThanOrEqual(
+    page.viewportSize()?.height ?? 0,
+  );
+
+  await page.clock.runFor(3000);
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(
     page.getByText("Saved. From Sep 28 your target is 7.", { exact: true }),
@@ -559,6 +569,12 @@ test("weekly loop: self-report, target, finalized result", async ({
   ).toBeVisible();
   await expect(
     page.getByText("Saved. From Sep 28 your target is 8.", { exact: false }),
+  ).toHaveCount(0);
+  await page.clock.runFor(3000);
+  await expect(
+    page.getByText("Progress refreshed. Review current locked target above.", {
+      exact: true,
+    }),
   ).toHaveCount(0);
   expect(targetKeys).toHaveLength(2);
   expect(targetKeys[0]).toBe(targetKeys[1]);

@@ -8,6 +8,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 import { Weekly, type WeeklySnapshot } from "./Weekly";
 
@@ -26,7 +27,6 @@ type Access =
   | "revoked"
   | "unavailable"
   | "failure";
-type Notice = { kind: "success" | "error"; text: string } | null;
 const codePositions = [1, 2, 3, 4, 5, 6] as const;
 const memberRoutes: Array<[Route, string]> = [
   ["/home", "Home"],
@@ -84,23 +84,6 @@ function TabIcon({ route }: { route: Route }) {
   );
 }
 
-function Result({ notice }: { notice: Notice }) {
-  const ref = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (notice) ref.current?.focus();
-  }, [notice]);
-  return notice ? (
-    <p
-      className={`result ${notice.kind}`}
-      role={notice.kind === "error" ? "alert" : "status"}
-      tabIndex={-1}
-      ref={ref}
-    >
-      {notice.text}
-    </p>
-  ) : null;
-}
-
 export function App({
   auth,
   apiBaseUrl,
@@ -144,7 +127,7 @@ export function App({
     membershipId: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useNotice();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLaunching(false), 700);
@@ -268,7 +251,7 @@ export function App({
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [setNotice]);
   useEffect(() => {
     let active = true;
     let revision = 0;
@@ -377,13 +360,17 @@ export function App({
           setMembership(null);
           setAccess("revoked");
         } else {
-          setNotice({ kind: "error", text: "Couldn’t load your name." });
+          setNotice({
+            kind: "error",
+            text: "Couldn’t load your name.",
+            persistent: true,
+          });
         }
       });
     return () => {
       active = false;
     };
-  }, [access, api, membership, path, session]);
+  }, [access, api, membership, path, session, setNotice]);
   useEffect(() => {
     void groupRevision;
     if (
