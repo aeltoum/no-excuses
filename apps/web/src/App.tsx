@@ -1,5 +1,5 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, createApiClient } from "./api-client";
 import {
   normalizeOtp,
@@ -101,7 +101,11 @@ export function App({
       }
       const { data, error } = result;
       if (error) {
-        const unavailable = error.status === undefined || error.status >= 500;
+        const unavailable =
+          error.status === undefined ||
+          error.status === 0 ||
+          error.status === 429 ||
+          error.status >= 500;
         throw new ApiError(
           unavailable ? "failure" : "unauthorized",
           unavailable
@@ -119,9 +123,25 @@ export function App({
   const [launching, setLaunching] = useState(true);
   const [path, setPath] = useState(currentPath);
   const [access, setAccess] = useState<Access>("checking");
+  const [accessRevision, setAccessRevision] = useState(0);
+  const lastUnauthorizedToken = useRef<string | null>(null);
+  const retryAccess = useCallback(() => {
+    lastUnauthorizedToken.current = null;
+    setAccessRevision((current) => current + 1);
+  }, []);
   const [session, setSession] = useState<Session | null>(null);
   const sessionUser = useRef<string | null>(null);
   sessionUser.current = session?.user.id ?? null;
+  const recheckAccess = useCallback(() => {
+    const rejectedToken = session?.access_token ?? null;
+    if (rejectedToken && lastUnauthorizedToken.current === rejectedToken) {
+      setAccess("failure");
+      return;
+    }
+    lastUnauthorizedToken.current = rejectedToken;
+    setAccess("checking");
+    setAccessRevision((current) => current + 1);
+  }, [session]);
   const [membership, setMembership] = useState<{
     groupId: string;
     membershipId: string;
@@ -254,7 +274,7 @@ export function App({
   }, [setNotice]);
   useEffect(() => {
     let active = true;
-    let revision = 0;
+    let revision = accessRevision;
     const resolve = async (next: Session | null, expected: number) => {
       if (!next) {
         if (active && revision === expected) {
@@ -308,7 +328,10 @@ export function App({
         if (error) {
           if (active && revision === expected)
             setAccess(
-              error.status === undefined || error.status >= 500
+              error.status === undefined ||
+                error.status === 0 ||
+                error.status === 429 ||
+                error.status >= 500
                 ? "unavailable"
                 : "failure",
             );
@@ -323,7 +346,21 @@ export function App({
       active = false;
       listener.data.subscription.unsubscribe();
     };
-  }, [api, auth]);
+  }, [api, auth, accessRevision]);
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState === "visible")
+        setAccessRevision((current) => current + 1);
+    };
+    window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.removeEventListener("online", resume);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, []);
   useEffect(() => {
     if (access !== "signed-in" || (path !== "/sign-in" && path !== "/")) return;
     const destination = membership ? "/home" : "/group";
@@ -358,7 +395,7 @@ export function App({
         if (error instanceof ApiError && error.kind === "unauthorized") {
           setSession(null);
           setMembership(null);
-          setAccess("revoked");
+          recheckAccess();
         } else {
           setNotice({
             kind: "error",
@@ -370,7 +407,7 @@ export function App({
     return () => {
       active = false;
     };
-  }, [access, api, membership, path, session, setNotice]);
+  }, [access, api, membership, path, session, setNotice, recheckAccess]);
   useEffect(() => {
     void groupRevision;
     if (
@@ -442,7 +479,7 @@ export function App({
         if (error instanceof ApiError && error.kind === "unauthorized") {
           setSession(null);
           setMembership(null);
-          setAccess("revoked");
+          recheckAccess();
           return;
         }
         if (hasCache) {
@@ -454,7 +491,7 @@ export function App({
       active = false;
       window.clearTimeout(groupChangedTimer.current);
     };
-  }, [access, api, groupRevision, membership, path, session]);
+  }, [access, api, groupRevision, membership, path, session, recheckAccess]);
   useEffect(() => {
     if (codeSent) codeInputs.current[0]?.focus();
     else if (signInDoor) emailInput.current?.focus();
@@ -490,13 +527,15 @@ export function App({
       setNotice({ kind: "success", text });
     } catch (error) {
       const message =
-        error instanceof WebAuthError || error instanceof ApiError
-          ? error.message
-          : "Action failed. Try again.";
+        error instanceof ApiError && error.kind === "unauthorized"
+          ? "Action failed. Try again."
+          : error instanceof WebAuthError || error instanceof ApiError
+            ? error.message
+            : "Action failed. Try again.";
       if (error instanceof ApiError && error.kind === "unauthorized") {
         setSession(null);
         setMembership(null);
-        setAccess("revoked");
+        recheckAccess();
       }
       setNotice({ kind: "error", text: message });
     } finally {
@@ -605,19 +644,32 @@ export function App({
               Return to start
             </a>
           </Page>
-        ) : access !== "signed-in" && route !== "/sign-in" ? (
+        ) : access !== "signed-in" &&
+          (route !== "/sign-in" ||
+            access === "unavailable" ||
+            access === "failure") ? (
           <Page
             eyebrow="Private friend-group accountability"
             title={statusCopy[access][0]}
             lead={statusCopy[access][1]}
           >
-            <a
-              className="primary-action"
-              href="/sign-in"
-              onClick={(e) => navigate(e, "/sign-in")}
-            >
-              Continue to sign in
-            </a>
+            {access === "unavailable" || access === "failure" ? (
+              <button
+                className="primary-action"
+                type="button"
+                onClick={retryAccess}
+              >
+                Try again
+              </button>
+            ) : access !== "checking" ? (
+              <a
+                className="primary-action"
+                href="/sign-in"
+                onClick={(e) => navigate(e, "/sign-in")}
+              >
+                Continue to sign in
+              </a>
+            ) : null}
             <Result notice={notice} />
           </Page>
         ) : route === "/sign-in" ? (
@@ -1908,7 +1960,7 @@ export function App({
             onRevoked={() => {
               setSession(null);
               setMembership(null);
-              setAccess("revoked");
+              recheckAccess();
             }}
           />
         )}

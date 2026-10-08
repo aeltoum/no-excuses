@@ -1,4 +1,8 @@
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import {
+  AuthRetryableFetchError,
+  type Session,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,7 +16,8 @@ export class WebAuthError extends Error {
   }
 }
 
-const unavailable = (status?: number) => status === undefined || status >= 500;
+const unavailable = (status?: number) =>
+  status === undefined || status === 0 || status === 429 || status >= 500;
 
 export function normalizeEmail(value: string) {
   const email = value.trim().toLowerCase();
@@ -88,10 +93,38 @@ export async function resolveLiveAccess(
   session: Session,
 ): Promise<"signed-in" | "revoked" | "unavailable"> {
   try {
-    const { data, error } = await client.auth.getUser(session.access_token);
+    let { data, error } = await client.auth.getUser(session.access_token);
+    // An expired JWT is not a revoked refresh credential. Retry only this
+    // token error; deleted, banned and revoked sessions remain authoritative.
+    if (error?.code === "bad_jwt") {
+      const refreshed = await client.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session)
+        return unavailable(refreshed.error?.status) ? "unavailable" : "revoked";
+      ({ data, error } = await client.auth.getUser(
+        refreshed.data.session.access_token,
+      ));
+    }
     if (!error && data.user) return "signed-in";
     return unavailable(error?.status) ? "unavailable" : "revoked";
   } catch {
     return "unavailable";
   }
 }
+
+// The SDK otherwise treats refresh rate limits as permanent credential rejection.
+export const fetchAuth: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  const url = new URL(
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url,
+  );
+  if (url.pathname.endsWith("/auth/v1/token") && response.status === 429)
+    throw new AuthRetryableFetchError(
+      "Authentication temporarily rate limited.",
+      429,
+    );
+  return response;
+};

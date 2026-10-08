@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { fetchAuth } from "./auth";
 import { readPublicEnvironment } from "./env";
 import "./styles.css";
 
@@ -15,6 +16,7 @@ try {
     environment.supabaseUrl,
     environment.supabaseAnonKey,
     {
+      global: { fetch: fetchAuth },
       auth: {
         persistSession: true,
         autoRefreshToken: true,

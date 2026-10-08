@@ -51,26 +51,36 @@ export function createApiClient(
       key: string;
     },
   ) {
-    const accessToken = getFreshToken ? await getFreshToken() : token;
+    let accessToken = getFreshToken ? await getFreshToken() : token;
     let response: Response;
     try {
-      response = await fetcher(`${root}${path}`, {
-        method: command?.method ?? "GET",
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          ...(command
-            ? {
-                "content-type": "application/json",
-                "idempotency-key": command.key,
-              }
-            : {}),
-        },
-        body:
-          command?.body === undefined
-            ? undefined
-            : JSON.stringify(command.body),
-      });
-    } catch {
+      const send = () =>
+        fetcher(`${root}${path}`, {
+          method: command?.method ?? "GET",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            ...(command
+              ? {
+                  "content-type": "application/json",
+                  "idempotency-key": command.key,
+                }
+              : {}),
+          },
+          body:
+            command?.body === undefined
+              ? undefined
+              : JSON.stringify(command.body),
+        });
+      response = await send();
+      if (response.status === 401 && !command && getFreshToken) {
+        const nextToken = await getFreshToken();
+        if (nextToken !== accessToken) {
+          accessToken = nextToken;
+          response = await send();
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
       throw new ApiError("failure", "Service unavailable. Try again.", true);
     }
     let body: unknown;
