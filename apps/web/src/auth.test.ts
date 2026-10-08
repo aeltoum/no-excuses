@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  fetchAuth,
   normalizeEmail,
   normalizeOtp,
   requestOtp,
@@ -72,4 +73,63 @@ describe("browser email OTP", () => {
       ),
     ).resolves.toBe("unavailable");
   });
+});
+
+describe("persistent session recovery", () => {
+  it("refreshes bad_jwt once, then verifies live user", async () => {
+    const refreshSession = vi.fn(async () => ({
+      data: { session: { access_token: "fresh" } },
+      error: null,
+    }));
+    const getUser = vi.fn(async (token: string) =>
+      token === "fresh"
+        ? { data: { user: { id: "member" } }, error: null }
+        : { data: { user: null }, error: { status: 401, code: "bad_jwt" } },
+    );
+    await expect(
+      resolveLiveAccess(
+        { auth: { getUser, refreshSession } } as never,
+        { access_token: "expired" } as never,
+      ),
+    ).resolves.toBe("signed-in");
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+  it("keeps rate limits recoverable and never refreshes revoked sessions", async () => {
+    for (const [status, code, expected] of [
+      [0, "network", "unavailable"],
+      [429, "over_request_rate_limit", "unavailable"],
+      [401, "session_not_found", "revoked"],
+      [403, "user_banned", "revoked"],
+    ] as const) {
+      const refreshSession = vi.fn();
+      const getUser = vi.fn(async () => ({
+        data: { user: null },
+        error: { status, code },
+      }));
+      await expect(
+        resolveLiveAccess(
+          { auth: { getUser, refreshSession } } as never,
+          { access_token: "token" } as never,
+        ),
+      ).resolves.toBe(expected);
+      expect(refreshSession).not.toHaveBeenCalled();
+    }
+  });
+});
+
+it("keeps refresh rate limits retryable without changing other HTTP responses", async () => {
+  const response = new Response("{}", { status: 429 });
+  const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+  try {
+    await expect(
+      fetchAuth(
+        "https://auth.example.test/auth/v1/token?grant_type=refresh_token",
+      ),
+    ).rejects.toMatchObject({ name: "AuthRetryableFetchError" });
+    await expect(
+      fetchAuth("https://auth.example.test/auth/v1/user"),
+    ).resolves.toBe(response);
+  } finally {
+    fetcher.mockRestore();
+  }
 });

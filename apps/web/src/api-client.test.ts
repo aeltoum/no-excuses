@@ -314,6 +314,74 @@ describe("browser API client", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("retries an expired in-flight token once only when session token changed", async () => {
+    for (const changed of [true, false]) {
+      const unauthorized = () =>
+        Response.json(
+          {
+            contractVersion: 1,
+            error: {
+              code: "unauthorized",
+              message: "expired",
+              retryable: false,
+            },
+          },
+          { status: 401 },
+        );
+      const fetcher = vi
+        .fn()
+        .mockResolvedValueOnce(unauthorized())
+        .mockResolvedValueOnce(
+          Response.json({ contractVersion: 1, data: { membership: null } }),
+        );
+      const getFreshToken = vi
+        .fn()
+        .mockResolvedValueOnce("aging")
+        .mockResolvedValueOnce(changed ? "fresh" : "aging");
+      const operation = createApiClient(
+        "https://api.example.test",
+        fetcher,
+        getFreshToken,
+      ).current("stale");
+      if (changed) {
+        await expect(operation).resolves.toMatchObject({
+          data: { membership: null },
+        });
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(fetcher.mock.calls[1]?.[1].headers).toMatchObject({
+          authorization: "Bearer fresh",
+        });
+      } else {
+        await expect(operation).rejects.toMatchObject({ kind: "unauthorized" });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+      }
+    }
+  });
+
+  it("never replays mutations after unauthorized response", async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json(
+        {
+          contractVersion: 1,
+          error: { code: "unauthorized", message: "revoked", retryable: false },
+        },
+        { status: 401 },
+      ),
+    );
+    const getFreshToken = vi
+      .fn()
+      .mockResolvedValueOnce("aging")
+      .mockResolvedValueOnce("another-user");
+    await expect(
+      createApiClient("https://api.example.test", fetcher, getFreshToken).leave(
+        "old",
+        uuid,
+      ),
+    ).rejects.toMatchObject({ kind: "unauthorized" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(getFreshToken).toHaveBeenCalledTimes(1);
+  });
+
   it("maps denied/conflict without exposing server details", async () => {
     for (const [status, kind, message] of [
       [403, "denied", "Action denied."],
