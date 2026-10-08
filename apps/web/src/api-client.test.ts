@@ -2,7 +2,156 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError, createApiClient } from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
+const workout = {
+  workoutCheckinId: uuid,
+  activityType: "mixed" as const,
+  completedAt: "2026-10-08T12:00:00.000Z",
+  durationMinutes: 90,
+  perceivedIntensity: "high" as const,
+  selfReportAttested: true as const,
+};
+const workoutReceipt = {
+  contractVersion: 1,
+  data: { workoutCheckinId: uuid, currentWeekCount: 4 },
+};
 describe("browser API client", () => {
+  it("submits a healthy workout once", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(workoutReceipt));
+    await expect(
+      createApiClient("https://api.example.test", fetcher).checkIn(
+        "token",
+        workout,
+        uuid,
+      ),
+    ).resolves.toEqual(workoutReceipt);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it("logs on first submission when the initial transport attempt fails", async () => {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(
+        Response.json({
+          contractVersion: 1,
+          data: {
+            workoutCheckinId: uuid,
+            currentWeekCount: 4,
+          },
+        }),
+      );
+    await expect(
+      createApiClient("https://api.example.test", fetcher).checkIn(
+        "token",
+        workout,
+        uuid,
+      ),
+    ).resolves.toMatchObject({ data: { currentWeekCount: 4 } });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+  });
+  it("replays an accepted workout after its response is lost without a second write", async () => {
+    const receipts = new Map<string, unknown>();
+    let writes = 0;
+    const fetcher = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        const key = new Headers(init?.headers).get("idempotency-key") ?? "";
+        if (!receipts.has(key)) {
+          receipts.set(key, workoutReceipt);
+          writes++;
+          throw new TypeError("Response lost");
+        }
+        return Response.json(receipts.get(key));
+      },
+    );
+    await expect(
+      createApiClient(
+        "https://api.example.test",
+        fetcher as typeof fetch,
+      ).checkIn("token", workout, uuid),
+    ).resolves.toEqual(workoutReceipt);
+    expect(writes).toBe(1);
+    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+  });
+  it("recovers one retryable service response on the same submission", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            contractVersion: 1,
+            error: {
+              code: "domain_failure",
+              message: "private detail",
+              retryable: true,
+            },
+          },
+          { status: 500 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(workoutReceipt));
+    await expect(
+      createApiClient("https://api.example.test", fetcher).checkIn(
+        "token",
+        workout,
+        uuid,
+      ),
+    ).resolves.toEqual(workoutReceipt);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+  });
+  it("stops after two transport failures and preserves the caller's draft for manual retry", async () => {
+    const fetcher = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const api = createApiClient("https://api.example.test", fetcher);
+    await expect(api.checkIn("token", workout, uuid)).rejects.toMatchObject({
+      kind: "failure",
+      retryable: true,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    fetcher.mockResolvedValueOnce(Response.json(workoutReceipt));
+    await expect(api.checkIn("token", workout, uuid)).resolves.toEqual(
+      workoutReceipt,
+    );
+    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[2]);
+  });
+  it.each([401, 403, 409, 500])(
+    "does not replay terminal HTTP %s",
+    async (status) => {
+      const fetcher = vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            contractVersion: 1,
+            error: {
+              code: "domain_failure",
+              message: "private detail",
+              retryable: false,
+            },
+          },
+          { status },
+        ),
+      );
+      await expect(
+        createApiClient("https://api.example.test", fetcher).checkIn(
+          "token",
+          workout,
+          uuid,
+        ),
+      ).rejects.toBeInstanceOf(ApiError);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("does not replay an invalid success response", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(Response.json({ unexpected: true }));
+    await expect(
+      createApiClient("https://api.example.test", fetcher).checkIn(
+        "token",
+        workout,
+        uuid,
+      ),
+    ).rejects.toMatchObject({ retryable: false });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("reads only narrow invitation preview fields", async () => {
     const fetcher = vi.fn(async () =>
       Response.json({

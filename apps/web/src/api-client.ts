@@ -215,15 +215,28 @@ export function createApiClient(
         selfReportAttested: true;
       },
       key: string,
-    ) =>
-      command(
-        "/v1/workout-check-ins",
-        token,
-        submitWorkoutCheckinResponseSchema,
-        body,
-        "POST",
-        key,
-      ),
+    ) => {
+      const submit = () =>
+        command(
+          "/v1/workout-check-ins",
+          token,
+          submitWorkoutCheckinResponseSchema,
+          body,
+          "POST",
+          key,
+        );
+      return submit().catch((error: unknown) => {
+        if (
+          !(error instanceof ApiError) ||
+          error.kind !== "failure" ||
+          !error.retryable
+        )
+          throw error;
+        // A lost response may follow a committed workout. Replay the same ID,
+        // timestamp and idempotency key so recovery cannot log it twice.
+        return submit();
+      });
+    },
     current: (token: string) =>
       request(
         "/v1/group-memberships/current",

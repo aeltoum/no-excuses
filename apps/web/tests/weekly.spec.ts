@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, type TestInfo, test } from "@playwright/test";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const friendMembershipId = "30000000-0000-4000-8000-000000000002";
@@ -162,9 +162,12 @@ test("one-member Group pauses workouts until a second member joins", async ({
   expect(failures).toEqual([]);
 });
 
-test("weekly loop: self-report, target, finalized result", async ({
-  page,
-}, testInfo) => {
+const weeklyLoop = async (
+  { page }: { page: Page },
+  testInfo: TestInfo,
+  workoutFailures: number,
+) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(error.message));
   page.on("console", (message) => {
@@ -302,7 +305,7 @@ test("weekly loop: self-report, target, finalized result", async ({
     if (path.endsWith("/workout-check-ins")) {
       const body = request.postDataJSON();
       keys.push(request.headers()["idempotency-key"]);
-      if (keys.length === 1)
+      if (keys.length <= workoutFailures)
         return route.fulfill({
           status: 500,
           json: {
@@ -480,18 +483,37 @@ test("weekly loop: self-report, target, finalized result", async ({
     dialog.getByRole("button", { name: "Log workout" }),
   ).toBeEnabled();
   await dialog.getByRole("button", { name: "Log workout" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "Couldn't log it — the connection dropped. Your choices are kept; try again.",
-  );
-  await expect(
-    dialog.getByRole("button", { name: "Strength" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await dialog.getByRole("button", { name: "Log workout" }).click();
+  if (workoutFailures === 2) {
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "Couldn't log it — the connection dropped. Your choices are kept; try again.",
+    );
+    await expect(
+      dialog.getByRole("button", { name: "Strength" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      dialog.getByRole("button", { name: "45 min" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      dialog.getByLabel("I did this workout. It's my own self-report."),
+    ).toBeChecked();
+    await expect(
+      dialog.getByRole("button", { name: "Moderate" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("persistent-workout-failure.png"),
+    });
+    await dialog.getByRole("button", { name: "Log workout" }).click();
+  }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText(
     "Workout logged. 3 of 4 this week.",
   );
-  expect(keys).toHaveLength(2);
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath("workout-success.png"),
+  });
+  expect(keys).toHaveLength(workoutFailures + 1);
   await expect(
     page.getByText("3 of 4 this week", { exact: true }),
   ).toBeVisible();
@@ -504,8 +526,8 @@ test("weekly loop: self-report, target, finalized result", async ({
       .locator('rect[fill="var(--activity-strength)"]'),
   ).toHaveCount(4);
   await page.getByRole("button", { name: "Refresh count" }).click();
-  expect(keys).toHaveLength(2);
-  expect(keys[0]).toBe(keys[1]);
+  expect(keys).toHaveLength(workoutFailures + 1);
+  expect(new Set(keys).size).toBe(1);
   const targetLink = page.getByRole("link", {
     name: "3 of 4 workouts. Change weekly target.",
   });
@@ -682,6 +704,11 @@ test("weekly loop: self-report, target, finalized result", async ({
   ).toEqual([]);
   expect(failures.sort()).toEqual(
     [
+      ...Array.from(
+        { length: workoutFailures - 1 },
+        () =>
+          "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      ),
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
@@ -692,4 +719,10 @@ test("weekly loop: self-report, target, finalized result", async ({
       "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
     ].sort(),
   );
-});
+};
+
+for (const workoutFailures of [1, 2]) {
+  test(`weekly loop: ${workoutFailures === 1 ? "transient" : "persistent"} workout failure, target, finalized result`, ({
+    page,
+  }, testInfo) => weeklyLoop({ page }, testInfo, workoutFailures));
+}
