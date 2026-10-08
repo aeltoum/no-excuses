@@ -37,7 +37,7 @@ export const submitWorkoutCheckinRequestSchema = z
   .object({
     workoutCheckinId: uuidSchema,
     activityType: workoutActivityTypeSchema,
-    completedAt: utcInstantSchema,
+    completedAt: utcInstantSchema.optional(),
     durationMinutes: positiveIntegerSchema,
     perceivedIntensity: perceivedIntensitySchema,
     selfReportAttested: z.literal(true),

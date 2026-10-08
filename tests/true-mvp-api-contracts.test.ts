@@ -336,7 +336,10 @@ describe("True-MVP API runtime contracts", () => {
     expect(submitWorkoutCheckinRequestSchema.parse(commandBody)).toEqual(
       commandBody,
     );
+    const { completedAt: _completedAt, ...logNow } = commandBody;
+    expect(submitWorkoutCheckinRequestSchema.parse(logNow)).toEqual(logNow);
     for (const malformed of [
+      { ...commandBody, completedAt: null },
       { ...commandBody, workoutCheckinId: "not-a-uuid" },
       { ...commandBody, activityType: "other" },
       { ...commandBody, completedAt: "2026-03-05T09:00:00+01:00" },
