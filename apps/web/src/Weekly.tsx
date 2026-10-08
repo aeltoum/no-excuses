@@ -70,7 +70,7 @@ export function Weekly({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
-  const [logError, setLogError] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
   const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
@@ -79,7 +79,6 @@ export function Weekly({
     signature: string;
     key: string;
     id: string;
-    completedAt: string;
   } | null>(null);
   const targetDraft = useRef<{ signature: string; key: string } | null>(null);
   useEffect(() => {
@@ -544,18 +543,16 @@ export function Weekly({
                             signature,
                             key: crypto.randomUUID(),
                             id: crypto.randomUUID(),
-                            completedAt: new Date().toISOString(),
                           };
                         const current = draft.current;
                         setBusy(true);
-                        setLogError(false);
+                        setLogError(null);
                         void api
                           .checkIn(
                             token,
                             {
                               workoutCheckinId: current.id,
                               activityType,
-                              completedAt: current.completedAt,
                               durationMinutes: minutes,
                               perceivedIntensity: intensity,
                               selfReportAttested: true,
@@ -615,7 +612,11 @@ export function Weekly({
                               error.kind === "unauthorized"
                             )
                               onRevoked();
-                            setLogError(true);
+                            setLogError(
+                              error instanceof ApiError
+                                ? error.message
+                                : "Workout could not be logged.",
+                            );
                           })
                           .finally(() => setBusy(false));
                       }}
@@ -733,8 +734,7 @@ export function Weekly({
                       )}
                       {logError && (
                         <p className="result error" role="alert">
-                          Couldn't log it — the connection dropped. Your choices
-                          are kept; try again.
+                          {logError} Your choices are kept; try again.
                         </p>
                       )}
                     </form>

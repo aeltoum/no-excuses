@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { afterEach, describe, expect, it } from "vitest";
@@ -62,6 +63,143 @@ function submit() {
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("True-MVP workout check-ins", () => {
+  it("reproduces identical first-submit failure then success at the clock boundary", async () => {
+    const db = await database();
+    await auth(db, adminAuth);
+    await db.exec("set role service_role");
+    const first = submit().replace(
+      "2026-03-05T09:00Z",
+      "2026-03-05T10:00:00.420Z",
+    );
+    await expect(db.query(first)).rejects.toThrow(
+      "completion cannot be in the future",
+    );
+    expect(
+      (
+        await db.query(
+          first.replace("'2026-03-05T10:00Z')", "'2026-03-05T10:00:01Z')"),
+        )
+      ).rows,
+    ).toMatchObject([{ current_week_count: 1 }]);
+  });
+
+  it("logs now through the deployed SQL adapter without trusting phone time and replays once", async () => {
+    const db = await database();
+    await auth(db, adminAuth);
+    await db.exec("set role service_role");
+    const server = await readFile(
+      new URL("../packages/delivery/src/server.ts", import.meta.url),
+      "utf8",
+    );
+    // Evaluate the actual adapter registration, without starting its server or Auth.
+    const registration = server
+      .split("submitWorkoutCheckin: command(")[1]
+      ?.split("  deleteAccount:")[0];
+    expect(registration).toBeDefined();
+    const adapter = new Function(
+      "command",
+      "submitWorkoutCheckinRequestSchema",
+      `return command(${registration?.trim().replace(/,$/, "")}`,
+    )(
+      (
+        sql: string,
+        input: (body: Record<string, unknown>, now: string) => unknown[],
+      ) => ({ sql, input }),
+      {},
+    ) as {
+      sql: string;
+      input: (body: Record<string, unknown>, now: string) => unknown[];
+    };
+    const body = {
+      workoutCheckinId: "70000000-0000-4000-8000-000000000003",
+      activityType: "cardio",
+      durationMinutes: 90,
+      perceivedIntensity: "moderate",
+      selfReportAttested: true,
+    };
+    const hash = (command: string, payload: unknown) =>
+      createHash("sha256")
+        .update(JSON.stringify({ command, body: payload }))
+        .digest("hex");
+    const execute = (
+      key: string,
+      payload: Record<string, unknown>,
+      fingerprint: string,
+      now: string,
+    ) =>
+      db.query(adapter.sql, [
+        key,
+        fingerprint,
+        "70000000-0000-4000-8000-000000000002",
+        ...adapter.input(payload, now),
+        now,
+      ]);
+    const key = "70000000-0000-4000-8000-000000000001";
+    const first = await execute(
+      key,
+      body,
+      hash(adapter.sql, body),
+      "2026-03-05T10:00:00Z",
+    );
+    expect(first.rows).toMatchObject([{ current_week_count: 1 }]);
+    expect(
+      (
+        await execute(
+          key,
+          body,
+          hash(adapter.sql, body),
+          "2026-03-05T10:00:01Z",
+        )
+      ).rows,
+    ).toEqual(first.rows);
+    // A receipt produced before rollout must still replay with its old hash.
+    const legacySql =
+      "select * from app_private.submit_workout_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)";
+    const legacyBody = {
+      ...body,
+      workoutCheckinId: "70000000-0000-4000-8000-000000000004",
+      completedAt: "2026-03-05T09:00:00Z",
+    };
+    const legacyKey = "70000000-0000-4000-8000-000000000005";
+    const legacy = await db.query(legacySql, [
+      legacyKey,
+      hash(legacySql, legacyBody),
+      "70000000-0000-4000-8000-000000000002",
+      legacyBody.workoutCheckinId,
+      "cardio",
+      legacyBody.completedAt,
+      90,
+      "moderate",
+      true,
+      "2026-03-05T10:00:00Z",
+    ]);
+    expect(
+      (
+        await execute(
+          legacyKey,
+          legacyBody,
+          hash(adapter.sql, legacyBody),
+          "2026-03-05T10:00:01Z",
+        )
+      ).rows,
+    ).toEqual(legacy.rows);
+    await db.exec("reset role");
+    expect(
+      (
+        await db.query(
+          "select completed_at = submitted_at as server_time, count(*) over()::integer as count from app_private.workout_checkins where workout_checkin_id = '70000000-0000-4000-8000-000000000003'",
+        )
+      ).rows,
+    ).toEqual([{ server_time: true, count: 1 }]);
+    expect(
+      (
+        await db.query(
+          "select count(*)::integer as count from app_private.workout_checkins",
+        )
+      ).rows,
+    ).toEqual([{ count: 2 }]);
+  });
+
   it("lets an Account set only its own trimmed display name", async () => {
     const db = await database();
     await auth(db, adminAuth);

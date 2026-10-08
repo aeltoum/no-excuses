@@ -15,6 +15,19 @@ const workoutReceipt = {
   data: { workoutCheckinId: uuid, currentWeekCount: 4 },
 };
 describe("browser API client", () => {
+  it("submits log-now without a client clock timestamp", async () => {
+    const { completedAt: _completedAt, ...logNow } = workout;
+    const fetcher = vi.fn().mockResolvedValue(Response.json(workoutReceipt));
+    await createApiClient("https://api.example.test", fetcher).checkIn(
+      "token",
+      logNow,
+      uuid,
+    );
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).not.toHaveProperty(
+      "completedAt",
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("submits a healthy workout once", async () => {
     const fetcher = vi.fn().mockResolvedValue(Response.json(workoutReceipt));
     await expect(
@@ -113,7 +126,7 @@ describe("browser API client", () => {
     );
     expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[2]);
   });
-  it.each([401, 403, 409, 500])(
+  it.each([400, 401, 403, 409, 500])(
     "does not replay terminal HTTP %s",
     async (status) => {
       const fetcher = vi.fn().mockResolvedValue(

@@ -417,7 +417,8 @@ export interface components {
             workoutCheckinId: string;
             /** @enum {string} */
             activityType: "strength" | "cardio" | "class" | "sport" | "mixed";
-            completedAt: components["schemas"]["UtcInstant"];
+            /** @description Omit to log completion at the server receipt time. Explicit times must be within current membership and accountability week and cannot be in the future. */
+            completedAt?: components["schemas"]["UtcInstant"];
             durationMinutes: number;
             /** @enum {string} */
             perceivedIntensity: "low" | "moderate" | "high";

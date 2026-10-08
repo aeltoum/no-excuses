@@ -434,13 +434,15 @@ components:
     SubmitWorkoutCheckinRequest:
       type: object
       additionalProperties: false
-      required: [workoutCheckinId, activityType, completedAt, durationMinutes, perceivedIntensity, selfReportAttested]
+      required: [workoutCheckinId, activityType, durationMinutes, perceivedIntensity, selfReportAttested]
       properties:
         workoutCheckinId: { type: string, format: uuid }
         activityType:
           type: string
           enum: [strength, cardio, class, sport, mixed]
-        completedAt: { $ref: "#/components/schemas/UtcInstant" }
+        completedAt:
+          allOf: [{ $ref: "#/components/schemas/UtcInstant" }]
+          description: Omit to log completion at the server receipt time. Explicit times must be within current membership and accountability week and cannot be in the future.
         durationMinutes: { type: integer, minimum: 1 }
         perceivedIntensity:
           type: string

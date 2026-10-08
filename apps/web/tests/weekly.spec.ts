@@ -304,6 +304,7 @@ const weeklyLoop = async (
     if (path.endsWith("/finalized-weekly-history")) return respond(historyData);
     if (path.endsWith("/workout-check-ins")) {
       const body = request.postDataJSON();
+      expect(body).not.toHaveProperty("completedAt");
       keys.push(request.headers()["idempotency-key"]);
       if (keys.length <= workoutFailures)
         return route.fulfill({
@@ -485,7 +486,7 @@ const weeklyLoop = async (
   await dialog.getByRole("button", { name: "Log workout" }).click();
   if (workoutFailures === 2) {
     await expect(dialog.getByRole("alert")).toHaveText(
-      "Couldn't log it — the connection dropped. Your choices are kept; try again.",
+      "Action failed. Try again. Your choices are kept; try again.",
     );
     await expect(
       dialog.getByRole("button", { name: "Strength" }),

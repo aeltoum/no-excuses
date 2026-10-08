@@ -209,7 +209,7 @@ export function createApiClient(
       body: {
         workoutCheckinId: string;
         activityType: "strength" | "cardio" | "class" | "sport" | "mixed";
-        completedAt: string;
+        completedAt?: string;
         durationMinutes: number;
         perceivedIntensity: "low" | "moderate" | "high";
         selfReportAttested: true;

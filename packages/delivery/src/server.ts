@@ -296,7 +296,7 @@ function protectedHandler(
 
 const command = (
   sql: string,
-  input: (body: Record<string, unknown>) => unknown[],
+  input: (body: Record<string, unknown>, now: string) => unknown[],
   output: (
     rows: Record<string, unknown>[],
     body: Record<string, unknown>,
@@ -313,7 +313,7 @@ const command = (
           context.key,
           context.hash,
           context.id,
-          ...input(body),
+          ...input(body, context.now),
           ...(includeNow ? [context.now] : []),
         ])
       ).rows;
@@ -456,10 +456,10 @@ const handlers = {
   ),
   submitWorkoutCheckin: command(
     "select * from app_private.submit_workout_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
-    (body) => [
+    (body, now) => [
       body.workoutCheckinId,
       body.activityType,
-      body.completedAt,
+      body.completedAt ?? now,
       body.durationMinutes,
       body.perceivedIntensity,
       body.selfReportAttested,
