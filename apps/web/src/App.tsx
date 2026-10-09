@@ -188,7 +188,6 @@ export function App({
   } | null>(null);
   const groupScope = useRef("");
   const groupRosterRef = useRef<typeof groupRoster>(null);
-  const [groupRefreshing, setGroupRefreshing] = useState(false);
   const [groupStale, setGroupStale] = useState(false);
   const [groupChanged, setGroupChanged] = useState(false);
   const groupChangedTimer = useRef<number | undefined>(undefined);
@@ -421,8 +420,7 @@ export function App({
     const scope = `${session.user.id}:${membership.groupId}:${membership.membershipId}`;
     const previousRoster = groupRosterRef.current;
     const hasCache = groupScope.current === scope && previousRoster !== null;
-    if (hasCache) setGroupRefreshing(true);
-    else {
+    if (!hasCache) {
       groupScope.current = scope;
       groupRosterRef.current = null;
       setGroupRoster(null);
@@ -451,7 +449,6 @@ export function App({
         setGroupStale(false);
         if (path === "/account") {
           setGroupLoad("ready");
-          setGroupRefreshing(false);
           return;
         }
         const creator = response.data.members.some(
@@ -472,7 +469,6 @@ export function App({
         );
         setManageGroup((current) => current && creator);
         setGroupLoad("ready");
-        setGroupRefreshing(false);
       })
       .catch((error) => {
         if (!active) return;
@@ -484,7 +480,6 @@ export function App({
         }
         if (hasCache) {
           setGroupStale(true);
-          setGroupRefreshing(false);
         } else setGroupLoad("error");
       });
     return () => {
@@ -1301,23 +1296,18 @@ export function App({
                   groupScope.current ===
                     `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
                     <>
-                      {(groupStale || groupRefreshing) && (
+                      {groupStale && (
                         <div className="data-freshness">
-                          {groupStale && <span>Showing saved data</span>}
-                          {groupRefreshing && (
-                            <span role="status">Refreshing…</span>
-                          )}
-                          {groupStale && (
-                            <button
-                              className="data-retry"
-                              type="button"
-                              onClick={() =>
-                                setGroupRevision((value) => value + 1)
-                              }
-                            >
-                              Try again
-                            </button>
-                          )}
+                          <span>Showing saved data</span>
+                          <button
+                            className="data-retry"
+                            type="button"
+                            onClick={() =>
+                              setGroupRevision((value) => value + 1)
+                            }
+                          >
+                            Try again
+                          </button>
                         </div>
                       )}
                       <div className="group-heading">
@@ -1662,25 +1652,18 @@ export function App({
               ) : (
                 <>
                   {groupLoad === "ready" &&
-                    (groupStale || groupRefreshing) &&
+                    groupStale &&
                     groupScope.current ===
                       `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` && (
                       <div className="data-freshness">
-                        {groupStale && <span>Showing saved data</span>}
-                        {groupRefreshing && (
-                          <span role="status">Refreshing…</span>
-                        )}
-                        {groupStale && (
-                          <button
-                            className="data-retry"
-                            type="button"
-                            onClick={() =>
-                              setGroupRevision((value) => value + 1)
-                            }
-                          >
-                            Try again
-                          </button>
-                        )}
+                        <span>Showing saved data</span>
+                        <button
+                          className="data-retry"
+                          type="button"
+                          onClick={() => setGroupRevision((value) => value + 1)}
+                        >
+                          Try again
+                        </button>
                       </div>
                     )}
                   <a

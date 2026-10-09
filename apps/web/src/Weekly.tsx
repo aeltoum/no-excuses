@@ -45,7 +45,6 @@ export function Weekly({
   const [history, setHistory] = useState<FinalizedWeeklyHistoryItem[]>(
     saved?.history ?? [],
   );
-  const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
   const [changed, setChanged] = useState(false);
   const changedTimer = useRef<number | undefined>(undefined);
@@ -99,8 +98,7 @@ export function Weekly({
     void retry;
     let active = true;
     const previous = cache.get(cacheKey);
-    if (previous) setRefreshing(true);
-    else setState("loading");
+    if (!previous) setState("loading");
     if (!groupId) {
       setProgress([]);
       setHistory([]);
@@ -166,14 +164,12 @@ export function Weekly({
           }
         }
         setStale(false);
-        setRefreshing(false);
         setState("ready");
       })
       .catch((error) => {
         if (!active) return;
         if (previous) {
           setStale(true);
-          setRefreshing(false);
         } else setState("error");
         if (error instanceof ApiError && error.kind === "unauthorized")
           revokeRef.current();
@@ -351,15 +347,12 @@ export function Weekly({
           </p>
         </>
       )}
-      {state === "ready" && (stale || refreshing) && (
+      {state === "ready" && stale && (
         <div className="data-freshness">
-          {stale && <span>Showing saved data</span>}
-          {refreshing && <span role="status">Refreshing…</span>}
-          {stale && (
-            <button className="data-retry" type="button" onClick={refresh}>
-              Try again
-            </button>
-          )}
+          <span>Showing saved data</span>
+          <button className="data-retry" type="button" onClick={refresh}>
+            Try again
+          </button>
         </div>
       )}
       {state === "loading" ? (
