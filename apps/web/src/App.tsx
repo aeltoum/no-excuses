@@ -148,6 +148,7 @@ export function App({
       return;
     }
     lastUnauthorizedToken.current = rejectedToken;
+    signedInUser.current = null;
     setAccess("checking");
     setAccessRevision((current) => current + 1);
   }, [session]);
@@ -315,8 +316,8 @@ export function App({
       }
       // A signed-in member stays signed in through transient outages
       // (backgrounded PWA, flaky network); only authoritative rejection ends access.
-      const known = signedInUser.current ?? pendingUser.current ?? null;
-      if (known === next.user.id) setSession(next);
+      const known = signedInUser.current ?? pendingUser.current;
+      if (pendingUser.current === next.user.id) setSession(next);
       const keep = () => {
         if (known !== next.user.id) return false;
         setSession(next);

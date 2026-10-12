@@ -142,7 +142,7 @@ test("five icon tabs use one sliding indicator and fade only incoming content", 
       const style = getComputedStyle(node);
       return `${style.transitionProperty} ${style.transitionDuration} ${style.transitionTimingFunction}`;
     }),
-  ).toBe("transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1)");
+  ).toBe("transform 0.22s cubic-bezier(0.3, 0.7, 0.2, 1)");
 
   const mastheadBox = await page.locator(".masthead").boundingBox();
   const navBox = await nav.boundingBox();
@@ -165,7 +165,7 @@ test("five icon tabs use one sliding indicator and fade only incoming content", 
       const style = getComputedStyle(node);
       return `${style.animationName} ${style.animationDuration}`;
     }),
-  ).toBe("route-in 0.22s");
+  ).toBe("route-in 0.16s");
 });
 
 test("reduced motion switches content and indicator with no movement", async ({
