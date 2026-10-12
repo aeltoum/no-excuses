@@ -323,9 +323,18 @@ form p {
 }
 .group-heading {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   min-height: 48px;
+  margin-top: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.group-heading h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .text-button,
 .row-action {
@@ -706,28 +715,46 @@ button:disabled {
 }
 .result {
   max-width: 42rem;
-  padding: 16px;
-  border: 1px solid var(--safety);
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--safety);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
   overflow-wrap: anywhere;
 }
 .result.error {
-  border-color: var(--error);
+  border-left-color: var(--error);
 }
 .result.event-notice {
   position: fixed;
   z-index: 30;
-  top: max(16px, env(safe-area-inset-top));
+  top: max(12px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 40px);
+  width: min(calc(100% - 32px), 28rem);
   margin: 0;
   pointer-events: none;
-  padding: 8px 12px;
-  border: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
   border-left: 3px solid var(--safety);
   background: var(--surface);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   font-size: 14px;
+  font-weight: 600;
+  animation: notice-in 180ms ease-out;
+}
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .result.event-notice {
+    animation: none;
+  }
 }
 .result.event-notice.error {
   border-left-color: var(--error);

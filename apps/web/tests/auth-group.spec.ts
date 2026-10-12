@@ -544,7 +544,7 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   await expect(continueButton).toBeDisabled();
   await page.getByLabel("What should your crew call you?").fill("Akrum");
   await page.getByLabel("I’m 18 or older").check();
-  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await continueButton.click();
   await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
@@ -606,7 +606,7 @@ test("invited OTP preserves its code into no-Group onboarding", async ({
 
   await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
   await page.getByLabel("I’m 18 or older").check();
-  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -631,7 +631,7 @@ test("join onboarding previews eligible crew and rejects unavailable code", asyn
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.getByLabel("I’m 18 or older").check();
-  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "I have a code" }).click();
@@ -1138,7 +1138,7 @@ test("Group conflict retains draft and retries same idempotency key", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page.getByRole("heading", { name: "Your Group" })).toBeVisible();
   await page.getByLabel("I’m 18 or older").check();
-  await page.getByLabel("I’m joining this private pilot").check();
+  await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Crew name").fill("Morning crew");

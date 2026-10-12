@@ -979,7 +979,7 @@ export function App({
                         required
                         disabled={busy}
                       />{" "}
-                      I’m joining this private pilot
+                      I understand this is an early-access pilot
                     </label>
                     <label className="check-label">
                       <input
@@ -1316,6 +1316,7 @@ export function App({
                         </div>
                       )}
                       <div className="group-heading">
+                        <h2>Members</h2>
                         {groupRoster.members.some(
                           (member) =>
                             member.membershipId === membership.membershipId &&
@@ -1567,6 +1568,7 @@ export function App({
             lead="Your account and crew settings."
           >
             <div className="account-page">
+              {deletionStep === "idle" && <Result notice={notice} />}
               <section className="account-identity" aria-label="Your identity">
                 <span className="account-initials" aria-hidden="true">
                   {(displayName || session?.user.email || "You")
@@ -1934,7 +1936,6 @@ export function App({
                 <Result notice={notice} />
               </div>
             </Sheet>
-            {deletionStep === "idle" && <Result notice={notice} />}
           </Page>
         ) : (
           <Weekly
