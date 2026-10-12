@@ -84,6 +84,10 @@ function TabIcon({ route }: { route: Route }) {
   );
 }
 
+function workoutCount(count: number) {
+  return `${count} ${count === 1 ? "workout" : "workouts"}`;
+}
+
 export function App({
   auth,
   apiBaseUrl,
@@ -644,7 +648,7 @@ export function App({
             access === "unavailable" ||
             access === "failure") ? (
           <Page
-            eyebrow="Private friend-group accountability"
+            eyebrow="Members only"
             title={statusCopy[access][0]}
             lead={statusCopy[access][1]}
           >
@@ -671,7 +675,7 @@ export function App({
           <Page
             eyebrow="Private access"
             title="Sign in"
-            lead="We use a six-digit email code. Unknown or ineligible accounts receive the same response."
+            lead="We’ll email you a six-digit code. For privacy, every address gets the same response."
           >
             {!signInDoor && (
               <section
@@ -869,7 +873,7 @@ export function App({
                 ? `${groupRoster.members.length} members`
                 : membership
                   ? "Loading your crew."
-                  : "Create a private Group or join with an invitation token."
+                  : "Start a private crew or join one with an invitation code."
             }
           >
             {!membership && (
@@ -945,7 +949,7 @@ export function App({
                         disabled={busy || !displayNameLoaded}
                       />
                     </label>
-                    <label>
+                    <label className="check-label">
                       <input
                         type="checkbox"
                         name="adult"
@@ -961,7 +965,7 @@ export function App({
                       />{" "}
                       I’m 18 or older
                     </label>
-                    <label>
+                    <label className="check-label">
                       <input
                         type="checkbox"
                         name="pilot"
@@ -977,7 +981,7 @@ export function App({
                       />{" "}
                       I’m joining this private pilot
                     </label>
-                    <label>
+                    <label className="check-label">
                       <input
                         type="checkbox"
                         name="product"
@@ -1138,7 +1142,7 @@ export function App({
                       >
                         −
                       </button>
-                      <strong>{recurringTarget} workouts</strong>
+                      <strong>{workoutCount(recurringTarget)}</strong>
                       <button
                         type="button"
                         aria-label="Increase weekly target"
@@ -1210,7 +1214,7 @@ export function App({
                         >
                           −
                         </button>
-                        <strong>{currentTarget} workouts</strong>
+                        <strong>{workoutCount(currentTarget)}</strong>
                         <button
                           className="target-button"
                           type="button"
@@ -1238,7 +1242,7 @@ export function App({
                         >
                           −
                         </button>
-                        <strong>{recurringTarget} workouts</strong>
+                        <strong>{workoutCount(recurringTarget)}</strong>
                         <button
                           className="target-button"
                           type="button"
@@ -1521,7 +1525,7 @@ export function App({
                       )}
                       {canLeaveGroup ? (
                         <button
-                          className="text-button danger-text leave-group"
+                          className="danger-outline leave-group"
                           type="button"
                           disabled={busy}
                           onClick={() => {

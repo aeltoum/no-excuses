@@ -565,7 +565,7 @@ test("no-Group onboarding saves About you then starts a crew", async ({
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Decrease weekly target" }).click();
-  await expect(page.getByText("1 workouts")).toBeVisible();
+  await expect(page.getByText("1 workout", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start 6AM Crew" }).click();
   await expect(page.getByRole("status")).toHaveText("Group created.");
 });

@@ -264,6 +264,11 @@ form {
   color: var(--muted);
 }
 
+.hint {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
 .back-button {
   width: 3rem;
   padding: 0;
@@ -278,15 +283,25 @@ form {
   grid-template-columns: 1fr 1fr;
 }
 
-.crew-choice button[aria-pressed="true"] {
-  background: var(--safety);
-  color: var(--ink-on-safety);
+.crew-choice {
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--ground);
 }
 
 .target-stepper {
   grid-template-columns: 3rem 1fr 3rem;
   align-items: center;
   text-align: center;
+}
+
+.target-stepper strong {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
 }
 
 .crew-preview {
@@ -370,6 +385,12 @@ form p {
 .pending-invitations h3,
 .invite-form h3 {
   margin-bottom: 4px;
+}
+.danger-outline {
+  width: 100%;
+  border-color: var(--error);
+  background: transparent;
+  color: #ff6b6f;
 }
 .leave-group {
   margin-top: 24px;
@@ -473,6 +494,15 @@ select {
   align-items: center;
   gap: 12px;
 }
+.check-label {
+  font-weight: 500;
+  line-height: 1.4;
+}
+.check-label input,
+input[type="checkbox"] {
+  accent-color: var(--chalk);
+  cursor: pointer;
+}
 .check-label input {
   width: 24px;
   min-width: 24px;
@@ -500,6 +530,25 @@ button {
   color: var(--ink-on-safety);
   font-weight: 800;
   cursor: pointer;
+}
+.crew-choice button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.crew-choice button[aria-pressed="true"] {
+  background: var(--safety);
+  color: var(--ink-on-safety);
+}
+
+.target-stepper button {
+  padding: 0;
+  background: var(--surface);
+  color: var(--chalk);
+  font-size: 1.5rem;
 }
 button:disabled {
   cursor: wait;
