@@ -339,7 +339,7 @@ export function Weekly({
         </header>
       ) : (
         <>
-          <p className="eyebrow">True MVP · Self-reported</p>
+          <p className="eyebrow">Self-reported</p>
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
             Workouts are self-reported. Friends see your count; nobody
@@ -735,7 +735,12 @@ export function Weekly({
                 </>
               )}
               {refreshWarning && (
-                <button type="button" onClick={refreshCount} disabled={busy}>
+                <button
+                  className="secondary-button home-refresh-button"
+                  type="button"
+                  onClick={refreshCount}
+                  disabled={busy}
+                >
                   {busy ? "Refreshing…" : "Refresh count"}
                 </button>
               )}

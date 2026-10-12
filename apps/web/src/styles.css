@@ -401,6 +401,10 @@ form p {
   margin: 0;
   font-size: 0.8rem;
 }
+.secondary-button {
+  background: transparent;
+  color: var(--chalk);
+}
 .invite-card .secondary-button {
   border-color: var(--rubber);
   background: transparent;
@@ -449,7 +453,7 @@ button {
   min-width: 0;
   min-height: 48px;
   border: 1px solid var(--muted);
-  border-radius: 0;
+  border-radius: 6px;
   font: inherit;
 }
 input {
@@ -1156,7 +1160,14 @@ button:disabled {
   line-height: 1;
   text-align: center;
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.member-nav a > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .member-nav a[aria-current="page"] {
   color: var(--chalk);
@@ -1317,7 +1328,7 @@ button:disabled {
 
 .target-control {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   margin: 0;
@@ -1335,8 +1346,8 @@ button:disabled {
 }
 
 .target-adjust {
-  width: 64px;
-  min-height: 64px;
+  width: clamp(48px, 16vw, 64px);
+  min-height: clamp(48px, 16vw, 64px);
   padding: 0;
   background: var(--surface);
   color: var(--chalk);
@@ -1351,12 +1362,15 @@ button:disabled {
 .target-control output strong {
   display: block;
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: clamp(5rem, 28vw, 6.875rem);
+  font-size: clamp(3.5rem, 28vw, 6.875rem);
   font-weight: 900;
   line-height: 0.85;
   font-variant-numeric: tabular-nums;
 }
 
+.target-control output span {
+  display: block;
+}
 .target-control output span,
 .target-guidance {
   color: var(--muted);
@@ -1374,4 +1388,22 @@ button:disabled {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.home-refresh-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 240px) {
+  .member-nav a {
+    grid-template-rows: 24px;
+  }
+  .member-nav a > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 }

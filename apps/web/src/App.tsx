@@ -621,7 +621,7 @@ export function App({
           <span>No Excuses</span>
         </a>
         <span className="status">
-          <span aria-hidden="true" /> Private PWA
+          <span aria-hidden="true" /> Private crew
         </span>
       </header>
       <main className="route-content" id="main-content" key={route ?? path}>
@@ -686,6 +686,7 @@ export function App({
                     I was invited
                   </button>
                   <button
+                    className="secondary-button"
                     type="button"
                     onClick={() => setSignInDoor("returning")}
                   >
