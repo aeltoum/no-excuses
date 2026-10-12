@@ -10,7 +10,7 @@ import {
 } from "./auth";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
-import { Weekly, type WeeklySnapshot } from "./Weekly";
+import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
 type Route =
   | "/"
@@ -136,6 +136,7 @@ export function App({
   const [session, setSession] = useState<Session | null>(null);
   const sessionUser = useRef<string | null>(null);
   sessionUser.current = session?.user.id ?? null;
+  const signedInUser = useRef<string | null>(null);
   const recheckAccess = useCallback(() => {
     const rejectedToken = session?.access_token ?? null;
     if (rejectedToken && lastUnauthorizedToken.current === rejectedToken) {
@@ -251,6 +252,25 @@ export function App({
     setNotice(null);
     window.scrollTo(0, 0);
   };
+  // Start a tab's data request on hover/press so it is in flight before click.
+  const warmTab = (destination: string) => {
+    if (
+      !session ||
+      !membership ||
+      (destination !== "/home" &&
+        destination !== "/target" &&
+        destination !== "/history")
+    )
+      return;
+    prefetchWeekly(
+      api,
+      session.access_token,
+      membership.groupId,
+      destination,
+      weeklyCache,
+      `${session.user.id}:${membership.groupId}:${membership.membershipId}:${destination}`,
+    );
+  };
   const navigate = (
     event: React.MouseEvent<HTMLAnchorElement>,
     destination: string,
@@ -287,8 +307,16 @@ export function App({
         }
         return;
       }
+      // A signed-in member stays signed in through transient outages
+      // (backgrounded PWA, flaky network); only authoritative rejection ends access.
+      const keep = () => {
+        if (signedInUser.current !== next.user.id) return false;
+        setSession(next);
+        return true;
+      };
       const result = await resolveLiveAccess(auth, next);
       if (!active || revision !== expected) return;
+      if (result === "unavailable" && keep()) return;
       if (result !== "signed-in") {
         setSession(null);
         setMembership(null);
@@ -303,6 +331,7 @@ export function App({
         setAccess("signed-in");
       } catch (error) {
         if (!active || revision !== expected) return;
+        if (error instanceof ApiError && error.retryable && keep()) return;
         setSession(null);
         setMembership(null);
         setAccess(
@@ -318,6 +347,7 @@ export function App({
       if (event === "INITIAL_SESSION" && !next) return;
       const expected = ++revision;
       if (next?.user.id !== sessionUser.current) {
+        signedInUser.current = null;
         setSession(null);
         setMembership(null);
         setAccess("checking");
@@ -350,6 +380,10 @@ export function App({
       listener.data.subscription.unsubscribe();
     };
   }, [api, auth, accessRevision]);
+  useEffect(() => {
+    signedInUser.current =
+      access === "signed-in" ? (session?.user.id ?? null) : null;
+  }, [access, session]);
   useEffect(() => {
     const resume = () => {
       if (document.visibilityState === "visible")
@@ -1962,6 +1996,9 @@ export function App({
               href={destination}
               key={destination}
               onClick={(e) => navigate(e, destination)}
+              onPointerEnter={() => warmTab(destination)}
+              onPointerDown={() => warmTab(destination)}
+              onFocus={() => warmTab(destination)}
             >
               <TabIcon route={destination} />
               <span>{label}</span>

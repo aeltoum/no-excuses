@@ -106,38 +106,15 @@ export function Weekly({
       return;
     }
     if (!previous && route === "/history") setHistoryLimit(12);
-    const load =
-      route === "/history"
-        ? Promise.all([api.history(token, groupId), api.target(token)])
-        : route === "/target"
-          ? Promise.all([api.progress(token, groupId), api.target(token)])
-          : api.progress(token, groupId);
-    void load
-      .then((response) => {
+    const early = previous ? undefined : inflight.get(cacheKey);
+    inflight.delete(cacheKey);
+    void (
+      early?.token === token
+        ? early.load
+        : loadWeekly(api, token, groupId, route, previous)
+    )
+      .then((next) => {
         if (!active) return;
-        const next: WeeklySnapshot = {
-          progress: previous?.progress ?? [],
-          history: previous?.history ?? [],
-          targetContext: previous?.targetContext ?? null,
-          syncedAt: Date.now(),
-        };
-        if (route === "/history") {
-          const [historyResponse, targetResponse] = response as [
-            Awaited<ReturnType<Api["history"]>>,
-            Awaited<ReturnType<Api["target"]>>,
-          ];
-          next.history = historyResponse.data as FinalizedWeeklyHistoryItem[];
-          next.targetContext = targetResponse.data as WeeklyTargetContext;
-        } else if (route === "/target") {
-          const [progressResponse, targetResponse] = response as [
-            Awaited<ReturnType<Api["progress"]>>,
-            Awaited<ReturnType<Api["target"]>>,
-          ];
-          next.progress = progressResponse.data;
-          next.targetContext = targetResponse.data as WeeklyTargetContext;
-        } else
-          next.progress = (response as Awaited<ReturnType<Api["progress"]>>)
-            .data as CurrentWeekProgressItem[];
         const differs =
           !previous ||
           JSON.stringify({ ...previous, syncedAt: 0 }) !==
@@ -979,4 +956,60 @@ export function Weekly({
       )}
     </section>
   );
+}
+
+export async function loadWeekly(
+  api: Api,
+  token: string,
+  groupId: string,
+  route: Route,
+  previous?: WeeklySnapshot,
+): Promise<WeeklySnapshot> {
+  const next: WeeklySnapshot = {
+    progress: previous?.progress ?? [],
+    history: previous?.history ?? [],
+    targetContext: previous?.targetContext ?? null,
+    syncedAt: Date.now(),
+  };
+  if (route === "/history") {
+    const [historyResponse, targetResponse] = await Promise.all([
+      api.history(token, groupId),
+      api.target(token),
+    ]);
+    next.history = historyResponse.data as FinalizedWeeklyHistoryItem[];
+    next.targetContext = targetResponse.data as WeeklyTargetContext;
+  } else if (route === "/target") {
+    const [progressResponse, targetResponse] = await Promise.all([
+      api.progress(token, groupId),
+      api.target(token),
+    ]);
+    next.progress = progressResponse.data;
+    next.targetContext = targetResponse.data as WeeklyTargetContext;
+  } else
+    next.progress = (await api.progress(token, groupId))
+      .data as CurrentWeekProgressItem[];
+  return next;
+}
+
+const inflight = new Map<
+  string,
+  { token: string; load: Promise<WeeklySnapshot> }
+>();
+
+// Starts a first load early; the tab adopts it on mount instead of refetching.
+export function prefetchWeekly(
+  api: Api,
+  token: string,
+  groupId: string,
+  route: Route,
+  cache: Map<string, WeeklySnapshot>,
+  cacheKey: string,
+) {
+  if (cache.has(cacheKey) || inflight.get(cacheKey)?.token === token) return;
+  const load = loadWeekly(api, token, groupId, route);
+  inflight.set(cacheKey, { token, load });
+  const settle = () => {
+    if (inflight.get(cacheKey)?.load === load) inflight.delete(cacheKey);
+  };
+  load.then(settle, settle);
 }
