@@ -264,6 +264,11 @@ form {
   color: var(--muted);
 }
 
+.hint {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
 .back-button {
   width: 3rem;
   padding: 0;
@@ -278,15 +283,25 @@ form {
   grid-template-columns: 1fr 1fr;
 }
 
-.crew-choice button[aria-pressed="true"] {
-  background: var(--safety);
-  color: var(--ink-on-safety);
+.crew-choice {
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--ground);
 }
 
 .target-stepper {
   grid-template-columns: 3rem 1fr 3rem;
   align-items: center;
   text-align: center;
+}
+
+.target-stepper strong {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
 }
 
 .crew-preview {
@@ -308,9 +323,18 @@ form p {
 }
 .group-heading {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   min-height: 48px;
+  margin-top: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.group-heading h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .text-button,
 .row-action {
@@ -371,6 +395,12 @@ form p {
 .invite-form h3 {
   margin-bottom: 4px;
 }
+.danger-outline {
+  width: 100%;
+  border-color: var(--error);
+  background: transparent;
+  color: #ff6b6f;
+}
 .leave-group {
   margin-top: 24px;
 }
@@ -400,6 +430,10 @@ form p {
 .invite-card p {
   margin: 0;
   font-size: 0.8rem;
+}
+.secondary-button {
+  background: transparent;
+  color: var(--chalk);
 }
 .invite-card .secondary-button {
   border-color: var(--rubber);
@@ -449,7 +483,7 @@ button {
   min-width: 0;
   min-height: 48px;
   border: 1px solid var(--muted);
-  border-radius: 0;
+  border-radius: 6px;
   font: inherit;
 }
 input {
@@ -468,6 +502,15 @@ select {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.check-label {
+  font-weight: 500;
+  line-height: 1.4;
+}
+.check-label input,
+input[type="checkbox"] {
+  accent-color: var(--chalk);
+  cursor: pointer;
 }
 .check-label input {
   width: 24px;
@@ -496,6 +539,25 @@ button {
   color: var(--ink-on-safety);
   font-weight: 800;
   cursor: pointer;
+}
+.crew-choice button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.crew-choice button[aria-pressed="true"] {
+  background: var(--safety);
+  color: var(--ink-on-safety);
+}
+
+.target-stepper button {
+  padding: 0;
+  background: var(--surface);
+  color: var(--chalk);
+  font-size: 1.5rem;
 }
 button:disabled {
   cursor: wait;
@@ -562,8 +624,11 @@ button:disabled {
   grid-template-columns: 1fr auto;
   align-items: end;
   gap: 12px;
+  margin: 0;
   padding: 16px 0;
+  border: 0;
   border-bottom: 1px solid var(--rule);
+  background: transparent;
 }
 .account-name-label {
   display: block;
@@ -653,28 +718,46 @@ button:disabled {
 }
 .result {
   max-width: 42rem;
-  padding: 16px;
-  border: 1px solid var(--safety);
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--safety);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
   overflow-wrap: anywhere;
 }
 .result.error {
-  border-color: var(--error);
+  border-left-color: var(--error);
 }
 .result.event-notice {
   position: fixed;
   z-index: 30;
-  top: max(16px, env(safe-area-inset-top));
+  top: max(12px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 40px);
+  width: min(calc(100% - 32px), 28rem);
   margin: 0;
   pointer-events: none;
-  padding: 8px 12px;
-  border: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
   border-left: 3px solid var(--safety);
   background: var(--surface);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   font-size: 14px;
+  font-weight: 600;
+  animation: notice-in 180ms ease-out;
+}
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .result.event-notice {
+    animation: none;
+  }
 }
 .result.event-notice.error {
   border-left-color: var(--error);
@@ -1156,7 +1239,14 @@ button:disabled {
   line-height: 1;
   text-align: center;
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.member-nav a > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .member-nav a[aria-current="page"] {
   color: var(--chalk);
@@ -1317,7 +1407,7 @@ button:disabled {
 
 .target-control {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   margin: 0;
@@ -1335,8 +1425,8 @@ button:disabled {
 }
 
 .target-adjust {
-  width: 64px;
-  min-height: 64px;
+  width: clamp(48px, 16vw, 64px);
+  min-height: clamp(48px, 16vw, 64px);
   padding: 0;
   background: var(--surface);
   color: var(--chalk);
@@ -1351,12 +1441,15 @@ button:disabled {
 .target-control output strong {
   display: block;
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: clamp(5rem, 28vw, 6.875rem);
+  font-size: clamp(3.5rem, 28vw, 6.875rem);
   font-weight: 900;
   line-height: 0.85;
   font-variant-numeric: tabular-nums;
 }
 
+.target-control output span {
+  display: block;
+}
 .target-control output span,
 .target-guidance {
   color: var(--muted);
@@ -1374,4 +1467,22 @@ button:disabled {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.home-refresh-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 240px) {
+  .member-nav a {
+    grid-template-rows: 24px;
+  }
+  .member-nav a > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 }
