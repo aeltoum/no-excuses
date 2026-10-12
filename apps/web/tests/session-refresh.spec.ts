@@ -131,22 +131,20 @@ test("expired access token with valid refresh credential restores signed-in API 
   await expect.poll(() => requests).toContain("api:Bearer fresh-access");
   liveUnavailable = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  // Transient outage keeps a signed-in member in the app.
+  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Access unavailable" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Continue to sign in" }),
   ).toHaveCount(0);
   liveUnavailable = false;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
   liveOffline = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  // Transient outage keeps a signed-in member in the app.
+  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Access unavailable" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Continue to sign in" }),
   ).toHaveCount(0);
   liveOffline = false;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
