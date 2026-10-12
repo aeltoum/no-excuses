@@ -124,9 +124,13 @@ export function App({
     }),
   ).current;
   const weeklyCache = useRef(new Map<string, WeeklySnapshot>()).current;
-  const [launching, setLaunching] = useState(true);
+  // Last verified member on this device: reopen straight into the app and
+  // verify in the background instead of blocking on network checks.
+  const hint = useRef(readMemberHint()).current;
+  const pendingUser = useRef(hint?.userId ?? null);
+  const [launching, setLaunching] = useState(!hint);
   const [path, setPath] = useState(currentPath);
-  const [access, setAccess] = useState<Access>("checking");
+  const [access, setAccess] = useState<Access>(hint ? "signed-in" : "checking");
   const [accessRevision, setAccessRevision] = useState(0);
   const lastUnauthorizedToken = useRef<string | null>(null);
   const retryAccess = useCallback(() => {
@@ -150,7 +154,7 @@ export function App({
   const [membership, setMembership] = useState<{
     groupId: string;
     membershipId: string;
-  } | null>(null);
+  } | null>(hint?.membership ?? null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useNotice();
 
@@ -160,6 +164,8 @@ export function App({
   }, []);
   useEffect(() => {
     if (access === "signed-in") return;
+    if (access !== "checking") pendingUser.current = null;
+    if (access === "signed-out" || access === "revoked") writeMemberHint(null);
     weeklyCache.clear();
     groupScope.current = "";
     groupRosterRef.current = null;
@@ -309,8 +315,10 @@ export function App({
       }
       // A signed-in member stays signed in through transient outages
       // (backgrounded PWA, flaky network); only authoritative rejection ends access.
+      const known = signedInUser.current ?? pendingUser.current ?? null;
+      if (known === next.user.id) setSession(next);
       const keep = () => {
-        if (signedInUser.current !== next.user.id) return false;
+        if (known !== next.user.id) return false;
         setSession(next);
         return true;
       };
@@ -326,6 +334,11 @@ export function App({
       try {
         const current = await api.current(next.access_token);
         if (!active || revision !== expected) return;
+        pendingUser.current = null;
+        writeMemberHint({
+          userId: next.user.id,
+          membership: current.data.membership,
+        });
         setSession(next);
         setMembership(current.data.membership);
         setAccess("signed-in");
@@ -346,7 +359,8 @@ export function App({
     const listener = auth.auth.onAuthStateChange((event, next) => {
       if (event === "INITIAL_SESSION" && !next) return;
       const expected = ++revision;
-      if (next?.user.id !== sessionUser.current) {
+      if (next?.user.id !== (sessionUser.current ?? pendingUser.current)) {
+        pendingUser.current = null;
         signedInUser.current = null;
         setSession(null);
         setMembership(null);
@@ -1971,12 +1985,18 @@ export function App({
               </div>
             </Sheet>
           </Page>
+        ) : !session ? (
+          <section className="hero" aria-busy="true">
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-row" />
+            <span className="skeleton skeleton-row" />
+          </section>
         ) : (
           <Weekly
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}
-            token={token()}
+            token={session?.access_token ?? ""}
             membership={membership}
             cache={weeklyCache}
             cacheKey={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
@@ -2043,4 +2063,28 @@ function Page({
       {children}
     </section>
   );
+}
+
+type MemberHint = {
+  userId: string;
+  membership: { groupId: string; membershipId: string } | null;
+};
+const memberHintKey = "no-excuses:member";
+
+function readMemberHint(): MemberHint | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(memberHintKey) ?? "null");
+    return typeof value?.userId === "string" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMemberHint(hint: MemberHint | null) {
+  try {
+    if (hint) localStorage.setItem(memberHintKey, JSON.stringify(hint));
+    else localStorage.removeItem(memberHintKey);
+  } catch {
+    // Storage unavailable: next open verifies before showing the app.
+  }
 }
