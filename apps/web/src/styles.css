@@ -1195,6 +1195,7 @@ button:disabled {
   border-top: 1px solid var(--rule);
 }
 .member-nav a {
+  position: relative;
   min-width: 0;
   min-height: 64px;
   display: grid;
@@ -1963,4 +1964,62 @@ button:disabled {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* In-app confirm sheet */
+.confirm-body {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.confirm-actions {
+  display: grid;
+  gap: 10px;
+}
+.confirm-danger {
+  border-color: var(--error);
+  background: var(--error);
+  color: #fff;
+}
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.install-prompt {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--activity-class);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.install-prompt p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.install-share {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+}
+.install-dismiss {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.4rem;
 }

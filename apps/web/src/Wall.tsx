@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "./api-client";
+import { useConfirm } from "./Confirm";
 import {
   actOnProof,
   loadProofFeed,
@@ -52,6 +53,7 @@ export function ProofFeed({
   const [reload, setReload] = useState(0);
   const [stamped, setStamped] = useState<string | null>(null);
   const [notice, setNotice] = useNotice();
+  const [confirmSheet, ask] = useConfirm();
 
   useEffect(() => {
     void revision;
@@ -272,11 +274,14 @@ export function ProofFeed({
             type="button"
             className="proof-report"
             disabled={disabled}
-            onClick={() => {
+            onClick={async () => {
               if (
-                window.confirm(
-                  "Report these photos as inappropriate? They’ll be hidden until the Group admin reviews them.",
-                )
+                await ask({
+                  title: "Report these photos?",
+                  body: "They’ll be hidden from the Group until the Group admin reviews them.",
+                  confirm: "Report photos",
+                  tone: "danger",
+                })
               )
                 void act(
                   item,
@@ -296,6 +301,7 @@ export function ProofFeed({
   return (
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
+      {confirmSheet}
       {state === "loading" ? (
         <p role="status" className="proof-feed-note">
           Loading proof…

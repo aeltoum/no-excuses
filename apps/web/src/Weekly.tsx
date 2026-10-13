@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences } from "./Consequences";
+import { InstallPrompt } from "./InstallPrompt";
 import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
@@ -26,6 +27,7 @@ type ProofPhoto = { id: string; blob: Blob; url: string };
 export function Weekly({
   apiBaseUrl,
   onNavigate,
+  onAttention,
   route,
   api,
   token,
@@ -35,6 +37,7 @@ export function Weekly({
   cacheKey,
 }: {
   apiBaseUrl: string;
+  onAttention: (count: number) => void;
   onNavigate: (
     event: React.MouseEvent<HTMLAnchorElement>,
     destination: string,
@@ -90,9 +93,17 @@ export function Weekly({
   );
   const [docked, setDocked] = useState(false);
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
+  const [feedAttention, setFeedAttention] = useState(0);
+  const [cardAttention, setCardAttention] = useState(0);
+  useEffect(() => {
+    if (route === "/home") onAttention(feedAttention + cardAttention);
+  }, [route, feedAttention, cardAttention, onAttention]);
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
   const feedItems = useCallback((items: ProofItem[]) => {
+    setFeedAttention(
+      items.filter((item) => item.canReview || item.canVote).length,
+    );
     setAwaitingReview(
       new Set(
         items
@@ -470,6 +481,7 @@ export function Weekly({
         <>
           {route === "/home" && (
             <>
+              <InstallPrompt />
               {own && (
                 <div
                   className={`week-dock${docked ? " on" : ""}`}
@@ -547,6 +559,7 @@ export function Weekly({
                   token={token}
                   onRevoked={feedRevoked}
                   onGroupOwed={setGroupOwed}
+                  onAttention={setCardAttention}
                 />
               )}
               {own && progress.length > 1 && (

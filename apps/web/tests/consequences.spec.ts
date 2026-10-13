@@ -213,8 +213,10 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
   await expect(page.getByText(/Due in 4[78] hours/)).toBeVisible();
 
-  page.once("dialog", (confirm) => void confirm.accept());
   await page.getByRole("button", { name: "I did it" }).click();
+  const confirm = page.getByRole("dialog", { name: "Mark it done?" });
+  await expect(confirm).toContainText("Confirm you completed 5 km run.");
+  await confirm.getByRole("button", { name: "I did it" }).click();
   await expect(
     page.getByText("Waiting for friends: 0 of 2 approvals."),
   ).toBeVisible();
