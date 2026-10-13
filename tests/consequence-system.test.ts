@@ -75,7 +75,7 @@ describe("M5 Consequence system", () => {
         await db.query(`select count(*)::integer as total,
         count(*) filter (where not progression)::integer as starters,
         count(*) filter (where progression)::integer as progression
-        from app_private.consequence_cards`)
+        from app_private.consequence_cards where retired_at is null`)
       ).rows,
     ).toEqual([{ total: 14, starters: 6, progression: 8 }]);
 

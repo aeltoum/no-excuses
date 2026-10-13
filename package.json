@@ -36,6 +36,7 @@
     "@electric-sql/pglite": "0.5.8",
     "@types/node": "24.10.1",
     "@types/pg": "8.15.5",
+    "@types/web-push": "3.6.4",
     "image-size-next": "2.1.1",
     "openapi-typescript": "7.13.0",
     "supabase": "2.117.0",
@@ -44,6 +45,7 @@
   },
   "dependencies": {
     "pg": "8.23.0",
+    "web-push": "3.6.7",
     "zod": "4.5.4"
   }
 }
