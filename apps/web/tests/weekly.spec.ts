@@ -162,6 +162,12 @@ test("one-member Group pauses workouts until a second member joins", async ({
   expect(failures).toEqual([]);
 });
 
+// 1x1 PNG; the app re-encodes it to JPEG before upload.
+const proofPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 const weeklyLoop = async (
   { page }: { page: Page },
   testInfo: TestInfo,
@@ -174,6 +180,11 @@ const weeklyLoop = async (
     if (message.type() === "error") failures.push(message.text());
   });
   page.on("requestfailed", (request) => failures.push(request.url()));
+  await page.route("http://127.0.0.1:54321/storage/v1/**", (route) => {
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().headers()["content-type"]).toBe("image/jpeg");
+    return route.fulfill({ status: 200, json: { Key: "proof-photos/x" } });
+  });
   await page.route("http://127.0.0.1:54321/auth/v1/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
@@ -184,6 +195,7 @@ const weeklyLoop = async (
     return route.fulfill({ status: 401, json: { message: "no session" } });
   });
   let count = 2;
+  let uploads = 0;
   let progressFailed = false;
   let targetProgressFailed = false;
   const keys: string[] = [];
@@ -302,9 +314,19 @@ const weeklyLoop = async (
       });
     }
     if (path.endsWith("/finalized-weekly-history")) return respond(historyData);
+    if (path.endsWith("/proof/uploads")) {
+      uploads++;
+      return respond({
+        path: `20000000-0000-4000-8000-000000000001/70000000-0000-4000-8000-00000000000${uploads}.jpg`,
+        uploadUrl: `http://127.0.0.1:54321/storage/v1/object/upload/sign/proof-photos/${uploads}?token=t`,
+      });
+    }
     if (path.endsWith("/workout-check-ins")) {
       const body = request.postDataJSON();
       expect(body).not.toHaveProperty("completedAt");
+      expect(body.mediaConsent).toBe(true);
+      expect(body.activityPhotoPath).toMatch(/\.jpg$/);
+      expect(body.presencePhotoPath).toMatch(/\.jpg$/);
       keys.push(request.headers()["idempotency-key"]);
       if (keys.length <= workoutFailures)
         return route.fulfill({
@@ -423,7 +445,7 @@ const weeklyLoop = async (
   ).toHaveCount(5);
   await expect(
     dialog.getByText(
-      "Pick an activity, a time, and confirm it's your own self-report.",
+      "Pick an activity and a time, take both photos, and confirm.",
     ),
   ).toBeVisible();
   await expect(
@@ -438,7 +460,9 @@ const weeklyLoop = async (
   ).toEqual([]);
   await page.keyboard.press("Shift+Tab");
   await expect(
-    dialog.getByLabel("I did this workout. It's my own self-report."),
+    dialog.getByLabel(
+      "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
+    ),
   ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -465,19 +489,38 @@ const weeklyLoop = async (
   await expect(dialog.getByText("This one makes 3 of 4.")).toBeVisible();
   await expect(
     dialog.getByText(
-      "Pick an activity, a time, and confirm it's your own self-report.",
+      "Pick an activity and a time, take both photos, and confirm.",
     ),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "45 min" }).click();
   await expect(
     dialog.getByText(
-      "Pick an activity, a time, and confirm it's your own self-report.",
+      "Pick an activity and a time, take both photos, and confirm.",
     ),
   ).toBeVisible();
-  await page.getByLabel("I did this workout. It's my own self-report.").check();
+  const photoInputs = dialog.locator('input[type="file"]');
+  await expect(photoInputs.nth(0)).toHaveAttribute("capture", "environment");
+  await expect(photoInputs.nth(1)).toHaveAttribute("capture", "user");
+  for (const index of [0, 1])
+    await photoInputs.nth(index).setInputFiles({
+      name: `proof-${index}.png`,
+      mimeType: "image/png",
+      buffer: proofPng,
+    });
+  await expect(
+    dialog.getByRole("img", { name: "Activity preview" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("img", { name: "Your presence preview" }),
+  ).toBeVisible();
+  await page
+    .getByLabel(
+      "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
+    )
+    .check();
   await expect(
     dialog.getByText(
-      "Pick an activity, a time, and confirm it's your own self-report.",
+      "Pick an activity and a time, take both photos, and confirm.",
     ),
   ).toHaveCount(0);
   await expect(
@@ -495,7 +538,9 @@ const weeklyLoop = async (
       dialog.getByRole("button", { name: "45 min" }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
-      dialog.getByLabel("I did this workout. It's my own self-report."),
+      dialog.getByLabel(
+        "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
+      ),
     ).toBeChecked();
     await expect(
       dialog.getByRole("button", { name: "Moderate" }),
@@ -508,8 +553,9 @@ const weeklyLoop = async (
   }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText(
-    "Workout logged. 3 of 4 this week.",
+    "Workout logged. 3 of 4 this week. It counts once a friend verifies it or 24 hours pass.",
   );
+  expect(uploads).toBe(2);
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("workout-success.png"),

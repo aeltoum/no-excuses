@@ -6,6 +6,7 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
+import { compressPhoto, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 
@@ -18,7 +19,10 @@ export type WeeklySnapshot = {
   syncedAt: number;
 };
 
+type ProofPhoto = { id: string; blob: Blob; url: string };
+
 export function Weekly({
+  apiBaseUrl,
   route,
   api,
   token,
@@ -27,6 +31,7 @@ export function Weekly({
   cache,
   cacheKey,
 }: {
+  apiBaseUrl: string;
   route: Route;
   api: Api;
   token: string;
@@ -66,6 +71,36 @@ export function Weekly({
     "moderate",
   );
   const [attested, setAttested] = useState(false);
+  const [photos, setPhotos] = useState<{
+    activity?: ProofPhoto;
+    presence?: ProofPhoto;
+  }>({});
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const uploaded = useRef(new Map<string, string>());
+  const choosePhoto =
+    (kind: "activity" | "presence") =>
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      setPhotoError(null);
+      try {
+        const blob = await compressPhoto(file);
+        setPhotos((current) => {
+          if (current[kind]) URL.revokeObjectURL(current[kind].url);
+          return {
+            ...current,
+            [kind]: {
+              id: crypto.randomUUID(),
+              blob,
+              url: URL.createObjectURL(blob),
+            },
+          };
+        });
+      } catch {
+        setPhotoError("Couldn’t use that photo. Take another one.");
+      }
+    };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
@@ -304,6 +339,8 @@ export function Weekly({
     activityType !== null &&
     Number.isSafeInteger(Number(duration)) &&
     Number(duration) >= 1 &&
+    photos.activity !== undefined &&
+    photos.presence !== undefined &&
     attested;
   return (
     <section
@@ -312,15 +349,15 @@ export function Weekly({
       {home ? (
         <header className="home-header">
           <h1>Our week</h1>
-          <span>Self-reported</span>
+          <span>Proof required</span>
         </header>
       ) : (
         <>
-          <p className="eyebrow">Self-reported</p>
+          <p className="eyebrow">Proof required</p>
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
-            Workouts are self-reported. Friends see your count; nobody
-            independently verifies check-ins.
+            Every workout needs proof photos. Only workouts your friends verify,
+            or that go unquestioned for 24 hours, count.
           </p>
         </>
       )}
@@ -502,9 +539,18 @@ export function Weekly({
                       className="log-sheet-form"
                       onSubmit={(event) => {
                         event.preventDefault();
-                        if (busy || !logReady || !activityType) return;
+                        if (
+                          busy ||
+                          !logReady ||
+                          !activityType ||
+                          !photos.activity ||
+                          !photos.presence
+                        )
+                          return;
                         const minutes = Number(duration);
-                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
+                        const activityPhoto = photos.activity;
+                        const presencePhoto = photos.presence;
+                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}:${activityPhoto.id}:${presencePhoto.id}`;
                         if (
                           !draft.current ||
                           draft.current.signature !== signature
@@ -517,17 +563,41 @@ export function Weekly({
                         const current = draft.current;
                         setBusy(true);
                         setLogError(null);
-                        void api
-                          .checkIn(
+                        // Uploaded paths are reused on retry so a failed submit never re-uploads.
+                        const upload = async (
+                          kind: "activity" | "presence",
+                          photo: ProofPhoto,
+                        ) => {
+                          const known = uploaded.current.get(photo.id);
+                          if (known) return known;
+                          const path = await uploadProofPhoto(
+                            apiBaseUrl,
                             token,
-                            {
-                              workoutCheckinId: current.id,
-                              activityType,
-                              durationMinutes: minutes,
-                              perceivedIntensity: intensity,
-                              selfReportAttested: true,
-                            },
-                            current.key,
+                            kind,
+                            photo.blob,
+                          );
+                          uploaded.current.set(photo.id, path);
+                          return path;
+                        };
+                        void Promise.all([
+                          upload("activity", activityPhoto),
+                          upload("presence", presencePhoto),
+                        ])
+                          .then(([activityPhotoPath, presencePhotoPath]) =>
+                            api.checkIn(
+                              token,
+                              {
+                                workoutCheckinId: current.id,
+                                activityType,
+                                durationMinutes: minutes,
+                                perceivedIntensity: intensity,
+                                selfReportAttested: true,
+                                activityPhotoPath,
+                                presencePhotoPath,
+                                mediaConsent: true,
+                              },
+                              current.key,
+                            ),
                           )
                           .then(async (response) => {
                             if (response.data.workoutCheckinId !== current.id)
@@ -557,9 +627,12 @@ export function Weekly({
                             setDuration("");
                             setOtherDuration(false);
                             setAttested(false);
+                            URL.revokeObjectURL(activityPhoto.url);
+                            URL.revokeObjectURL(presencePhoto.url);
+                            setPhotos({});
                             setNotice({
                               kind: "success",
-                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week.`,
+                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week. It counts once a friend verifies it or 24 hours pass.`,
                             });
                             try {
                               setProgress(
@@ -682,6 +755,67 @@ export function Weekly({
                           )}
                         </div>
                       </fieldset>
+                      <fieldset>
+                        <legend>Proof photos</legend>
+                        <div className="proof-capture">
+                          {(
+                            [
+                              [
+                                "activity",
+                                "Activity photo",
+                                "environment",
+                                "Your equipment, trail, class, or machine.",
+                              ],
+                              [
+                                "presence",
+                                "You at the workout",
+                                "user",
+                                "Any part of you. Your call how much.",
+                              ],
+                            ] as const
+                          ).map(([kind, title, facing, hint]) => (
+                            <label className="proof-capture-slot" key={kind}>
+                              {photos[kind] ? (
+                                <img
+                                  src={photos[kind].url}
+                                  alt={
+                                    kind === "activity"
+                                      ? "Activity preview"
+                                      : "Your presence preview"
+                                  }
+                                />
+                              ) : (
+                                <span
+                                  className="proof-capture-plus"
+                                  aria-hidden="true"
+                                >
+                                  +
+                                </span>
+                              )}
+                              <strong>
+                                {photos[kind]
+                                  ? `Retake ${title.toLowerCase()}`
+                                  : title}
+                              </strong>
+                              <small>{hint}</small>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture={facing}
+                                disabled={busy}
+                                onChange={(event) =>
+                                  void choosePhoto(kind)(event)
+                                }
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        {photoError && (
+                          <p className="result error" role="alert">
+                            {photoError}
+                          </p>
+                        )}
+                      </fieldset>
                       <label className="check-label">
                         <input
                           type="checkbox"
@@ -691,15 +825,16 @@ export function Weekly({
                           }
                           disabled={busy}
                         />
-                        I did this workout. It's my own self-report.
+                        I did this workout. My Group can review these photos,
+                        and verified ones stay on the Wall for 90 days.
                       </label>
                       <button type="submit" disabled={busy || !logReady}>
                         {busy ? "Logging…" : "Log workout"}
                       </button>
                       {!logReady && (
                         <p className="sheet-hint">
-                          Pick an activity, a time, and confirm it&apos;s your
-                          own self-report.
+                          Pick an activity and a time, take both photos, and
+                          confirm.
                         </p>
                       )}
                       {logError && (

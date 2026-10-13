@@ -934,7 +934,7 @@ button:disabled {
 }
 .activity-plates {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 .activity-plate {
@@ -1255,7 +1255,7 @@ button:disabled {
   display: block;
 }
 .tab-indicator {
-  width: 20%;
+  width: calc(100% / 6);
   height: 3px;
   position: absolute;
   top: -1px;
@@ -1485,4 +1485,123 @@ button:disabled {
     overflow: hidden;
     clip-path: inset(50%);
   }
+}
+
+/* Proof capture and Wall */
+.proof-capture {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.proof-capture-slot {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  align-content: center;
+  min-height: 148px;
+  padding: 12px;
+  border: 2px dashed var(--empty-slot);
+  border-radius: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+.proof-capture-slot:focus-within {
+  outline: 3px solid var(--chalk);
+  outline-offset: 2px;
+}
+.proof-capture-plus {
+  font-size: 2rem;
+  line-height: 1;
+}
+.proof-capture-slot img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.proof-capture-slot small,
+.proof-detail,
+.proof-tally,
+.proof-actions small {
+  color: var(--muted);
+}
+.proof-capture-slot input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.wall h2 {
+  margin-top: 28px;
+  font-size: 1.1rem;
+}
+.proof-list {
+  display: grid;
+  gap: 16px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.proof-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.proof-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.proof-card p {
+  margin: 0;
+}
+.proof-status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.proof-verified {
+  border-color: var(--sport);
+}
+.proof-questioned {
+  border-color: var(--error);
+}
+.proof-photos {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
+.proof-photos img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--rubber);
+}
+.proof-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.proof-actions legend {
+  margin-bottom: 6px;
+}
+.proof-report {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
 }

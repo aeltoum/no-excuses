@@ -434,7 +434,7 @@ components:
     SubmitWorkoutCheckinRequest:
       type: object
       additionalProperties: false
-      required: [workoutCheckinId, activityType, durationMinutes, perceivedIntensity, selfReportAttested]
+      required: [workoutCheckinId, activityType, durationMinutes, perceivedIntensity, selfReportAttested, activityPhotoPath, presencePhotoPath, mediaConsent]
       properties:
         workoutCheckinId: { type: string, format: uuid }
         activityType:
@@ -448,6 +448,15 @@ components:
           type: string
           enum: [low, moderate, high]
         selfReportAttested: { type: boolean, const: true }
+        activityPhotoPath:
+          type: string
+          pattern: "^[0-9a-f-]{36}/[0-9a-f-]{36}\\.jpg$"
+          description: Unused Activity photo path issued to the caller by POST /v1/proof/uploads.
+        presencePhotoPath:
+          type: string
+          pattern: "^[0-9a-f-]{36}/[0-9a-f-]{36}\\.jpg$"
+          description: Unused Member-presence photo path issued to the caller by POST /v1/proof/uploads.
+        mediaConsent: { type: boolean, const: true }
     CreateGroupRequest:
       type: object
       additionalProperties: false

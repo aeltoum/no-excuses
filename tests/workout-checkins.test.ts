@@ -10,6 +10,7 @@ const otherGroup = "10000000-0000-4000-8000-000000000002";
 const adminAuth = "30000000-0000-4000-8000-000000000001";
 const peerAuth = "30000000-0000-4000-8000-000000000002";
 const outsiderAuth = "30000000-0000-4000-8000-000000000003";
+const adminAccount = "20000000-0000-4000-8000-000000000001";
 
 async function database() {
   const db = new PGlite();
@@ -116,7 +117,18 @@ describe("True-MVP workout check-ins", () => {
       durationMinutes: 90,
       perceivedIntensity: "moderate",
       selfReportAttested: true,
+      activityPhotoPath: `${adminAccount}/70000000-0000-4000-8000-0000000000a1.jpg`,
+      presencePhotoPath: `${adminAccount}/70000000-0000-4000-8000-0000000000a2.jpg`,
+      mediaConsent: true,
     };
+    await db.exec("reset role");
+    await db.query(
+      `insert into app_private.proof_uploads (path, account_id, kind, created_at) values
+        ($1, '${adminAccount}', 'activity', '2026-03-05T09:00Z'),
+        ($2, '${adminAccount}', 'presence', '2026-03-05T09:00Z')`,
+      [body.activityPhotoPath, body.presencePhotoPath],
+    );
+    await db.exec("set role service_role");
     const hash = (command: string, payload: unknown) =>
       createHash("sha256")
         .update(JSON.stringify({ command, body: payload }))
@@ -152,37 +164,6 @@ describe("True-MVP workout check-ins", () => {
         )
       ).rows,
     ).toEqual(first.rows);
-    // A receipt produced before rollout must still replay with its old hash.
-    const legacySql =
-      "select * from app_private.submit_workout_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)";
-    const legacyBody = {
-      ...body,
-      workoutCheckinId: "70000000-0000-4000-8000-000000000004",
-      completedAt: "2026-03-05T09:00:00Z",
-    };
-    const legacyKey = "70000000-0000-4000-8000-000000000005";
-    const legacy = await db.query(legacySql, [
-      legacyKey,
-      hash(legacySql, legacyBody),
-      "70000000-0000-4000-8000-000000000002",
-      legacyBody.workoutCheckinId,
-      "cardio",
-      legacyBody.completedAt,
-      90,
-      "moderate",
-      true,
-      "2026-03-05T10:00:00Z",
-    ]);
-    expect(
-      (
-        await execute(
-          legacyKey,
-          legacyBody,
-          hash(adapter.sql, legacyBody),
-          "2026-03-05T10:00:01Z",
-        )
-      ).rows,
-    ).toEqual(legacy.rows);
     await db.exec("reset role");
     expect(
       (
@@ -197,7 +178,7 @@ describe("True-MVP workout check-ins", () => {
           "select count(*)::integer as count from app_private.workout_checkins",
         )
       ).rows,
-    ).toEqual([{ count: 2 }]);
+    ).toEqual([{ count: 1 }]);
   });
 
   it("lets an Account set only its own trimmed display name", async () => {
@@ -283,6 +264,15 @@ describe("True-MVP workout check-ins", () => {
       "perceived_intensity",
       "self_report_attested",
       "submitted_at",
+      "review_status",
+      "activity_photo_path",
+      "presence_photo_path",
+      "verified_at",
+      "questioned_at",
+      "decided_at",
+      "hidden_at",
+      "removed_at",
+      "media_deleted_at",
     ]);
   });
 

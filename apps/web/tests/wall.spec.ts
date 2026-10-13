@@ -1,0 +1,173 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test } from "@playwright/test";
+
+const membershipId = "30000000-0000-4000-8000-000000000001";
+const groupId = "40000000-0000-4000-8000-000000000001";
+const pendingId = "70000000-0000-4000-8000-000000000001";
+const questionedId = "70000000-0000-4000-8000-000000000002";
+const session = {
+  access_token: "live-access",
+  token_type: "bearer",
+  expires_in: 3600,
+  expires_at: 1999999999,
+  refresh_token: "refresh",
+  user: {
+    id: "20000000-0000-4000-8000-000000000001",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "member@example.test",
+    app_metadata: {},
+    user_metadata: {},
+    created_at: "2026-09-12T00:00:00Z",
+  },
+};
+const photo =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='3' height='4'><rect width='3' height='4' fill='%23555'/></svg>";
+const item = (overrides: Record<string, unknown>) => ({
+  workoutCheckinId: pendingId,
+  authorName: "Maya",
+  mine: false,
+  activityType: "strength",
+  durationMinutes: 45,
+  perceivedIntensity: "high",
+  completedAt: "2026-10-12T15:00:00.000Z",
+  submittedAt: "2026-10-12T15:05:00.000Z",
+  reviewStatus: "pending",
+  reviewClosesAt: new Date(Date.now() + 5 * 3_600_000).toISOString(),
+  decisionClosesAt: null,
+  hidden: false,
+  myVote: null,
+  acceptVotes: 0,
+  rejectVotes: 0,
+  eligibleVoters: 0,
+  canReview: true,
+  canVote: false,
+  activityPhotoUrl: photo,
+  presencePhotoUrl: photo,
+  ...overrides,
+});
+
+test("Wall reviews, votes on, and reports friends' proof", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  const actions: string[] = [];
+  let feed = [
+    item({}),
+    item({
+      workoutCheckinId: questionedId,
+      authorName: "Jordan",
+      reviewStatus: "questioned",
+      reviewClosesAt: null,
+      decisionClosesAt: new Date(Date.now() + 30 * 3_600_000).toISOString(),
+      acceptVotes: 1,
+      rejectVotes: 0,
+      eligibleVoters: 3,
+      canReview: false,
+      canVote: true,
+    }),
+  ];
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("http://127.0.0.1:54321/auth/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
+    if (path.endsWith("/verify"))
+      return route.fulfill({ status: 200, json: session });
+    if (path.endsWith("/user"))
+      return route.fulfill({ status: 200, json: session.user });
+    return route.fulfill({ status: 401, json: { message: "no session" } });
+  });
+  await page.route("http://127.0.0.1:8787/v1/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    expect(request.headers().authorization).toBe("Bearer live-access");
+    const ok = (data: unknown) =>
+      route.fulfill({ status: 200, json: { contractVersion: 1, data } });
+    if (path.endsWith("/current"))
+      return ok({ membership: { groupId, membershipId } });
+    if (path.endsWith("/current-week-progress")) return ok([]);
+    if (path.endsWith("/finalized-weekly-history")) return ok([]);
+    if (path.endsWith("/weekly-target"))
+      return ok({
+        membershipId,
+        recurringTarget: 3,
+        lockedTarget: 3,
+        nextWeekStartsAt: null,
+        memberCount: 2,
+        timeZone: "America/Chicago",
+      });
+    if (path === "/v1/proof/feed") return ok(feed);
+    const action = /^\/v1\/proof\/([^/]+)\/(\w+)$/.exec(path);
+    if (action) {
+      const choice = request.postDataJSON().choice;
+      actions.push(`${action[2]}:${choice}`);
+      if (action[2] === "review")
+        feed = feed.map((entry) =>
+          entry.workoutCheckinId === action[1]
+            ? { ...entry, reviewStatus: "verified", canReview: false }
+            : entry,
+        );
+      if (action[2] === "vote")
+        feed = feed.map((entry) =>
+          entry.workoutCheckinId === action[1]
+            ? { ...entry, myVote: choice, rejectVotes: 1 }
+            : entry,
+        );
+      if (action[2] === "report")
+        feed = feed.filter((entry) => entry.workoutCheckinId !== action[1]);
+      return ok({ workoutCheckinId: action[1], status: "ok" });
+    }
+    return route.fulfill({ status: 404, json: {} });
+  });
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await page.getByLabel("Email address").fill("member@example.test");
+  await page.getByRole("button", { name: "Send code" }).click();
+  for (const [index, digit] of [..."123456"].entries())
+    await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
+  await page.getByRole("button", { name: "Verify code" }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  await page.getByRole("link", { name: "Wall" }).click();
+  await expect(page.getByRole("heading", { name: "Wall" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Needs your review" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Maya at the workout" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("5 hours left before it auto-verifies"),
+  ).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).analyze()).violations.filter((entry) =>
+      ["serious", "critical"].includes(entry.impact ?? ""),
+    ),
+  ).toEqual([]);
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath("wall-review.png"),
+  });
+
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByRole("status")).toHaveText("Verified.");
+  await expect(page.getByText("Verified", { exact: true })).toBeVisible();
+
+  await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
+  await page.getByRole("button", { name: "Reject" }).click();
+  await expect(page.getByRole("button", { name: "Reject" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Report photos" }).first().click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Reported. The photos are hidden.",
+  );
+  expect(actions).toEqual(["review:verify", "vote:reject", "report:"]);
+  expect(errors).toEqual([]);
+});

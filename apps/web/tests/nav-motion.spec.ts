@@ -95,7 +95,7 @@ test.afterEach(async ({ page }, testInfo) => {
   });
 });
 
-test("five icon tabs use one sliding indicator and fade only incoming content", async ({
+test("six icon tabs use one sliding indicator and fade only incoming content", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -104,16 +104,17 @@ test("five icon tabs use one sliding indicator and fade only incoming content", 
 
   const nav = page.getByRole("navigation", { name: "Member destinations" });
   const links = nav.getByRole("link");
-  await expect(links).toHaveCount(5);
+  await expect(links).toHaveCount(6);
   for (const [index, name] of [
     "Home",
+    "Wall",
     "Group",
     "Target",
     "History",
     "Account",
   ].entries())
     await expect(links.nth(index)).toHaveAccessibleName(name);
-  await expect(nav.locator("svg")).toHaveCount(5);
+  await expect(nav.locator("svg")).toHaveCount(6);
   await expect(nav.locator(".tab-indicator")).toHaveCount(1);
 
   for (const link of await links.all()) {

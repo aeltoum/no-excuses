@@ -24,6 +24,11 @@ const checkin = {
   durationMinutes: 30,
   perceivedIntensity: "moderate" as const,
   selfReportAttested: true as const,
+  activityPhotoPath:
+    "20000000-0000-4000-8000-000000000001/70000000-0000-4000-8000-0000000000a1.jpg",
+  presencePhotoPath:
+    "20000000-0000-4000-8000-000000000001/70000000-0000-4000-8000-0000000000a2.jpg",
+  mediaConsent: true as const,
 };
 const request = (body: unknown, idempotency = true): ApiRequest => ({
   authorization: "Bearer local",

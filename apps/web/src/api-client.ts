@@ -223,6 +223,9 @@ export function createApiClient(
         durationMinutes: number;
         perceivedIntensity: "low" | "moderate" | "high";
         selfReportAttested: true;
+        activityPhotoPath: string;
+        presencePhotoPath: string;
+        mediaConsent: true;
       },
       key: string,
     ) => {
