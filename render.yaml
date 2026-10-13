@@ -25,3 +25,9 @@ services:
         sync: false
       - key: PWA_ORIGIN
         sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false

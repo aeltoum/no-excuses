@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import pg from "pg";
+import webpush from "web-push";
 import {
   acceptGroupInvitationRequestSchema,
   consentRequestSchema,
@@ -38,6 +39,16 @@ const port = Number(process.env.PORT ?? "8787");
 const host = process.env.HOST ?? "127.0.0.1";
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid PORT");
+
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY ?? "";
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? "";
+const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
+if (pushEnabled)
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT ?? "mailto:no-reply@example.com",
+    vapidPublicKey,
+    vapidPrivateKey,
+  );
 
 const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
 type Actor = { id: string; issuedAt: string; email: string };
@@ -157,6 +168,52 @@ async function finishAuthDeletion(authUserId: string) {
   );
 }
 
+let delivering = false;
+async function deliverPush() {
+  if (!pushEnabled || delivering) return;
+  delivering = true;
+  try {
+    await pool.query("select app_private.enqueue_push_notifications(now())");
+    const pending = await pool.query(
+      "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
+    );
+    const sent = new Set<string>();
+    for (const row of pending.rows) {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: row.endpoint as string,
+            keys: { p256dh: row.p256dh as string, auth: row.auth as string },
+          },
+          JSON.stringify({ title: row.title, body: row.body }),
+          { TTL: 86400 },
+        );
+      } catch (error) {
+        const status = (error as { statusCode?: number }).statusCode;
+        if (status === 404 || status === 410)
+          await pool.query(
+            "delete from app_private.web_push_subscriptions where endpoint=$1",
+            [row.endpoint],
+          );
+        else console.error("Push delivery failed", status ?? "unknown");
+      }
+      sent.add(String(row.outbox_id));
+    }
+    // Unsent rows for accounts without a live subscription are dropped too.
+    await pool.query(
+      "update app_private.web_push_outbox set sent_at=now() where sent_at is null and (outbox_id = any($1::bigint[]) or not exists (select 1 from app_private.web_push_subscriptions s where s.account_id=web_push_outbox.account_id))",
+      [[...sent]],
+    );
+  } catch (error) {
+    console.error(
+      "Push delivery failed",
+      (error as { code?: string }).code ?? "unknown",
+    );
+  } finally {
+    delivering = false;
+  }
+}
+
 async function maintenance() {
   try {
     await pool.query("select app_private.advance_true_mvp_weeks(now())");
@@ -170,6 +227,7 @@ async function maintenance() {
         console.error("Account Auth deletion pending retry");
       }
     }
+    await deliverPush();
   } catch (error) {
     console.error(
       "Weekly maintenance failed",
@@ -464,10 +522,13 @@ const handlers = {
       body.perceivedIntensity,
       body.selfReportAttested,
     ],
-    (rows) => ({
-      workoutCheckinId: rows[0]?.workout_checkin_id,
-      currentWeekCount: rows[0]?.current_week_count,
-    }),
+    (rows) => {
+      setImmediate(() => void deliverPush());
+      return {
+        workoutCheckinId: rows[0]?.workout_checkin_id,
+        currentWeekCount: rows[0]?.current_week_count,
+      };
+    },
     submitWorkoutCheckinRequestSchema,
   ),
   deleteAccount: protectedHandler(
@@ -638,6 +699,52 @@ async function consent(request: Request): Promise<Response> {
   }
 }
 
+async function push(request: Request): Promise<Response> {
+  if (request.method === "GET")
+    return Response.json(
+      ok({ publicKey: pushEnabled ? vapidPublicKey : null }).body,
+    );
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return Response.json(fail("domain_failure", 503).body, { status: 503 });
+  }
+  if (!actor)
+    return Response.json(fail("unauthorized", 401).body, { status: 401 });
+  let body: { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  }
+  const endpoint = body?.endpoint;
+  if (typeof endpoint !== "string" || !endpoint.startsWith("https://"))
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  try {
+    if (request.method === "DELETE") {
+      await query(actor, "select app_private.delete_push_subscription($1)", [
+        endpoint,
+      ]);
+    } else {
+      const { p256dh, auth } = body.keys ?? {};
+      if (typeof p256dh !== "string" || typeof auth !== "string")
+        return Response.json(fail("invalid_request", 400).body, {
+          status: 400,
+        });
+      await query(
+        actor,
+        "select app_private.save_push_subscription($1,$2,$3)",
+        [endpoint, p256dh, auth],
+      );
+    }
+    return Response.json(ok({ subscribed: request.method !== "DELETE" }).body);
+  } catch (error) {
+    const response = dbError(error);
+    return Response.json(response.body, { status: response.status });
+  }
+}
+
 const server = createServer(async (incoming, outgoing) => {
   const origin = incoming.headers.origin;
   if (origin && origin !== allowedOrigin) {
@@ -678,7 +785,10 @@ const server = createServer(async (incoming, outgoing) => {
         ? await enrollment(request)
         : path === "/v1/consent" && request.method === "POST"
           ? await consent(request)
-          : await route(request);
+          : path === "/v1/push" &&
+              ["GET", "POST", "DELETE"].includes(request.method)
+            ? await push(request)
+            : await route(request);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",

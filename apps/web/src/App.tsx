@@ -8,6 +8,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { PushToggle, unsubscribePush } from "./PushToggle";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
@@ -563,6 +564,7 @@ export function App({
           (await api.current(session.access_token)).data.membership,
         );
       if (options.cutoff) {
+        await unsubscribePush();
         try {
           await auth.auth.signOut({ scope: "local" });
         } catch {
@@ -1754,6 +1756,7 @@ export function App({
                   </a>
                 </>
               )}
+              <PushToggle apiBaseUrl={apiBaseUrl} accessToken={token} />
               <button
                 className="account-row"
                 type="button"
