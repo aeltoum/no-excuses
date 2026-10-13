@@ -167,13 +167,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
   // The hand pops up on its own, like an augment round.
-  let dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+  let dialog = page.getByRole("dialog", { name: "Choose your punishment" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("You owe 1 card")).toBeVisible();
+  await expect(dialog.getByText("Penalty due · 1 owed")).toBeVisible();
   const handButtons = dialog.locator(".augment-card");
   await expect(handButtons).toHaveCount(3);
   await expect(
-    dialog.getByRole("button", { name: "Lock it in" }),
+    dialog.getByRole("button", { name: "Accept penalty" }),
   ).toBeDisabled();
   await page.waitForTimeout(700);
   expect(
@@ -195,7 +195,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(dialog).toHaveCount(0);
   await page.getByRole("button", { name: "Choose your card" }).click();
-  dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+  dialog = page.getByRole("dialog", { name: "Choose your punishment" });
 
   await dialog.getByRole("button", { name: /Reroll all/ }).click();
   await expect(
@@ -208,7 +208,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toHaveAttribute("aria-pressed", "true");
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath("card-chosen.png") });
-  await dialog.getByRole("button", { name: "Lock it in" }).click();
+  await dialog.getByRole("button", { name: "Accept penalty" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
   await expect(page.getByText(/Due in 4[78] hours/)).toBeVisible();

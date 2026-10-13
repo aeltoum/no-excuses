@@ -94,11 +94,10 @@ export function AugmentPicker({
         >
           ×
         </button>
-        <p className="augment-kicker">
-          You owe {owed} {owed === 1 ? "card" : "cards"}
-        </p>
+        <div className="augment-tape" aria-hidden="true" />
+        <p className="augment-kicker">Penalty due · {owed} owed</p>
         <h2 id={titleId} tabIndex={-1}>
-          Choose your Consequence
+          Choose your punishment
         </h2>
         <div className="augment-hand" key={hand}>
           {cards.map((card, index) => (
@@ -106,17 +105,26 @@ export function AugmentPicker({
               type="button"
               key={card.cardId}
               className={`augment-card${card.unlockedByFriend ? " tier-gold" : ""}`}
-              style={{ animationDelay: `${index * 110}ms` }}
+              style={{ animationDelay: `${index * 140}ms` }}
               aria-pressed={chosen === card.cardId}
               disabled={busy}
               onClick={() => setChosen(card.cardId)}
             >
               <span className="augment-tier">
-                {card.unlockedByFriend ? "Friend unlock" : "Standard"}
+                <span aria-hidden="true">⚠ </span>
+                {card.unlockedByFriend ? "Dealt by a friend" : "Penalty"}
               </span>
               <strong className="augment-title">{card.title}</strong>
               <span className="augment-rule" aria-hidden="true" />
               <span className="augment-text">{card.instructions}</span>
+              <span className="augment-due" aria-hidden="true">
+                48h
+              </span>
+              {chosen === card.cardId && (
+                <span className="augment-stamp" aria-hidden="true">
+                  Yours
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -136,12 +144,12 @@ export function AugmentPicker({
             disabled={busy || !chosen}
             onClick={() => chosen && onLock(chosen)}
           >
-            {busy ? "Locking…" : "Lock it in"}
+            {busy ? "Locking…" : "Accept penalty"}
           </button>
         </div>
         <p className="augment-hint">
-          48 hours starts when you lock it in. Two friends approve when you’re
-          done.
+          The 48-hour clock starts when you accept. Miss it and you owe another.
+          Two friends sign off when it’s done.
         </p>
       </div>
     </div>,
