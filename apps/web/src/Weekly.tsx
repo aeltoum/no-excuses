@@ -6,6 +6,7 @@ import type {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
+import { Consequences } from "./Consequences";
 import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
@@ -88,6 +89,7 @@ export function Weekly({
     () => new Set(),
   );
   const [docked, setDocked] = useState(false);
+  const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
   const feedItems = useCallback((items: ProofItem[]) => {
@@ -539,6 +541,14 @@ export function Weekly({
                   </a>
                 </div>
               )}
+              {own && (
+                <Consequences
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  onRevoked={feedRevoked}
+                  onGroupOwed={setGroupOwed}
+                />
+              )}
               {own && progress.length > 1 && (
                 <ul className="friend-cards" aria-label="Friends this week">
                   {progress
@@ -565,6 +575,9 @@ export function Weekly({
                         />
                         <span>
                           {item.completedWorkoutCount}/{item.lockedTarget}
+                          {groupOwed[item.membershipId]
+                            ? ` · owes ${groupOwed[item.membershipId]}`
+                            : ""}
                           {awaitingReview.has(item.membershipId) && " · review"}
                         </span>
                       </li>

@@ -119,6 +119,14 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
         timeZone: "America/Chicago",
       });
     if (path === "/v1/proof/feed") return ok(feed);
+    if (path === "/v1/consequences")
+      return ok({
+        owed: 0,
+        offer: null,
+        attempt: null,
+        reviews: [],
+        groupOwed: {},
+      });
     const action = /^\/v1\/proof\/([^/]+)\/(\w+)$/.exec(path);
     if (action) {
       const choice = request.postDataJSON().choice;

@@ -1747,3 +1747,220 @@ button:disabled {
   font-size: 0.8rem;
   text-decoration: underline;
 }
+
+/* Consequence cards on Home */
+.consequences {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.owed-card,
+.card-reviews li {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid var(--error);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.owed-card h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+.owed-card p,
+.card-reviews p {
+  margin: 0;
+}
+.owed-count {
+  color: var(--error);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.owed-deadline {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.card-reviews {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-reviews li {
+  border-color: var(--rule);
+}
+.augment-layer {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(
+    circle at 50% 40%,
+    rgb(40 34 18 / 97%),
+    rgb(8 8 9 / 98%)
+  );
+  animation: augment-fade 0.25s ease-out;
+}
+.augment-dialog {
+  position: relative;
+  width: min(100%, 560px);
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  text-align: center;
+}
+.augment-dialog h2 {
+  margin: 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 2.6rem;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.augment-kicker {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.augment-close {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.6rem;
+}
+.augment-hand {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.augment-card {
+  --tier: #c9cccf;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 8px;
+  border: 2px solid var(--tier);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2e3034 0%, #17181a 100%);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 60%),
+    0 0 18px color-mix(in srgb, var(--tier) 35%, transparent);
+  color: var(--chalk);
+  text-align: center;
+  white-space: normal;
+  transition:
+    transform 0.18s ease-out,
+    box-shadow 0.18s ease-out;
+  animation: augment-deal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.augment-card.tier-gold {
+  --tier: #e8c22e;
+  background: linear-gradient(180deg, #3a3218 0%, #17181a 100%);
+}
+.augment-card[aria-pressed="true"] {
+  transform: translateY(-12px) scale(1.04);
+  box-shadow:
+    0 0 0 2px var(--tier),
+    0 0 36px color-mix(in srgb, var(--tier) 70%, transparent);
+}
+.augment-title {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.augment-tier {
+  color: var(--tier);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.augment-rule {
+  width: 60%;
+  height: 2px;
+  background: var(--tier);
+  opacity: 0.6;
+}
+.augment-text {
+  color: #c6c8cb;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.augment-footer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.augment-reroll {
+  border-color: #4a4d52;
+  background: transparent;
+  color: var(--chalk);
+}
+.augment-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+@keyframes augment-deal {
+  from {
+    opacity: 0;
+    transform: translateY(40px) rotateY(80deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes augment-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .augment-layer,
+  .augment-card {
+    animation: none;
+  }
+  .augment-card {
+    transition: none;
+  }
+}
+@media (max-width: 360px) {
+  .augment-hand {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .augment-card {
+    min-height: 0;
+  }
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
