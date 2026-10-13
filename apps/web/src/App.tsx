@@ -217,6 +217,8 @@ export function App({
   const [deletionCode, setDeletionCode] = useState("");
   const deletionCodeInputs = useRef<Array<HTMLInputElement | null>>([]);
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  // Items waiting on the member (proof reviews, votes, card picks and approvals).
+  const [attention, setAttention] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const displayNameScope = useRef("");
@@ -1998,6 +2000,7 @@ export function App({
           <Weekly
             apiBaseUrl={apiBaseUrl}
             onNavigate={navigate}
+            onAttention={setAttention}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}
@@ -2027,6 +2030,12 @@ export function App({
             >
               <TabIcon route={destination} />
               <span>{label}</span>
+              {destination === "/home" && attention > 0 && (
+                <span className="tab-badge">
+                  {attention}
+                  <span className="visually-hidden"> waiting on you</span>
+                </span>
+              )}
             </a>
           ))}
           <span

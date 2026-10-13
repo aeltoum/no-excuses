@@ -160,6 +160,8 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(
     page.getByRole("heading", { name: "Needs your review" }),
   ).toBeVisible();
+  const homeTab = page.getByRole("link", { name: /^Home/ });
+  await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText(["Maya2/3 · review"]);
   await expect(
@@ -199,11 +201,16 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     "true",
   );
 
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Report photos" }).first().click();
+  await page
+    .getByRole("dialog", { name: "Report these photos?" })
+    .getByRole("button", { name: "Report photos" })
+    .click();
   await expect(page.getByRole("status")).toHaveText(
     "Reported. The photos are hidden.",
   );
   expect(actions).toEqual(["review:verify", "vote:reject", "report:"]);
+  // The reported post leaves the feed, so nothing is left waiting on the member.
+  await expect(homeTab).toHaveAccessibleName("Home");
   expect(errors).toEqual([]);
 });

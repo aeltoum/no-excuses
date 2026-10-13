@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
 import { ApiError } from "./api-client";
+import { useConfirm } from "./Confirm";
 import { Result, useNotice } from "./Result";
 
 type Card = {
@@ -86,22 +87,52 @@ const hoursLeft = (until: string) => {
   return hours <= 1 ? "under 1 hour" : `${hours} hours`;
 };
 
+const debtCap = 5;
+// Owed cards stack toward the backlog cap of five; the meter heats up as it fills.
+function DebtMeter({ owed }: { owed: number }) {
+  const level = owed >= debtCap ? "maxed" : owed >= 3 ? "high" : "low";
+  return (
+    <div
+      className={`debt-meter debt-${level}`}
+      role="img"
+      aria-label={`Consequence debt: ${owed} of ${debtCap} cards owed`}
+    >
+      <span className="debt-label">Debt</span>
+      <span className="debt-cells" aria-hidden="true">
+        {Array.from({ length: debtCap }, (_, index) => (
+          <i
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed five-cell meter
+            key={index}
+            className={index < owed ? "filled" : undefined}
+          />
+        ))}
+      </span>
+      <span className="debt-value">
+        {owed >= debtCap ? "Maxed" : `${owed}/${debtCap}`}
+      </span>
+    </div>
+  );
+}
+
 // Owed Consequence cards on Home: pick, complete, and approve friends' claims.
 export function Consequences({
   apiBaseUrl,
   token,
   onRevoked,
   onGroupOwed,
+  onAttention,
 }: {
   apiBaseUrl: string;
   token: string;
   onRevoked: () => void;
   onGroupOwed: (owed: Record<string, number>) => void;
+  onAttention: (count: number) => void;
 }) {
   const [home, setHome] = useState<ConsequenceHome | null>(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [notice, setNotice] = useNotice();
+  const [confirmSheet, ask] = useConfirm();
 
   const fail = useCallback(
     (error: unknown) => {
@@ -141,6 +172,14 @@ export function Consequences({
     };
   }, [apiBaseUrl, token, onRevoked, onGroupOwed]);
 
+  useEffect(() => {
+    if (!home) return;
+    onAttention(
+      (home.offer ? 1 : 0) +
+        home.reviews.filter((review) => review.myResponse === null).length,
+    );
+  }, [home, onAttention]);
+
   const act = async (
     action: Action,
     target: string,
@@ -173,11 +212,13 @@ export function Consequences({
   return (
     <section className="consequences" aria-label="Consequence cards">
       <Result notice={notice} />
+      {confirmSheet}
       {home.owed > 0 && (
         <div className="owed-card">
           <p className="owed-count">
             You owe {home.owed} Consequence {home.owed === 1 ? "card" : "cards"}
           </p>
+          <DebtMeter owed={home.owed} />
           {offer && (
             <button type="button" onClick={() => setPicking(true)}>
               Choose your card
@@ -195,11 +236,13 @@ export function Consequences({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
-                        `Confirm you completed ${attempt.title}. Two friends must approve it.`,
-                      )
+                      await ask({
+                        title: "Mark it done?",
+                        body: `Confirm you completed ${attempt.title}. Two friends must approve it.`,
+                        confirm: "I did it",
+                      })
                     )
                       void act(
                         "claim",
@@ -215,11 +258,13 @@ export function Consequences({
                   type="button"
                   className="secondary-button"
                   disabled={busy}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
-                        "Pause this card because you can’t do it safely right now? No reason needed. The deadline stops until you’re ready.",
-                      )
+                      await ask({
+                        title: "Pause this card?",
+                        body: "Pause it because you can’t do it safely right now. No reason needed. The deadline stops until you’re ready.",
+                        confirm: "Pause card",
+                      })
                     )
                       void act(
                         "pause",

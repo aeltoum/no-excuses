@@ -157,6 +157,16 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     }
     return route.fulfill({ status: 404, json: {} });
   });
+  await page.addInitScript(() => {
+    const calls: unknown[] = [];
+    (window as unknown as { buzzes: unknown[] }).buzzes = calls;
+    Object.defineProperty(navigator, "vibrate", {
+      value: (pattern: unknown) => {
+        calls.push(pattern);
+        return true;
+      },
+    });
+  });
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
@@ -167,13 +177,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
   // The hand pops up on its own, like an augment round.
-  let dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+  let dialog = page.getByRole("dialog", { name: "Choose your punishment" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("You owe 1 card")).toBeVisible();
+  await expect(dialog.getByText("Penalty due · 1 owed")).toBeVisible();
   const handButtons = dialog.locator(".augment-card");
   await expect(handButtons).toHaveCount(3);
   await expect(
-    dialog.getByRole("button", { name: "Lock it in" }),
+    dialog.getByRole("button", { name: "Accept penalty" }),
   ).toBeDisabled();
   await page.waitForTimeout(700);
   expect(
@@ -185,17 +195,26 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("card-offer.png") });
 
+  // The deal buzzes the phone (dev StrictMode may deal twice).
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { buzzes: unknown[] }).buzzes,
+    ),
+  ).toContainEqual([60, 80, 60, 80, 140]);
   await dialog.getByRole("button", { name: "Decide later" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText(["Maya2/3 · owes 2"]);
+  await expect(
+    page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
+  ).toContainText("1/5");
   await page.reload();
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(dialog).toHaveCount(0);
   await page.getByRole("button", { name: "Choose your card" }).click();
-  dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+  dialog = page.getByRole("dialog", { name: "Choose your punishment" });
 
   await dialog.getByRole("button", { name: /Reroll all/ }).click();
   await expect(
@@ -208,13 +227,15 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toHaveAttribute("aria-pressed", "true");
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath("card-chosen.png") });
-  await dialog.getByRole("button", { name: "Lock it in" }).click();
+  await dialog.getByRole("button", { name: "Accept penalty" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
   await expect(page.getByText(/Due in 4[78] hours/)).toBeVisible();
 
-  page.once("dialog", (confirm) => void confirm.accept());
   await page.getByRole("button", { name: "I did it" }).click();
+  const confirm = page.getByRole("dialog", { name: "Mark it done?" });
+  await expect(confirm).toContainText("Confirm you completed 5 km run.");
+  await confirm.getByRole("button", { name: "I did it" }).click();
   await expect(
     page.getByText("Waiting for friends: 0 of 2 approvals."),
   ).toBeVisible();

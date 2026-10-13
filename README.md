@@ -115,6 +115,10 @@ active product and PWA delivery boundary is
 features and native-client work remain documented as deferred target-product behavior; they
 have not been rejected or erased.
 
+Since 2026-10-13 three deferred slices are active on the live PWA: push notifications, photo
+proof with peer verification, and the Consequence card loop. See "Activated deferred slices"
+in the scope document.
+
 ## Product and design context
 
 - [`docs/product/true-mvp-scope.md`](docs/product/true-mvp-scope.md) selects what ships now,

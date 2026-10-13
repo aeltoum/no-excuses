@@ -52,23 +52,34 @@ Product copy must say that plainly.
 
 ### Excluded behavior
 
-- Photos, video, descriptions, Proof, Wall, drafts, uploads, screening, and media retention.
-- Peer review, questioning, voting, Verified/Rejected/Unsupported outcomes, or settlement
-  windows.
-- Exceptions, Safety pauses, Technical pauses, or provisional results.
-- Consequence cards, unlocks, offers, redraws, backlogs, or completion review.
+- Video, proof descriptions, drafts, timed Workout sessions, and automated screening
+  (Proof photos and peer verification are active; see Activated deferred slices).
+- Exceptions, Technical pauses, or provisional results. (Consequence safety pauses are
+  active.)
 - Crowns, performance baselines, activity-source ingestion, Seasons, standings, summaries,
   or leaderboards.
 - Target streaks and Workout streaks.
-- Reactions, messages, digests, email reminders, or push notifications.
-- User-authored content, Content reports, Safety blocks, moderation cases, moderation holds,
-  or content-screening operations.
+- Reactions, messages, digests, or email reminders. (Push notifications are active.)
+- User-authored text, Safety blocks, moderation cases, appeals, or content-screening
+  operations. (Photo Content reports with Group-admin restore or removal are active.)
 - Offline-first behavior, app-store distribution, native-device integrations, and advanced
   PWA lifecycle behavior beyond an installable shell and the included flows.
 - Scored Validation-pilot operations, research analytics, automated operator dashboards,
   and production-shaped rehearsal machinery.
 
 Excluded means deferred, not rejected.
+
+## Activated deferred slices
+
+Owner approval on 2026-10-13 activated three deferred slices on the live PWA. Their
+behavior is now active scope; the excluded list below applies only to what these slices
+leave out.
+
+| Slice | Active behavior | Owner decisions and recorded differences | Shipped in |
+| --- | --- | --- | --- |
+| Notifications | Web Push for a friend's check-in or proof to review, a last-24-hours reminder when under target, weekly Met/Missed, questioned-report votes and outcomes, new Card offers, 12 hours left on a card, and friends' card claims. | Push only; no digests, email, or in-app notification center. iPhone delivery requires a Home Screen install, so Home shows an install tip on iPhone Safari. | #215 |
+| Proof photos and peer verification (lean v1) | Every check-in carries one camera Activity photo and one Member-presence photo with media-sharing consent. Verified after one other member verifies or 24 unquestioned hours; Questioned goes to a 48-hour strict-majority Group decision; Rejected owes a Consequence card; Unsupported does not count. Only Verified completions settle a week, and settlement waits for open reviews. Home is the proof feed; Verified proof stays 90 days. | Photo required on every check-in; live camera capture, re-encoded on device to strip metadata. Report-only moderation: a report hides the pair until the Group admin restores or removes it; no automated screening. Timed Workout sessions, multi-capture selection, descriptions, and appeals remain deferred. | #216 |
+| Consequence system | Missed weeks and Rejected reports owe cards (backlog cap 5). The member is dealt three cards, may reroll the hand once, has 48 hours after locking one in, and two other members approve the claim. Missed deadlines owe another card; a safety pause stops the deadline. Owed counts are Group-visible. | Catalog release 2: 14 heavy physical cards with no lower-impact variant. Obligations recorded before cards were playable were waived at launch. | #215, #217 |
 
 ## Deferred-feature preservation rule
 
@@ -123,9 +134,9 @@ Likely slices, ordered by learning value rather than commitment:
 1. Lightweight reactions/reminders.
 2. Streaks and richer weekly history.
 3. Exceptions.
-4. Proof photos and Wall, with required safety/privacy/media lifecycle.
-5. Peer verification and settlement.
-6. Consequence system.
+4. Proof photos and Wall, with required safety/privacy/media lifecycle. (Active, lean v1.)
+5. Peer verification and settlement. (Active.)
+6. Consequence system. (Active.)
 7. Activity ingestion, Crowns, and Seasons.
 8. Full pilot operations and research instrumentation.
 
