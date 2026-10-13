@@ -2,6 +2,7 @@ import { ApiError } from "./api-client";
 
 export type ProofItem = {
   workoutCheckinId: string;
+  authorMembershipId: string;
   authorName: string;
   mine: boolean;
   activityType: string;
@@ -62,8 +63,14 @@ async function call<T>(
   return ((await response.json()) as { data: T }).data;
 }
 
-export const loadProofFeed = (baseUrl: string, token: string) =>
-  call<ProofItem[]>(baseUrl, token, "/v1/proof/feed", { method: "GET" });
+export async function loadProofFeed(baseUrl: string, token: string) {
+  const items = await call<unknown>(baseUrl, token, "/v1/proof/feed", {
+    method: "GET",
+  });
+  if (!Array.isArray(items))
+    throw new ApiError("failure", "Couldn’t load the proof feed.", true);
+  return items as ProofItem[];
+}
 
 export const actOnProof = (
   baseUrl: string,

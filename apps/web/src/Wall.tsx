@@ -15,31 +15,53 @@ const remaining = (until: string | null) => {
     0,
     Math.ceil((new Date(until).getTime() - Date.now()) / 3_600_000),
   );
-  return hours <= 1 ? "under 1 hour left" : `${hours} hours left`;
+  return hours <= 1 ? "under 1 hour left" : `${hours}h left`;
+};
+const dayLabel = (iso: string) => {
+  const day = new Date(iso);
+  const today = new Date();
+  const start = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diff = Math.round((start(today) - start(day)) / 86_400_000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return day.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
 };
 
-export function Wall({
+// The Wall feed rendered on Home: proof waiting on the viewer first, then everything by day.
+export function ProofFeed({
   apiBaseUrl,
   token,
+  revision,
   onRevoked,
+  onItems,
 }: {
   apiBaseUrl: string;
   token: string;
+  revision: number;
   onRevoked: () => void;
+  onItems: (items: ProofItem[]) => void;
 }) {
   const [items, setItems] = useState<ProofItem[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
+  const [reload, setReload] = useState(0);
+  const [stamped, setStamped] = useState<string | null>(null);
   const [notice, setNotice] = useNotice();
 
   useEffect(() => {
     void revision;
+    void reload;
     let active = true;
     loadProofFeed(apiBaseUrl, token)
       .then((next) => {
         if (!active) return;
         setItems(next);
+        onItems(next);
         setState("ready");
       })
       .catch((error) => {
@@ -51,7 +73,7 @@ export function Wall({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, revision, onRevoked]);
+  }, [apiBaseUrl, token, revision, reload, onRevoked, onItems]);
 
   const act = useCallback(
     async (
@@ -69,6 +91,10 @@ export function Wall({
           action,
           choice,
         );
+        if (action === "review" && choice === "verify") {
+          setStamped(item.workoutCheckinId);
+          window.setTimeout(() => setStamped(null), 900);
+        }
         setNotice({ kind: "success", text: done });
       } catch (error) {
         if (error instanceof ApiError && error.kind === "unauthorized")
@@ -82,43 +108,45 @@ export function Wall({
         });
       } finally {
         setBusy(null);
-        setRevision((value) => value + 1);
+        setReload((value) => value + 1);
       }
     },
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
   const toReview = items.filter((item) => item.canReview || item.canVote);
-  const rest = items.filter((item) => !(item.canReview || item.canVote));
+  const days = new Map<string, ProofItem[]>();
+  for (const item of items.filter((entry) => !toReview.includes(entry))) {
+    const key = dayLabel(item.submittedAt);
+    days.set(key, [...(days.get(key) ?? []), item]);
+  }
 
-  const card = (item: ProofItem) => {
+  const post = (item: ProofItem) => {
     const disabled = busy !== null;
+    const who = item.mine ? "You" : item.authorName;
     return (
-      <li className="proof-card" key={item.workoutCheckinId}>
+      <li className="proof-post" key={item.workoutCheckinId}>
         <header>
-          <strong>{item.mine ? "You" : item.authorName}</strong>
+          <span className="proof-avatar" aria-hidden="true">
+            {who.slice(0, 2).toUpperCase()}
+          </span>
+          <strong>{who}</strong>
           <span className={`proof-status proof-${item.reviewStatus}`}>
             {item.hidden
               ? "Reported"
               : item.reviewStatus === "pending"
-                ? "Awaiting review"
+                ? item.canReview
+                  ? `Review · ${remaining(item.reviewClosesAt)}`
+                  : "Awaiting review"
                 : item.reviewStatus === "questioned"
                   ? "Questioned"
-                  : "Verified"}
+                  : "Verified ✓"}
           </span>
         </header>
-        <p className="proof-detail">
-          {label(item.activityType)} · {item.durationMinutes} min ·{" "}
-          {label(item.perceivedIntensity)} ·{" "}
-          {new Date(item.completedAt).toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}
-        </p>
-        <div className="proof-photos">
+        <div className="proof-frame">
           {item.activityPhotoUrl && (
             <img
+              className="proof-main"
               src={item.activityPhotoUrl}
               alt={`${item.mine ? "Your" : `${item.authorName}'s`} workout activity`}
               loading="lazy"
@@ -126,10 +154,21 @@ export function Wall({
           )}
           {item.presencePhotoUrl && (
             <img
+              className="proof-inset"
               src={item.presencePhotoUrl}
-              alt={`${item.mine ? "You" : item.authorName} at the workout`}
+              alt={`${who} at the workout`}
               loading="lazy"
             />
+          )}
+          <span className="proof-tag">
+            <i className={`activity-swatch activity-${item.activityType}`} />
+            {label(item.activityType)} · {item.durationMinutes} min ·{" "}
+            {label(item.perceivedIntensity)}
+          </span>
+          {stamped === item.workoutCheckinId && (
+            <span className="proof-stamp" aria-hidden="true">
+              Verified
+            </span>
           )}
         </div>
         {item.reviewStatus === "questioned" && (
@@ -162,9 +201,6 @@ export function Wall({
             >
               Question
             </button>
-            <small>
-              {remaining(item.reviewClosesAt)} before it auto-verifies
-            </small>
           </div>
         )}
         {item.canVote && (
@@ -258,41 +294,44 @@ export function Wall({
   };
 
   return (
-    <section className="hero wall">
-      <p className="eyebrow">Proof</p>
-      <h1>Wall</h1>
-      <p className="lead">
-        Verify your friends’ workouts. Unquestioned proof verifies after 24
-        hours; only verified workouts count.
-      </p>
+    <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
       {state === "loading" ? (
-        <p role="status">Loading the Wall…</p>
+        <p role="status" className="proof-feed-note">
+          Loading proof…
+        </p>
       ) : state === "error" ? (
-        <div className="history-load-error">
-          <p role="alert">Couldn’t load the Wall.</p>
-          <button type="button" onClick={() => setRevision((v) => v + 1)}>
+        <div className="proof-feed-note">
+          <p role="alert">Couldn’t load the proof feed.</p>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setReload((value) => value + 1)}
+          >
             Try again
           </button>
         </div>
       ) : items.length === 0 ? (
-        <p className="wall-empty">
-          No proof yet. Log a workout with photos to start the Wall.
+        <p className="proof-feed-note">
+          No proof yet this week. Log a workout and be first.
         </p>
       ) : (
         <>
           {toReview.length > 0 && (
-            <section aria-labelledby="wall-review-heading">
-              <h2 id="wall-review-heading">Needs your review</h2>
-              <ul className="proof-list">{toReview.map(card)}</ul>
+            <section aria-labelledby="feed-review-heading">
+              <h2 id="feed-review-heading" className="feed-day">
+                Needs your review
+                <span className="feed-badge">{toReview.length}</span>
+              </h2>
+              <ul className="proof-list">{toReview.map(post)}</ul>
             </section>
           )}
-          {rest.length > 0 && (
-            <section aria-labelledby="wall-feed-heading">
-              <h2 id="wall-feed-heading">This week and recent</h2>
-              <ul className="proof-list">{rest.map(card)}</ul>
+          {[...days.entries()].map(([day, posts]) => (
+            <section key={day} aria-label={day}>
+              <h2 className="feed-day">{day}</h2>
+              <ul className="proof-list">{posts.map(post)}</ul>
             </section>
-          )}
+          ))}
         </>
       )}
     </section>

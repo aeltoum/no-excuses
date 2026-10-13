@@ -255,7 +255,7 @@ test("private enrollment and live weekly PWA journey", async ({
     });
     await page.reload();
     await expect(page.getByText(/Your workouts:/)).toBeVisible();
-    await page.getByRole("link", { name: "Target", exact: true }).click();
+    await page.getByRole("link", { name: "Change target" }).click();
     await page.getByRole("button", { name: "Increase weekly target" }).click();
     await page.getByRole("button", { name: "Save for next week" }).click();
     await expect(

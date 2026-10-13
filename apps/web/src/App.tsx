@@ -11,7 +11,6 @@ import {
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
-import { Wall } from "./Wall";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
 type Route =
@@ -21,7 +20,6 @@ type Route =
   | "/home"
   | "/target"
   | "/history"
-  | "/wall"
   | "/account";
 type Access =
   | "checking"
@@ -33,9 +31,7 @@ type Access =
 const codePositions = [1, 2, 3, 4, 5, 6] as const;
 const memberRoutes: Array<[Route, string]> = [
   ["/home", "Home"],
-  ["/wall", "Wall"],
   ["/group", "Group"],
-  ["/target", "Target"],
   ["/history", "History"],
   ["/account", "Account"],
 ];
@@ -62,11 +58,6 @@ function TabIcon({ route }: { route: Route }) {
       <>
         <circle cx="12" cy="12" r="8.5" />
         <path d="M12 7.5V12l3 2" />
-      </>
-    ) : route === "/wall" ? (
-      <>
-        <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
-        <circle cx="12" cy="13" r="3.5" />
       </>
     ) : (
       <>
@@ -161,11 +152,6 @@ export function App({
     setAccess("checking");
     setAccessRevision((current) => current + 1);
   }, [session]);
-  const revokeWall = useCallback(() => {
-    setSession(null);
-    setMembership(null);
-    recheckAccess();
-  }, [recheckAccess]);
   const [membership, setMembership] = useState<{
     groupId: string;
     membershipId: string;
@@ -651,7 +637,6 @@ export function App({
       "/home",
       "/target",
       "/history",
-      "/wall",
       "/account",
     ] as string[]
   ).includes(path)
@@ -2009,16 +1994,10 @@ export function App({
             <span className="skeleton skeleton-row" />
             <span className="skeleton skeleton-row" />
           </section>
-        ) : route === "/wall" && membership ? (
-          <Wall
-            key={`${session.user.id}:${membership.groupId}:${membership.membershipId}`}
-            apiBaseUrl={apiBaseUrl}
-            token={session.access_token}
-            onRevoked={revokeWall}
-          />
         ) : (
           <Weekly
             apiBaseUrl={apiBaseUrl}
+            onNavigate={navigate}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}

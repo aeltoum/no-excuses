@@ -23,8 +23,10 @@ const session = {
 };
 const photo =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='3' height='4'><rect width='3' height='4' fill='%23555'/></svg>";
+const friendMembershipId = "30000000-0000-4000-8000-000000000002";
 const item = (overrides: Record<string, unknown>) => ({
   workoutCheckinId: pendingId,
+  authorMembershipId: friendMembershipId,
   authorName: "Maya",
   mine: false,
   activityType: "strength",
@@ -47,7 +49,7 @@ const item = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
-test("Wall reviews, votes on, and reports friends' proof", async ({
+test("Home feed reviews, votes on, and reports friends' proof", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -89,7 +91,23 @@ test("Wall reviews, votes on, and reports friends' proof", async ({
       route.fulfill({ status: 200, json: { contractVersion: 1, data } });
     if (path.endsWith("/current"))
       return ok({ membership: { groupId, membershipId } });
-    if (path.endsWith("/current-week-progress")) return ok([]);
+    if (path.endsWith("/current-week-progress"))
+      return ok([
+        {
+          membershipId,
+          displayName: "Akrum",
+          lockedTarget: 3,
+          completedWorkoutCount: 1,
+          activityTypes: ["cardio"],
+        },
+        {
+          membershipId: friendMembershipId,
+          displayName: "Maya",
+          lockedTarget: 3,
+          completedWorkoutCount: 2,
+          activityTypes: ["strength", "class"],
+        },
+      ]);
     if (path.endsWith("/finalized-weekly-history")) return ok([]);
     if (path.endsWith("/weekly-target"))
       return ok({
@@ -131,17 +149,27 @@ test("Wall reviews, votes on, and reports friends' proof", async ({
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
-  await page.getByRole("link", { name: "Wall" }).click();
-  await expect(page.getByRole("heading", { name: "Wall" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Needs your review" }),
   ).toBeVisible();
+  const friends = page.getByRole("list", { name: "Friends this week" });
+  await expect(friends.getByRole("listitem")).toHaveText(["Maya2/3 · review"]);
+  await expect(
+    page.getByRole("img", { name: "1 of 3 workouts" }),
+  ).toBeVisible();
+  const dock = page.locator(".week-dock");
+  await expect(dock).not.toHaveClass(/\bon\b/);
+  await page
+    .getByRole("img", { name: "Maya at the workout" })
+    .scrollIntoViewIfNeeded();
+  await page.mouse.wheel(0, 900);
+  await expect(dock).toHaveClass(/\bon\b/);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(dock).not.toHaveClass(/\bon\b/);
   await expect(
     page.getByRole("img", { name: "Maya at the workout" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("5 hours left before it auto-verifies"),
-  ).toBeVisible();
+  await expect(page.getByText("Review · 5h left")).toBeVisible();
   expect(
     (await new AxeBuilder({ page }).analyze()).violations.filter((entry) =>
       ["serious", "critical"].includes(entry.impact ?? ""),
@@ -154,7 +182,7 @@ test("Wall reviews, votes on, and reports friends' proof", async ({
 
   await page.getByRole("button", { name: "Verify" }).click();
   await expect(page.getByRole("status")).toHaveText("Verified.");
-  await expect(page.getByText("Verified", { exact: true })).toBeVisible();
+  await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   await page.getByRole("button", { name: "Reject" }).click();

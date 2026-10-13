@@ -133,7 +133,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
   await expect(logWorkout).toHaveCount(0);
   await expect(page.getByText("Action denied.")).toHaveCount(0);
   expect(workoutPostCount).toBe(0);
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(
     page.getByText(
       "Your week starts when a friend joins. This becomes your first target.",
@@ -196,6 +196,7 @@ const weeklyLoop = async (
   });
   let count = 2;
   let uploads = 0;
+  let feedLoads = 0;
   let progressFailed = false;
   let targetProgressFailed = false;
   const keys: string[] = [];
@@ -314,6 +315,10 @@ const weeklyLoop = async (
       });
     }
     if (path.endsWith("/finalized-weekly-history")) return respond(historyData);
+    if (path === "/v1/proof/feed") {
+      feedLoads++;
+      return respond([]);
+    }
     if (path.endsWith("/proof/uploads")) {
       uploads++;
       return respond({
@@ -556,6 +561,8 @@ const weeklyLoop = async (
     "Workout logged. 3 of 4 this week. It counts once a friend verifies it or 24 hours pass.",
   );
   expect(uploads).toBe(2);
+  // Logging refreshes the Home feed so the new proof appears.
+  await expect.poll(() => feedLoads).toBeGreaterThanOrEqual(2);
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("workout-success.png"),
@@ -692,7 +699,7 @@ const weeklyLoop = async (
   ).toBeVisible();
   for (const width of [195, 160]) {
     await page.setViewportSize({ width, height: width === 195 ? 422 : 284 });
-    for (const route of ["Home", "Target", "History"]) {
+    for (const route of ["Home", "History"]) {
       await page.getByRole("link", { name: route, exact: true }).click();
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await page.evaluate(() => window.scrollTo(0, 0));

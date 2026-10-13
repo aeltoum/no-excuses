@@ -3,12 +3,13 @@ import type {
   FinalizedWeeklyHistoryItem,
   WeeklyTargetContext,
 } from "@no-excuses/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
-import { compressPhoto, uploadProofPhoto } from "./proof";
+import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
+import { ProofFeed } from "./Wall";
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
@@ -23,6 +24,7 @@ type ProofPhoto = { id: string; blob: Blob; url: string };
 
 export function Weekly({
   apiBaseUrl,
+  onNavigate,
   route,
   api,
   token,
@@ -32,6 +34,10 @@ export function Weekly({
   cacheKey,
 }: {
   apiBaseUrl: string;
+  onNavigate: (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    destination: string,
+  ) => void;
   route: Route;
   api: Api;
   token: string;
@@ -77,6 +83,32 @@ export function Weekly({
   }>({});
   const [photoError, setPhotoError] = useState<string | null>(null);
   const uploaded = useRef(new Map<string, string>());
+  const [feedRevision, setFeedRevision] = useState(0);
+  const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [docked, setDocked] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const feedRevoked = useCallback(() => revokeRef.current(), []);
+  const feedItems = useCallback((items: ProofItem[]) => {
+    setAwaitingReview(
+      new Set(
+        items
+          .filter((item) => item.canReview || item.canVote)
+          .map((item) => item.authorMembershipId),
+      ),
+    );
+  }, []);
+  // The big barbell docks into a slim header once it scrolls out of view.
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setDocked(!entry?.isIntersecting),
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  });
   const choosePhoto =
     (kind: "activity" | "presence") =>
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -436,11 +468,28 @@ export function Weekly({
         <>
           {route === "/home" && (
             <>
+              {own && (
+                <div
+                  className={`week-dock${docked ? " on" : ""}`}
+                  aria-hidden="true"
+                >
+                  <Barbell
+                    count={own.completedWorkoutCount}
+                    target={own.lockedTarget}
+                    size="mini"
+                    activityTypes={own.activityTypes}
+                  />
+                  <strong>
+                    {own.completedWorkoutCount} of {own.lockedTarget}
+                  </strong>
+                </div>
+              )}
               {own ? (
-                <div className="own-progress">
+                <div className="own-progress" ref={heroRef}>
                   <a
                     className="own-target-link"
                     href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
                     aria-label={`${own.completedWorkoutCount} of ${own.lockedTarget} workouts. Change weekly target.`}
                   >
                     <Barbell
@@ -453,6 +502,13 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  <a
+                    className="home-target-link"
+                    href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
+                  >
+                    Change target
+                  </a>
                   <ul className="activity-legend" aria-label="Activity colours">
                     {(
                       ["strength", "cardio", "class", "sport", "mixed"] as const
@@ -474,17 +530,33 @@ export function Weekly({
                     Accountability and workouts begin once a second member joins
                     your Group.
                   </p>
+                  <a
+                    className="home-target-link"
+                    href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
+                  >
+                    Change target
+                  </a>
                 </div>
               )}
               {own && progress.length > 1 && (
-                <ul className="friend-progress" aria-label="Friends this week">
+                <ul className="friend-cards" aria-label="Friends this week">
                   {progress
                     .filter(
                       (item) => item.membershipId !== membership.membershipId,
                     )
                     .map((item) => (
-                      <li key={item.membershipId}>
-                        <strong>{item.displayName}</strong>
+                      <li
+                        key={item.membershipId}
+                        className={
+                          awaitingReview.has(item.membershipId)
+                            ? "awaiting-review"
+                            : undefined
+                        }
+                      >
+                        <strong className="friend-card-name">
+                          {item.displayName}
+                        </strong>
                         <Barbell
                           count={item.completedWorkoutCount}
                           target={item.lockedTarget}
@@ -493,6 +565,7 @@ export function Weekly({
                         />
                         <span>
                           {item.completedWorkoutCount}/{item.lockedTarget}
+                          {awaitingReview.has(item.membershipId) && " · review"}
                         </span>
                       </li>
                     ))}
@@ -503,12 +576,16 @@ export function Weekly({
                   <button
                     className="home-log-button"
                     type="button"
+                    aria-label="Log workout"
                     onClick={(event) => {
                       event.currentTarget.focus();
                       setSheetOpen(true);
                     }}
                   >
-                    Log workout
+                    <span className="log-plus" aria-hidden="true">
+                      +
+                    </span>{" "}
+                    Log
                   </button>
                   <Sheet
                     open={sheetOpen}
@@ -630,6 +707,7 @@ export function Weekly({
                             URL.revokeObjectURL(activityPhoto.url);
                             URL.revokeObjectURL(presencePhoto.url);
                             setPhotos({});
+                            setFeedRevision((value) => value + 1);
                             setNotice({
                               kind: "success",
                               text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week. It counts once a friend verifies it or 24 hours pass.`,
@@ -855,6 +933,15 @@ export function Weekly({
                 >
                   {busy ? "Refreshing…" : "Refresh count"}
                 </button>
+              )}
+              {own && (
+                <ProofFeed
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  revision={feedRevision}
+                  onRevoked={feedRevoked}
+                  onItems={feedItems}
+                />
               )}
             </>
           )}

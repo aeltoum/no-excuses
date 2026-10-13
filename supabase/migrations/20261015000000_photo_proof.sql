@@ -371,6 +371,7 @@ $$;
 create or replace function app_private.proof_feed(requested_at timestamptz)
 returns table (
   workout_checkin_id uuid,
+  author_membership_id uuid,
   author_name text,
   mine boolean,
   activity_type text,
@@ -401,7 +402,7 @@ begin
   end if;
   admin := exists (select 1 from app_private.group_admins where membership_id = viewer.membership_id);
   return query
-  select c.workout_checkin_id,
+  select c.workout_checkin_id, m.membership_id,
     coalesce(a.display_name, 'Member ' || left(m.membership_id::text, 8)),
     m.membership_id = viewer.membership_id,
     c.activity_type::text, c.duration_minutes, c.perceived_intensity::text,

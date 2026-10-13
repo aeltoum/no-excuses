@@ -849,6 +849,7 @@ async function proof(request: Request, path: string): Promise<Response> {
         ok(
           rows.map((row) => ({
             workoutCheckinId: row.workout_checkin_id,
+            authorMembershipId: row.author_membership_id,
             authorName: row.author_name,
             mine: row.mine,
             activityType: row.activity_type,
