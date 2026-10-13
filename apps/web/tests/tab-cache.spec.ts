@@ -100,24 +100,24 @@ test("member tabs retain data while background refresh resolves", async ({
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Home" }).click();
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("status", { name: "Loading weekly progress" }),
   ).toHaveCount(0);
   await expect.poll(() => targetGets).toBeGreaterThanOrEqual(4);
   await page.getByRole("link", { name: "Home" }).click();
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Target" }).focus();
+  await page.getByRole("link", { name: "Home" }).focus();
   releaseChange();
   await expect(page.getByText("4", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Target" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Home" })).toBeFocused();
   await page.getByRole("link", { name: "Home" }).click();
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(
     page.getByText("Showing saved data", { exact: true }),
   ).toBeVisible();
@@ -238,7 +238,7 @@ test("private tab cache ends at sign-out and new account sign-in", async ({
   };
   await page.goto("/sign-in");
   await signIn("member@example.test");
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Account" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -248,7 +248,7 @@ test("private tab cache ends at sign-out and new account sign-in", async ({
   await page.getByRole("link", { name: "Continue to sign in" }).click();
   currentSession = secondSession;
   await signIn("second@example.test");
-  await page.getByRole("link", { name: "Target" }).click();
+  await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("7", { exact: true })).toBeVisible();
   await expect(page.getByText("3", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Group" }).click();

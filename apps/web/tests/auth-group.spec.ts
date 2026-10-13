@@ -304,7 +304,7 @@ test("Account Name row loads and confirms a saved edit", async ({
   await name.fill("Akrum Eltoum");
   await save.click();
   await expect(page.getByRole("status")).toHaveText("Name saved.");
-  await page.getByRole("link", { name: "Target", exact: true }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.clock.runFor(3000);
   await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page.getByText("Name saved.")).toHaveCount(0);

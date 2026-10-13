@@ -3,11 +3,13 @@ import type {
   FinalizedWeeklyHistoryItem,
   WeeklyTargetContext,
 } from "@no-excuses/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
+import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
+import { ProofFeed } from "./Wall";
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
@@ -18,7 +20,11 @@ export type WeeklySnapshot = {
   syncedAt: number;
 };
 
+type ProofPhoto = { id: string; blob: Blob; url: string };
+
 export function Weekly({
+  apiBaseUrl,
+  onNavigate,
   route,
   api,
   token,
@@ -27,6 +33,11 @@ export function Weekly({
   cache,
   cacheKey,
 }: {
+  apiBaseUrl: string;
+  onNavigate: (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    destination: string,
+  ) => void;
   route: Route;
   api: Api;
   token: string;
@@ -66,6 +77,62 @@ export function Weekly({
     "moderate",
   );
   const [attested, setAttested] = useState(false);
+  const [photos, setPhotos] = useState<{
+    activity?: ProofPhoto;
+    presence?: ProofPhoto;
+  }>({});
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const uploaded = useRef(new Map<string, string>());
+  const [feedRevision, setFeedRevision] = useState(0);
+  const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [docked, setDocked] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const feedRevoked = useCallback(() => revokeRef.current(), []);
+  const feedItems = useCallback((items: ProofItem[]) => {
+    setAwaitingReview(
+      new Set(
+        items
+          .filter((item) => item.canReview || item.canVote)
+          .map((item) => item.authorMembershipId),
+      ),
+    );
+  }, []);
+  // The big barbell docks into a slim header once it scrolls out of view.
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setDocked(!entry?.isIntersecting),
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  });
+  const choosePhoto =
+    (kind: "activity" | "presence") =>
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      setPhotoError(null);
+      try {
+        const blob = await compressPhoto(file);
+        setPhotos((current) => {
+          if (current[kind]) URL.revokeObjectURL(current[kind].url);
+          return {
+            ...current,
+            [kind]: {
+              id: crypto.randomUUID(),
+              blob,
+              url: URL.createObjectURL(blob),
+            },
+          };
+        });
+      } catch {
+        setPhotoError("Couldn’t use that photo. Take another one.");
+      }
+    };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
@@ -304,6 +371,8 @@ export function Weekly({
     activityType !== null &&
     Number.isSafeInteger(Number(duration)) &&
     Number(duration) >= 1 &&
+    photos.activity !== undefined &&
+    photos.presence !== undefined &&
     attested;
   return (
     <section
@@ -312,15 +381,15 @@ export function Weekly({
       {home ? (
         <header className="home-header">
           <h1>Our week</h1>
-          <span>Self-reported</span>
+          <span>Proof required</span>
         </header>
       ) : (
         <>
-          <p className="eyebrow">Self-reported</p>
+          <p className="eyebrow">Proof required</p>
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
-            Workouts are self-reported. Friends see your count; nobody
-            independently verifies check-ins.
+            Every workout needs proof photos. Only workouts your friends verify,
+            or that go unquestioned for 24 hours, count.
           </p>
         </>
       )}
@@ -399,11 +468,28 @@ export function Weekly({
         <>
           {route === "/home" && (
             <>
+              {own && (
+                <div
+                  className={`week-dock${docked ? " on" : ""}`}
+                  aria-hidden="true"
+                >
+                  <Barbell
+                    count={own.completedWorkoutCount}
+                    target={own.lockedTarget}
+                    size="mini"
+                    activityTypes={own.activityTypes}
+                  />
+                  <strong>
+                    {own.completedWorkoutCount} of {own.lockedTarget}
+                  </strong>
+                </div>
+              )}
               {own ? (
-                <div className="own-progress">
+                <div className="own-progress" ref={heroRef}>
                   <a
                     className="own-target-link"
                     href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
                     aria-label={`${own.completedWorkoutCount} of ${own.lockedTarget} workouts. Change weekly target.`}
                   >
                     <Barbell
@@ -416,6 +502,13 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  <a
+                    className="home-target-link"
+                    href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
+                  >
+                    Change target
+                  </a>
                   <ul className="activity-legend" aria-label="Activity colours">
                     {(
                       ["strength", "cardio", "class", "sport", "mixed"] as const
@@ -437,17 +530,33 @@ export function Weekly({
                     Accountability and workouts begin once a second member joins
                     your Group.
                   </p>
+                  <a
+                    className="home-target-link"
+                    href="/target"
+                    onClick={(event) => onNavigate(event, "/target")}
+                  >
+                    Change target
+                  </a>
                 </div>
               )}
               {own && progress.length > 1 && (
-                <ul className="friend-progress" aria-label="Friends this week">
+                <ul className="friend-cards" aria-label="Friends this week">
                   {progress
                     .filter(
                       (item) => item.membershipId !== membership.membershipId,
                     )
                     .map((item) => (
-                      <li key={item.membershipId}>
-                        <strong>{item.displayName}</strong>
+                      <li
+                        key={item.membershipId}
+                        className={
+                          awaitingReview.has(item.membershipId)
+                            ? "awaiting-review"
+                            : undefined
+                        }
+                      >
+                        <strong className="friend-card-name">
+                          {item.displayName}
+                        </strong>
                         <Barbell
                           count={item.completedWorkoutCount}
                           target={item.lockedTarget}
@@ -456,6 +565,7 @@ export function Weekly({
                         />
                         <span>
                           {item.completedWorkoutCount}/{item.lockedTarget}
+                          {awaitingReview.has(item.membershipId) && " · review"}
                         </span>
                       </li>
                     ))}
@@ -466,12 +576,16 @@ export function Weekly({
                   <button
                     className="home-log-button"
                     type="button"
+                    aria-label="Log workout"
                     onClick={(event) => {
                       event.currentTarget.focus();
                       setSheetOpen(true);
                     }}
                   >
-                    Log workout
+                    <span className="log-plus" aria-hidden="true">
+                      +
+                    </span>{" "}
+                    Log
                   </button>
                   <Sheet
                     open={sheetOpen}
@@ -502,9 +616,18 @@ export function Weekly({
                       className="log-sheet-form"
                       onSubmit={(event) => {
                         event.preventDefault();
-                        if (busy || !logReady || !activityType) return;
+                        if (
+                          busy ||
+                          !logReady ||
+                          !activityType ||
+                          !photos.activity ||
+                          !photos.presence
+                        )
+                          return;
                         const minutes = Number(duration);
-                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}`;
+                        const activityPhoto = photos.activity;
+                        const presencePhoto = photos.presence;
+                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}:${activityPhoto.id}:${presencePhoto.id}`;
                         if (
                           !draft.current ||
                           draft.current.signature !== signature
@@ -517,17 +640,41 @@ export function Weekly({
                         const current = draft.current;
                         setBusy(true);
                         setLogError(null);
-                        void api
-                          .checkIn(
+                        // Uploaded paths are reused on retry so a failed submit never re-uploads.
+                        const upload = async (
+                          kind: "activity" | "presence",
+                          photo: ProofPhoto,
+                        ) => {
+                          const known = uploaded.current.get(photo.id);
+                          if (known) return known;
+                          const path = await uploadProofPhoto(
+                            apiBaseUrl,
                             token,
-                            {
-                              workoutCheckinId: current.id,
-                              activityType,
-                              durationMinutes: minutes,
-                              perceivedIntensity: intensity,
-                              selfReportAttested: true,
-                            },
-                            current.key,
+                            kind,
+                            photo.blob,
+                          );
+                          uploaded.current.set(photo.id, path);
+                          return path;
+                        };
+                        void Promise.all([
+                          upload("activity", activityPhoto),
+                          upload("presence", presencePhoto),
+                        ])
+                          .then(([activityPhotoPath, presencePhotoPath]) =>
+                            api.checkIn(
+                              token,
+                              {
+                                workoutCheckinId: current.id,
+                                activityType,
+                                durationMinutes: minutes,
+                                perceivedIntensity: intensity,
+                                selfReportAttested: true,
+                                activityPhotoPath,
+                                presencePhotoPath,
+                                mediaConsent: true,
+                              },
+                              current.key,
+                            ),
                           )
                           .then(async (response) => {
                             if (response.data.workoutCheckinId !== current.id)
@@ -557,9 +704,13 @@ export function Weekly({
                             setDuration("");
                             setOtherDuration(false);
                             setAttested(false);
+                            URL.revokeObjectURL(activityPhoto.url);
+                            URL.revokeObjectURL(presencePhoto.url);
+                            setPhotos({});
+                            setFeedRevision((value) => value + 1);
                             setNotice({
                               kind: "success",
-                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week.`,
+                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week. It counts once a friend verifies it or 24 hours pass.`,
                             });
                             try {
                               setProgress(
@@ -682,6 +833,67 @@ export function Weekly({
                           )}
                         </div>
                       </fieldset>
+                      <fieldset>
+                        <legend>Proof photos</legend>
+                        <div className="proof-capture">
+                          {(
+                            [
+                              [
+                                "activity",
+                                "Activity photo",
+                                "environment",
+                                "Your equipment, trail, class, or machine.",
+                              ],
+                              [
+                                "presence",
+                                "You at the workout",
+                                "user",
+                                "Any part of you. Your call how much.",
+                              ],
+                            ] as const
+                          ).map(([kind, title, facing, hint]) => (
+                            <label className="proof-capture-slot" key={kind}>
+                              {photos[kind] ? (
+                                <img
+                                  src={photos[kind].url}
+                                  alt={
+                                    kind === "activity"
+                                      ? "Activity preview"
+                                      : "Your presence preview"
+                                  }
+                                />
+                              ) : (
+                                <span
+                                  className="proof-capture-plus"
+                                  aria-hidden="true"
+                                >
+                                  +
+                                </span>
+                              )}
+                              <strong>
+                                {photos[kind]
+                                  ? `Retake ${title.toLowerCase()}`
+                                  : title}
+                              </strong>
+                              <small>{hint}</small>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture={facing}
+                                disabled={busy}
+                                onChange={(event) =>
+                                  void choosePhoto(kind)(event)
+                                }
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        {photoError && (
+                          <p className="result error" role="alert">
+                            {photoError}
+                          </p>
+                        )}
+                      </fieldset>
                       <label className="check-label">
                         <input
                           type="checkbox"
@@ -691,15 +903,16 @@ export function Weekly({
                           }
                           disabled={busy}
                         />
-                        I did this workout. It's my own self-report.
+                        I did this workout. My Group can review these photos,
+                        and verified ones stay on the Wall for 90 days.
                       </label>
                       <button type="submit" disabled={busy || !logReady}>
                         {busy ? "Logging…" : "Log workout"}
                       </button>
                       {!logReady && (
                         <p className="sheet-hint">
-                          Pick an activity, a time, and confirm it&apos;s your
-                          own self-report.
+                          Pick an activity and a time, take both photos, and
+                          confirm.
                         </p>
                       )}
                       {logError && (
@@ -720,6 +933,15 @@ export function Weekly({
                 >
                   {busy ? "Refreshing…" : "Refresh count"}
                 </button>
+              )}
+              {own && (
+                <ProofFeed
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  revision={feedRevision}
+                  onRevoked={feedRevoked}
+                  onItems={feedItems}
+                />
               )}
             </>
           )}

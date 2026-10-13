@@ -424,6 +424,12 @@ export interface components {
             perceivedIntensity: "low" | "moderate" | "high";
             /** @constant */
             selfReportAttested: true;
+            /** @description Unused Activity photo path issued to the caller by POST /v1/proof/uploads. */
+            activityPhotoPath: string;
+            /** @description Unused Member-presence photo path issued to the caller by POST /v1/proof/uploads. */
+            presencePhotoPath: string;
+            /** @constant */
+            mediaConsent: true;
         };
         CreateGroupRequest: {
             /** Format: uuid */

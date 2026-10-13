@@ -32,7 +32,6 @@ const codePositions = [1, 2, 3, 4, 5, 6] as const;
 const memberRoutes: Array<[Route, string]> = [
   ["/home", "Home"],
   ["/group", "Group"],
-  ["/target", "Target"],
   ["/history", "History"],
   ["/account", "Account"],
 ];
@@ -1997,6 +1996,8 @@ export function App({
           </section>
         ) : (
           <Weekly
+            apiBaseUrl={apiBaseUrl}
+            onNavigate={navigate}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}

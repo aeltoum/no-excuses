@@ -168,6 +168,34 @@ async function finishAuthDeletion(authUserId: string) {
   );
 }
 
+const proofBucket = "proof-photos";
+async function storage(path: string, method: string, body: unknown) {
+  const response = await fetch(`${authUrl}/storage/v1${path}`, {
+    method,
+    headers: {
+      apikey: serviceKey,
+      authorization: `Bearer ${serviceKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`Storage ${method} failed`);
+  return response.json() as Promise<unknown>;
+}
+
+async function deleteExpiredProofMedia() {
+  const due = await pool.query(
+    "select path from app_private.proof_media_due(now())",
+  );
+  const paths = due.rows.map((row) => row.path as string);
+  if (paths.length === 0) return;
+  await storage(`/object/${proofBucket}`, "DELETE", { prefixes: paths });
+  await pool.query("select app_private.mark_proof_media_deleted($1, now())", [
+    paths,
+  ]);
+}
+
 let delivering = false;
 async function deliverPush() {
   if (!pushEnabled || delivering) return;
@@ -226,6 +254,11 @@ async function maintenance() {
       } catch {
         console.error("Account Auth deletion pending retry");
       }
+    }
+    try {
+      await deleteExpiredProofMedia();
+    } catch {
+      console.error("Proof media deletion pending retry");
     }
     await deliverPush();
   } catch (error) {
@@ -513,7 +546,7 @@ const handlers = {
     currentGroupMembershipRequestSchema,
   ),
   submitWorkoutCheckin: command(
-    "select * from app_private.submit_workout_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+    "select * from app_private.submit_proof_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
     (body, now) => [
       body.workoutCheckinId,
       body.activityType,
@@ -521,6 +554,9 @@ const handlers = {
       body.durationMinutes,
       body.perceivedIntensity,
       body.selfReportAttested,
+      body.activityPhotoPath,
+      body.presencePhotoPath,
+      body.mediaConsent,
     ],
     (rows) => {
       setImmediate(() => void deliverPush());
@@ -745,6 +781,135 @@ async function push(request: Request): Promise<Response> {
   }
 }
 
+const proofAction =
+  /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
+async function proof(request: Request, path: string): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  let body: Record<string, unknown> = {};
+  if (request.method === "POST") {
+    try {
+      body = ((await request.json()) ?? {}) as Record<string, unknown>;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+  }
+  const now = new Date().toISOString();
+  try {
+    if (path === "/v1/proof/uploads" && request.method === "POST") {
+      if (body.kind !== "activity" && body.kind !== "presence")
+        return reply(fail("invalid_request", 400));
+      const created = await query(
+        actor,
+        "select app_private.create_proof_upload($1,$2) as path",
+        [body.kind, now],
+      );
+      const objectPath = created.rows[0]?.path as string;
+      const signed = (await storage(
+        `/object/upload/sign/${proofBucket}/${objectPath}`,
+        "POST",
+        {},
+      )) as { url?: string };
+      if (!signed.url) throw new Error("Storage sign failed");
+      return reply(
+        ok({
+          path: objectPath,
+          uploadUrl: `${authUrl}/storage/v1${signed.url}`,
+        }),
+      );
+    }
+    if (path === "/v1/proof/feed" && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.proof_feed($1)", [now])
+      ).rows;
+      const paths = rows.flatMap((row) => [
+        row.activity_photo_path as string,
+        row.presence_photo_path as string,
+      ]);
+      const urls = new Map<string, string>();
+      if (paths.length > 0) {
+        const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+          expiresIn: 3600,
+          paths,
+        })) as Array<{ path?: string; signedURL?: string }>;
+        for (const item of signed)
+          if (item.path && item.signedURL)
+            urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+      }
+      const iso = (value: unknown) =>
+        value ? new Date(String(value)).toISOString() : null;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            workoutCheckinId: row.workout_checkin_id,
+            authorMembershipId: row.author_membership_id,
+            authorName: row.author_name,
+            mine: row.mine,
+            activityType: row.activity_type,
+            durationMinutes: row.duration_minutes,
+            perceivedIntensity: row.perceived_intensity,
+            completedAt: iso(row.completed_at),
+            submittedAt: iso(row.submitted_at),
+            reviewStatus: row.review_status,
+            reviewClosesAt: iso(row.review_closes_at),
+            decisionClosesAt: iso(row.decision_closes_at),
+            hidden: row.hidden,
+            myVote: row.my_vote,
+            acceptVotes: row.accept_votes,
+            rejectVotes: row.reject_votes,
+            eligibleVoters: row.eligible_voters,
+            canReview: row.can_review,
+            canVote: row.can_vote,
+            activityPhotoUrl:
+              urls.get(row.activity_photo_path as string) ?? null,
+            presencePhotoUrl:
+              urls.get(row.presence_photo_path as string) ?? null,
+          })),
+        ),
+      );
+    }
+    const match = proofAction.exec(path);
+    if (match && request.method === "POST") {
+      const [, id = "", action = ""] = match;
+      const choice = String(body.choice ?? "");
+      const allowed: Record<string, string[]> = {
+        review: ["verify", "question"],
+        vote: ["accept", "reject", "cannot_assess"],
+        moderate: ["restore", "remove"],
+        withdraw: [""],
+        report: [""],
+      };
+      if (!allowed[action]?.includes(choice))
+        return reply(fail("invalid_request", 400));
+      const sql: Record<string, string> = {
+        review:
+          "select app_private.review_proof_checkin($1,$2,$3)::text as status",
+        vote: "select app_private.vote_proof_checkin($1,$2::app_private.proof_vote,$3)::text as status",
+        moderate:
+          "select app_private.moderate_proof_checkin($1,$2,$3)::text as status",
+        withdraw:
+          "select app_private.withdraw_proof_checkin($1,$3)::text as status, $2::text as unused",
+        report:
+          "select app_private.report_proof_checkin($1,$3)::text as status, $2::text as unused",
+      };
+      const rows = (await query(actor, sql[action] ?? "", [id, choice, now]))
+        .rows;
+      setImmediate(() => void deliverPush());
+      return reply(ok({ workoutCheckinId: id, status: rows[0]?.status }));
+    }
+    return reply(fail("not_found", 404));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
 const server = createServer(async (incoming, outgoing) => {
   const origin = incoming.headers.origin;
   if (origin && origin !== allowedOrigin) {
@@ -788,7 +953,9 @@ const server = createServer(async (incoming, outgoing) => {
           : path === "/v1/push" &&
               ["GET", "POST", "DELETE"].includes(request.method)
             ? await push(request)
-            : await route(request);
+            : path.startsWith("/v1/proof/")
+              ? await proof(request, path)
+              : await route(request);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",

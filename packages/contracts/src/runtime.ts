@@ -12,6 +12,9 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 const uuidSchema = z.uuid();
 const utcInstantSchema = z.iso.datetime({ offset: false });
 const positiveIntegerSchema = z.number().int().positive();
+const proofPhotoPathSchema = z
+  .string()
+  .regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/);
 const boundedTextSchema = (maximum: number) =>
   z.string().trim().min(1).max(maximum);
 
@@ -41,6 +44,9 @@ export const submitWorkoutCheckinRequestSchema = z
     durationMinutes: positiveIntegerSchema,
     perceivedIntensity: perceivedIntensitySchema,
     selfReportAttested: z.literal(true),
+    activityPhotoPath: proofPhotoPathSchema,
+    presencePhotoPath: proofPhotoPathSchema,
+    mediaConsent: z.literal(true),
   })
   .strict();
 
