@@ -46,6 +46,13 @@ const cards = [
   unlockedByFriend: false,
 }));
 
+const extra = {
+  cardId: "90000000-0000-4000-8000-000000000004",
+  title: "200 jumping jacks",
+  instructions: "Complete 200 jumping jacks, any sets.",
+  unlockedByFriend: true,
+};
+
 test("owed Consequence card is picked, completed, and friends' claims approved", async ({
   page,
 }, testInfo) => {
@@ -57,7 +64,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   const actions: string[] = [];
   let state: Record<string, unknown> = {
     owed: 1,
-    offer: { offerId, canRedraw: true, cards },
+    offer: { offerId, canRedraw: true, cards: cards.slice(0, 2).concat(extra) },
     attempt: null,
     reviews: [
       {
@@ -112,6 +119,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     if (action) {
       const body = request.postDataJSON();
       actions.push(`${action}:${body.target}:${body.choice}`);
+      if (action === "redraw")
+        state = { ...state, offer: { offerId, canRedraw: false, cards } };
       if (action === "select")
         state = {
           ...state,
@@ -157,16 +166,16 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
-  await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
-  await expect(
-    page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText(["Maya2/3 · owes 2"]);
-  await page.getByRole("button", { name: "Pick your card" }).click();
-  const dialog = page.getByRole("dialog", { name: "Pick your card" });
-  await expect(dialog.getByRole("radio")).toHaveCount(3);
+  // The hand pops up on its own, like an augment round.
+  let dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("You owe 1 card")).toBeVisible();
+  const handButtons = dialog.locator(".augment-card");
+  await expect(handButtons).toHaveCount(3);
   await expect(
     dialog.getByRole("button", { name: "Lock it in" }),
   ).toBeDisabled();
+  await page.waitForTimeout(700);
   expect(
     (
       await new AxeBuilder({ page }).include("[role=dialog]").analyze()
@@ -174,11 +183,31 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
       ["serious", "critical"].includes(item.impact ?? ""),
     ),
   ).toEqual([]);
-  await page.screenshot({
-    fullPage: true,
-    path: testInfo.outputPath("card-offer.png"),
-  });
-  await dialog.getByRole("radio", { name: /5 km run/ }).check();
+  await page.screenshot({ path: testInfo.outputPath("card-offer.png") });
+
+  await dialog.getByRole("button", { name: "Decide later" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
+  ).toHaveText(["Maya2/3 · owes 2"]);
+  await page.reload();
+  await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Choose your card" }).click();
+  dialog = page.getByRole("dialog", { name: "Choose your Consequence" });
+
+  await dialog.getByRole("button", { name: /Reroll all/ }).click();
+  await expect(
+    dialog.getByRole("button", { name: /No rerolls left/ }),
+  ).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: /5 km run/ })).toBeVisible();
+  await dialog.getByRole("button", { name: /5 km run/ }).click();
+  await expect(
+    dialog.getByRole("button", { name: /5 km run/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: testInfo.outputPath("card-chosen.png") });
   await dialog.getByRole("button", { name: "Lock it in" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
@@ -204,6 +233,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     path: testInfo.outputPath("card-home.png"),
   });
   expect(actions).toEqual([
+    `redraw:${offerId}:`,
     `select:${offerId}:${cards[2]?.cardId}`,
     `claim:${attemptId}:`,
     `respond:${claimId}:approve`,

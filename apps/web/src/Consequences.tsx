@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { AugmentPicker } from "./AugmentPicker";
 import { ApiError } from "./api-client";
 import { Result, useNotice } from "./Result";
-import { Sheet } from "./Sheet";
 
 type Card = {
   cardId: string;
@@ -63,6 +63,21 @@ async function request(
   return data as ConsequenceHome;
 }
 
+// The picker pops up on its own once per hand; afterwards it opens from Home.
+const seenKey = "no-excuses:seen-card-offer";
+const readSeen = () => {
+  try {
+    return window.localStorage.getItem(seenKey);
+  } catch {
+    return null;
+  }
+};
+const writeSeen = (offerId: string) => {
+  try {
+    window.localStorage.setItem(seenKey, offerId);
+  } catch {}
+};
+
 const hoursLeft = (until: string) => {
   const hours = Math.max(
     0,
@@ -86,7 +101,6 @@ export function Consequences({
   const [home, setHome] = useState<ConsequenceHome | null>(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [chosen, setChosen] = useState<string | null>(null);
   const [notice, setNotice] = useNotice();
 
   const fail = useCallback(
@@ -111,6 +125,11 @@ export function Consequences({
         if (!active) return;
         setHome(next);
         onGroupOwed(next.groupOwed);
+        const offerId = next.offer?.offerId;
+        if (offerId && readSeen() !== offerId) {
+          writeSeen(offerId);
+          setPicking(true);
+        }
       })
       .catch((error) => {
         if (!active) return;
@@ -160,14 +179,8 @@ export function Consequences({
             You owe {home.owed} Consequence {home.owed === 1 ? "card" : "cards"}
           </p>
           {offer && (
-            <button
-              type="button"
-              onClick={() => {
-                setChosen(null);
-                setPicking(true);
-              }}
-            >
-              Pick your card
+            <button type="button" onClick={() => setPicking(true)}>
+              Choose your card
             </button>
           )}
           {attempt?.status === "active" && (
@@ -296,73 +309,32 @@ export function Consequences({
           ))}
         </ul>
       )}
-      {offer && (
-        <Sheet
-          open={picking}
-          title="Pick your card"
-          dismissible={!busy}
-          onDismiss={() => setPicking(false)}
-        >
-          <p className="sheet-hint">
-            Choose one. You get 48 hours to finish it once you lock it in.
-          </p>
-          <fieldset className="card-choices">
-            <legend className="visually-hidden">Cards</legend>
-            {offer.cards.map((card) => (
-              <label className="card-choice" key={card.cardId}>
-                <input
-                  type="radio"
-                  name="consequence-card"
-                  checked={chosen === card.cardId}
-                  disabled={busy}
-                  onChange={() => setChosen(card.cardId)}
-                />
-                <strong>{card.title}</strong>
-                <span className="card-choice-detail">{card.instructions}</span>
-                {card.unlockedByFriend && (
-                  <small className="card-choice-detail">
-                    Unlocked by a friend
-                  </small>
-                )}
-              </label>
-            ))}
-          </fieldset>
-          <button
-            type="button"
-            disabled={busy || !chosen}
-            onClick={() => {
-              if (!chosen) return;
-              void act(
-                "select",
-                offer.offerId,
-                chosen,
-                "Card locked in. 48 hours starts now.",
-              ).then((saved) => {
-                if (saved) setPicking(false);
-              });
-            }}
-          >
-            Lock it in
-          </button>
-          {offer.canRedraw && (
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={busy}
-              onClick={() => {
-                setChosen(null);
-                void act(
-                  "redraw",
-                  offer.offerId,
-                  "",
-                  "Redrawn. These three are final.",
-                );
-              }}
-            >
-              Redraw (once)
-            </button>
-          )}
-        </Sheet>
+      {offer && picking && (
+        <AugmentPicker
+          cards={offer.cards}
+          canReroll={offer.canRedraw}
+          busy={busy}
+          owed={home.owed}
+          onClose={() => setPicking(false)}
+          onReroll={() =>
+            void act(
+              "redraw",
+              offer.offerId,
+              "",
+              "Rerolled. These three are final.",
+            )
+          }
+          onLock={(cardId) =>
+            void act(
+              "select",
+              offer.offerId,
+              cardId,
+              "Card locked in. 48 hours starts now.",
+            ).then((saved) => {
+              if (saved) setPicking(false);
+            })
+          }
+        />
       )}
     </section>
   );
