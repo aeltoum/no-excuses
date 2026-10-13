@@ -8,6 +8,15 @@ type Card = {
   unlockedByFriend: boolean;
 };
 
+// Short heavy buzzes as each card lands; skipped when motion is reduced or vibration
+// is unsupported (iPhone Safari has no Vibration API).
+const buzz = (pattern: number | number[]) => {
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {}
+};
+
 const focusable = 'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // Full-screen three-card pick in the style of TFT augments: cards deal in, one lifts when
@@ -40,6 +49,7 @@ export function AugmentPicker({
   useEffect(() => {
     void hand;
     setChosen(null);
+    buzz([60, 80, 60, 80, 140]);
   }, [hand]);
 
   useEffect(() => {
@@ -108,7 +118,10 @@ export function AugmentPicker({
               style={{ animationDelay: `${index * 140}ms` }}
               aria-pressed={chosen === card.cardId}
               disabled={busy}
-              onClick={() => setChosen(card.cardId)}
+              onClick={() => {
+                setChosen(card.cardId);
+                buzz(35);
+              }}
             >
               <span className="augment-tier">
                 <span aria-hidden="true">⚠ </span>

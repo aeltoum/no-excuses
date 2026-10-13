@@ -87,6 +87,33 @@ const hoursLeft = (until: string) => {
   return hours <= 1 ? "under 1 hour" : `${hours} hours`;
 };
 
+const debtCap = 5;
+// Owed cards stack toward the backlog cap of five; the meter heats up as it fills.
+function DebtMeter({ owed }: { owed: number }) {
+  const level = owed >= debtCap ? "maxed" : owed >= 3 ? "high" : "low";
+  return (
+    <div
+      className={`debt-meter debt-${level}`}
+      role="img"
+      aria-label={`Consequence debt: ${owed} of ${debtCap} cards owed`}
+    >
+      <span className="debt-label">Debt</span>
+      <span className="debt-cells" aria-hidden="true">
+        {Array.from({ length: debtCap }, (_, index) => (
+          <i
+            // biome-ignore lint/suspicious/noArrayIndexKey: fixed five-cell meter
+            key={index}
+            className={index < owed ? "filled" : undefined}
+          />
+        ))}
+      </span>
+      <span className="debt-value">
+        {owed >= debtCap ? "Maxed" : `${owed}/${debtCap}`}
+      </span>
+    </div>
+  );
+}
+
 // Owed Consequence cards on Home: pick, complete, and approve friends' claims.
 export function Consequences({
   apiBaseUrl,
@@ -191,6 +218,7 @@ export function Consequences({
           <p className="owed-count">
             You owe {home.owed} Consequence {home.owed === 1 ? "card" : "cards"}
           </p>
+          <DebtMeter owed={home.owed} />
           {offer && (
             <button type="button" onClick={() => setPicking(true)}>
               Choose your card

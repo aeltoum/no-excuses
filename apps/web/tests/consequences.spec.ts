@@ -157,6 +157,16 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     }
     return route.fulfill({ status: 404, json: {} });
   });
+  await page.addInitScript(() => {
+    const calls: unknown[] = [];
+    (window as unknown as { buzzes: unknown[] }).buzzes = calls;
+    Object.defineProperty(navigator, "vibrate", {
+      value: (pattern: unknown) => {
+        calls.push(pattern);
+        return true;
+      },
+    });
+  });
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
@@ -185,12 +195,21 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("card-offer.png") });
 
+  // The deal buzzes the phone (dev StrictMode may deal twice).
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { buzzes: unknown[] }).buzzes,
+    ),
+  ).toContainEqual([60, 80, 60, 80, 140]);
   await dialog.getByRole("button", { name: "Decide later" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText(["Maya2/3 · owes 2"]);
+  await expect(
+    page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
+  ).toContainText("1/5");
   await page.reload();
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(dialog).toHaveCount(0);

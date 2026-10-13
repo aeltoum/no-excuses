@@ -2107,3 +2107,67 @@ button:disabled {
   color: var(--muted);
   font-size: 1.4rem;
 }
+
+/* Consequence debt meter */
+.debt-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.debt-label,
+.debt-value {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.debt-value {
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.debt-cells {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+.debt-cells i {
+  height: 12px;
+  border: 1px solid #5a3a38;
+  border-radius: 2px;
+  background: #1a1112;
+}
+.debt-cells i.filled {
+  border-color: var(--error);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--error) 0 5px,
+    #b8312f 5px 10px
+  );
+}
+.debt-low .debt-value {
+  color: var(--chalk);
+}
+.debt-high .debt-value,
+.debt-maxed .debt-value {
+  color: var(--error);
+}
+.owed-card:has(.debt-high),
+.owed-card:has(.debt-maxed) {
+  background: linear-gradient(180deg, #2a1112 0%, var(--surface) 100%);
+}
+.owed-card:has(.debt-maxed) {
+  animation: debt-pulse 1.6s ease-in-out infinite;
+}
+@keyframes debt-pulse {
+  50% {
+    box-shadow: 0 0 22px rgb(229 72 77 / 55%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .owed-card:has(.debt-maxed) {
+    animation: none;
+  }
+}
