@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type State =
   | "checking"
@@ -33,6 +33,9 @@ export function PushToggle({
   const [state, setState] = useState<State>("checking");
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Session tokens refresh; read the latest without re-running the status check.
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
 
   useEffect(() => {
     let live = true;
@@ -42,7 +45,9 @@ export function PushToggle({
         return;
       }
       try {
-        const response = await fetch(`${apiBaseUrl}/v1/push`);
+        const response = await fetch(`${apiBaseUrl}/v1/push`, {
+          headers: { authorization: `Bearer ${tokenRef.current()}` },
+        });
         const key = (
           (await response.json()) as { data?: { publicKey?: string } }
         ).data?.publicKey;

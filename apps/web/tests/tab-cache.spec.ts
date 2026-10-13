@@ -51,6 +51,7 @@ test("member tabs retain data while background refresh resolves", async ({
       route.fulfill({ status: 200, json: { contractVersion: 1, data } });
     if (path.endsWith("/current"))
       return ok({ membership: { groupId, membershipId } });
+    if (path === "/v1/push") return ok({ publicKey: null });
     if (path.endsWith("/current-week-progress")) return ok([]);
     if (path.endsWith("/finalized-weekly-history")) return ok([]);
     if (path.endsWith("/weekly-target")) {
