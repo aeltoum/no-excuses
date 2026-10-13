@@ -80,7 +80,6 @@ export function Weekly({
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
     "moderate",
   );
-  const [attested, setAttested] = useState(false);
   const [photos, setPhotos] = useState<{
     activity?: ProofPhoto;
     presence?: ProofPhoto;
@@ -385,8 +384,7 @@ export function Weekly({
     Number.isSafeInteger(Number(duration)) &&
     Number(duration) >= 1 &&
     photos.activity !== undefined &&
-    photos.presence !== undefined &&
-    attested;
+    photos.presence !== undefined;
   return (
     <section
       className={`hero${home ? " home" : ""}${saved ? " data-cached" : ""}${changed ? " data-updated" : ""}`}
@@ -729,7 +727,6 @@ export function Weekly({
                             setActivityType(null);
                             setDuration("");
                             setOtherDuration(false);
-                            setAttested(false);
                             URL.revokeObjectURL(activityPhoto.url);
                             URL.revokeObjectURL(presencePhoto.url);
                             setPhotos({});
@@ -920,25 +917,12 @@ export function Weekly({
                           </p>
                         )}
                       </fieldset>
-                      <label className="check-label">
-                        <input
-                          type="checkbox"
-                          checked={attested}
-                          onChange={(event) =>
-                            setAttested(event.target.checked)
-                          }
-                          disabled={busy}
-                        />
-                        I did this workout. My Group can review these photos,
-                        and verified ones stay on the Wall for 90 days.
-                      </label>
                       <button type="submit" disabled={busy || !logReady}>
                         {busy ? "Logging…" : "Log workout"}
                       </button>
                       {!logReady && (
                         <p className="sheet-hint">
-                          Pick an activity and a time, take both photos, and
-                          confirm.
+                          Pick an activity and a time, then take both photos.
                         </p>
                       )}
                       {logError && (
