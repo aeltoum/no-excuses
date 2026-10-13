@@ -1747,3 +1747,89 @@ button:disabled {
   font-size: 0.8rem;
   text-decoration: underline;
 }
+
+/* Consequence cards on Home */
+.consequences {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.owed-card,
+.card-reviews li {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid var(--error);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.owed-card h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+.owed-card p,
+.card-reviews p {
+  margin: 0;
+}
+.owed-count {
+  color: var(--error);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.owed-deadline {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.card-reviews {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-reviews li {
+  border-color: var(--rule);
+}
+.card-choices {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+}
+.card-choice {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 2px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--chalk);
+  text-align: left;
+}
+.card-choice:has(input:checked) {
+  border-color: var(--chalk);
+}
+.card-choice input {
+  position: absolute;
+  opacity: 0;
+}
+.card-choice:focus-within {
+  outline: 3px solid var(--chalk);
+  outline-offset: 2px;
+}
+.card-choice-detail {
+  color: var(--muted);
+  font-weight: 400;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -315,6 +315,14 @@ const weeklyLoop = async (
       });
     }
     if (path.endsWith("/finalized-weekly-history")) return respond(historyData);
+    if (path === "/v1/consequences")
+      return respond({
+        owed: 0,
+        offer: null,
+        attempt: null,
+        reviews: [],
+        groupOwed: {},
+      });
     if (path === "/v1/proof/feed") {
       feedLoads++;
       return respond([]);

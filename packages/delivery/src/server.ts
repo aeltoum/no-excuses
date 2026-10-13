@@ -202,6 +202,7 @@ async function deliverPush() {
   delivering = true;
   try {
     await pool.query("select app_private.enqueue_push_notifications(now())");
+    await pool.query("select app_private.enqueue_consequence_push(now())");
     const pending = await pool.query(
       "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
     );
@@ -245,6 +246,7 @@ async function deliverPush() {
 async function maintenance() {
   try {
     await pool.query("select app_private.advance_true_mvp_weeks(now())");
+    await pool.query("select app_private.advance_consequences(now())");
     const pending = await pool.query(
       "select auth_user_id from app_private.accounts where status='deleted' and auth_deleted_at is null limit 50",
     );
@@ -910,6 +912,55 @@ async function proof(request: Request, path: string): Promise<Response> {
   }
 }
 
+const consequenceAction =
+  /^\/v1\/consequences\/(redraw|select|claim|pause|resume|respond)$/;
+async function consequences(request: Request, path: string): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  const now = new Date().toISOString();
+  try {
+    if (path === "/v1/consequences" && request.method === "GET") {
+      const rows = (
+        await query(actor, "select app_private.consequence_home($1) as home", [
+          now,
+        ])
+      ).rows;
+      return reply(ok(rows[0]?.home));
+    }
+    const action = consequenceAction.exec(path)?.[1];
+    if (!action || request.method !== "POST")
+      return reply(fail("not_found", 404));
+    let body: { target?: unknown; choice?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+    if (!uuid(body?.target)) return reply(fail("invalid_request", 400));
+    const choice = typeof body.choice === "string" ? body.choice : "";
+    if (action === "select" && !uuid(choice))
+      return reply(fail("invalid_request", 400));
+    const rows = (
+      await query(
+        actor,
+        "select app_private.consequence_command($1,$2,$3,$4) as home",
+        [action, body.target, choice, now],
+      )
+    ).rows;
+    setImmediate(() => void deliverPush());
+    return reply(ok(rows[0]?.home));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
 const server = createServer(async (incoming, outgoing) => {
   const origin = incoming.headers.origin;
   if (origin && origin !== allowedOrigin) {
@@ -955,7 +1006,10 @@ const server = createServer(async (incoming, outgoing) => {
             ? await push(request)
             : path.startsWith("/v1/proof/")
               ? await proof(request, path)
-              : await route(request);
+              : path === "/v1/consequences" ||
+                  path.startsWith("/v1/consequences/")
+                ? await consequences(request, path)
+                : await route(request);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",
