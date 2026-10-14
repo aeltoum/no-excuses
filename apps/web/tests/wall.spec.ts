@@ -63,6 +63,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     if (message.type() === "error") errors.push(message.text());
   });
   const actions: string[] = [];
+  let failNextVote = true;
   let feed = [
     item({}),
     item({
@@ -137,6 +138,10 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
       const choice = request.postDataJSON().choice;
       // Like a cold API: the reply lags well behind the tap.
       if (action[2] === "review") await releaseReview;
+      if (action[2] === "vote" && failNextVote) {
+        failNextVote = false;
+        return route.fulfill({ status: 500, json: {} });
+      }
       actions.push(`${action[2]}:${choice}`);
       if (action[2] === "review")
         feed = feed.map((entry) =>
@@ -203,12 +208,19 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await page.getByRole("button", { name: "Good lift" }).first().click();
   // The choice disappears on tap, before the API answers.
   await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
-  answerReview();
+  // Outcome shows at once, while the API is still answering.
   await expect(page.getByRole("status")).toHaveText("Good lift. Verified.");
   await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
+  answerReview();
   // A made choice takes its buttons with it.
   await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
 
+  await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
+  // A failed vote rolls back: the buttons and counts return with an error.
+  await page.getByRole("button", { name: "No lift" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Something went wrong. Try again.",
+  );
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   await page.getByRole("button", { name: "No lift" }).click();
   await expect(page.getByRole("status")).toHaveText("No lift. Vote saved.");
@@ -225,5 +237,6 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   expect(actions).toEqual(["review:verify", "vote:reject", "report:"]);
   // The reported post leaves the feed, so nothing is left waiting on the member.
   await expect(homeTab).toHaveAccessibleName("Home");
-  expect(errors).toEqual([]);
+  // Only the deliberately failed vote may log.
+  expect(errors.filter((text) => !text.includes("status of 500"))).toEqual([]);
 });

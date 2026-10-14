@@ -124,6 +124,9 @@ export async function uploadProofPhoto(
         "cache-control": "max-age=31536000",
       },
       body: photo,
+      // Photos are bounded to 1600 px, so a minute covers slow mobile links;
+      // a stalled upload must fail, never spin forever.
+      signal: AbortSignal.timeout(60_000),
     });
   } catch {
     throw new ApiError("failure", "Photo upload failed. Try again.", true);
