@@ -171,7 +171,10 @@ export function App({
     if (access === "signed-in") return;
     if (access !== "checking") pendingUser.current = null;
     if (access === "signed-out" || access === "revoked") writeMemberHint(null);
-    clearPersisted();
+    // Only a real sign-out drops the stored screens. A recheck or an outage
+    // ("checking", "unavailable") must keep them, or the next launch has
+    // nothing to show and waits on a cold API.
+    if (access === "signed-out" || access === "revoked") clearPersisted();
     groupScope.current = "";
     groupRosterRef.current = null;
     displayNameScope.current = "";
