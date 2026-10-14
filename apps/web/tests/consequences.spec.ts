@@ -179,7 +179,9 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   // The hand pops up on its own, like an augment round.
   let dialog = page.getByRole("dialog", { name: "Choose your punishment" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("Penalty due · 1 owed")).toBeVisible();
+  await expect(
+    dialog.getByText("Penalty due · 1 owed · 48 hours to finish"),
+  ).toBeVisible();
   const handButtons = dialog.locator(".augment-card");
   await expect(handButtons).toHaveCount(3);
   await expect(
