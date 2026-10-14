@@ -700,14 +700,10 @@ export function App({
           <img src="/icons/icon.svg" alt="" width="32" height="32" />
           <span>No Excuses</span>
         </a>
-        <span className="status">
-          <span aria-hidden="true" /> Private crew
-        </span>
       </header>
       <main className="route-content" id="main-content" key={route ?? path}>
         {!route ? (
           <Page
-            eyebrow="Route unavailable"
             title="Nothing shared here."
             lead="This address is unavailable. No Group or Account details were loaded."
           >
@@ -723,11 +719,7 @@ export function App({
           (route !== "/sign-in" ||
             access === "unavailable" ||
             access === "failure") ? (
-          <Page
-            eyebrow="Members only"
-            title={statusCopy[access][0]}
-            lead={statusCopy[access][1]}
-          >
+          <Page title={statusCopy[access][0]} lead={statusCopy[access][1]}>
             {access === "unavailable" || access === "failure" ? (
               <button
                 className="primary-action"
@@ -749,7 +741,6 @@ export function App({
           </Page>
         ) : route === "/sign-in" ? (
           <Page
-            eyebrow="Private access"
             title="Sign in"
             lead="We’ll email you a six-digit code. For privacy, every address gets the same response."
           >
@@ -930,7 +921,6 @@ export function App({
           </Page>
         ) : route === "/group" ? (
           <Page
-            eyebrow="Private membership"
             title={
               membership &&
               groupLoad === "ready" &&
@@ -1638,11 +1628,7 @@ export function App({
             <Result notice={notice} />
           </Page>
         ) : route === "/account" ? (
-          <Page
-            eyebrow="Account"
-            title="You"
-            lead="Your account and crew settings."
-          >
+          <Page title="You" lead="Your account and crew settings.">
             <div className="account-page">
               {deletionStep === "idle" && <Result notice={notice} />}
               <section className="account-identity" aria-label="Your identity">
@@ -2083,19 +2069,16 @@ export function App({
 }
 
 function Page({
-  eyebrow,
   title,
   lead,
   children,
 }: {
-  eyebrow: string;
   title: string;
   lead: string;
   children?: React.ReactNode;
 }) {
   return (
     <section className="hero">
-      <p className="eyebrow">{eyebrow}</p>
       <h1>{title}</h1>
       <p className="lead">{lead}</p>
       {children}

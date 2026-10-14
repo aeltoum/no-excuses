@@ -2164,3 +2164,251 @@ button:disabled {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Production polish layer: one place for the shared refinements that
+   tighten hierarchy, controls, and feedback across every screen. */
+:root {
+  --line-strong: #44474c;
+  --surface-raised: #2a2b2f;
+  --ease-out: cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: var(--chalk);
+  color: var(--rubber);
+}
+
+/* Masthead: compact, pinned, brand-led. */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  align-items: center;
+  padding: 4px 20px;
+  background: var(--rubber);
+}
+.wordmark {
+  gap: 10px;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+.wordmark img {
+  width: 28px;
+  height: 28px;
+}
+
+/* Page hierarchy: the approved 46px screen title, a measured lead. */
+main {
+  padding-block: clamp(28px, 6vw, 64px) 40px;
+}
+h1 {
+  max-width: 14ch;
+  font-size: clamp(2.5rem, 11vw, 3.5rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+.lead {
+  max-width: 38ch;
+  margin: 12px 0 28px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.eyebrow {
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Forms sit on the floor, unboxed, per the visual system. */
+form {
+  gap: 16px;
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+form h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+input,
+select {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  font-size: 1rem;
+  transition: border-color 120ms ease;
+}
+input::placeholder {
+  color: var(--muted);
+}
+input:hover,
+select:hover {
+  border-color: var(--muted);
+}
+input:focus,
+select:focus {
+  border-color: var(--chalk);
+}
+input[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+/* Buttons: one solid primary, quiet outlines for the rest. */
+button,
+.primary-action {
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+button:not(:disabled):active,
+.primary-action:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) {
+  button:not(:disabled):hover {
+    filter: brightness(0.92);
+  }
+}
+.primary-action {
+  justify-content: center;
+  border: 1px solid var(--safety);
+}
+.secondary-button,
+.sign-in-secondary-actions button {
+  border-color: var(--line-strong);
+}
+button:disabled {
+  opacity: 0.5;
+  filter: none;
+}
+.danger-zone {
+  border: 1px solid var(--error);
+  border-radius: 8px;
+}
+
+/* Section labels read as headings, not stamped caps. */
+.group-heading h2,
+.feed-day,
+.owed-count,
+.deletion-step {
+  color: var(--chalk);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.deletion-step {
+  color: var(--muted);
+  font-weight: 600;
+}
+.feed-badge {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.target-guidance {
+  margin-top: -4px;
+  font-size: 0.875rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.target-warning {
+  border-radius: 8px;
+  background: rgba(232, 194, 46, 0.08);
+  line-height: 1.45;
+}
+.hint {
+  line-height: 1.45;
+}
+
+/* Feedback: persistent notices are calm; transient ones rise from the
+   bottom, clear of the masthead and above the tab bar. */
+.result {
+  border-radius: 6px;
+  border-left-width: 3px;
+  font-size: 0.9375rem;
+}
+.result.event-notice {
+  top: auto;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  border-radius: 8px;
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+  border-left-color: var(--safety);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  animation: notice-rise 200ms var(--ease-out);
+}
+.result.event-notice.error {
+  border-left-color: var(--error);
+}
+body:has(.home-log-button) .result.event-notice {
+  bottom: calc(148px + env(safe-area-inset-bottom));
+}
+.sheet .result.event-notice {
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+@keyframes notice-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .result.event-notice {
+    animation: none;
+  }
+}
+
+/* Sheet: the approved 16px top corners. */
+.sheet {
+  border-radius: 16px 16px 0 0;
+}
+.sheet-header h2 {
+  font-weight: 800;
+}
+
+/* Launch: quiet sentence-case status under the mark. */
+.launch-status {
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Tab bar: legible labels at compact widths. */
+.member-nav a {
+  font-size: 0.75rem;
+  transition: color 160ms ease;
+}
+@media (max-width: 420px) {
+  .member-nav a {
+    font-size: 0.6875rem;
+  }
+}
+@media (max-width: 240px) {
+  h1 {
+    font-size: 2.25rem;
+  }
+  .masthead {
+    position: static;
+  }
+}
