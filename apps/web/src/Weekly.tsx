@@ -271,7 +271,6 @@ export function Weekly({
   if (!membership)
     return (
       <section className="hero">
-        <p className="eyebrow">Private Group</p>
         <h1>Join a Group</h1>
         <p className="lead">
           Create or join a Group to start weekly accountability.
@@ -391,11 +390,11 @@ export function Weekly({
         </header>
       ) : (
         <>
-          <p className="eyebrow">Proof required</p>
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
-            Every workout needs proof photos. Only workouts your friends verify,
-            or that go unquestioned for 24 hours, count.
+            {route === "/target"
+              ? "Every workout needs proof photos. Only workouts your friends verify, or that go unquestioned for 24 hours, count."
+              : "Each plate is a finished week, marked met or missed."}
           </p>
         </>
       )}
