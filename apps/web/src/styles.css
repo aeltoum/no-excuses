@@ -2151,3 +2151,16 @@ button:disabled {
 .debt-maxed .debt-value {
   color: var(--error);
 }
+
+.crash-detail {
+  max-height: 40vh;
+  overflow: auto;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
