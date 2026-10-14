@@ -913,6 +913,11 @@ async function proof(request: Request, path: string): Promise<Response> {
   }
 }
 
+// Consequence ids are often md5-derived in SQL, so they carry no RFC version or
+// variant bits; Postgres still rejects anything that is not a uuid.
+const anyUuid = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const consequenceAction =
   /^\/v1\/consequences\/(redraw|select|claim|pause|resume|respond)$/;
 async function consequences(request: Request, path: string): Promise<Response> {
@@ -944,9 +949,9 @@ async function consequences(request: Request, path: string): Promise<Response> {
     } catch {
       return reply(fail("invalid_request", 400));
     }
-    if (!uuid(body?.target)) return reply(fail("invalid_request", 400));
+    if (!anyUuid(body?.target)) return reply(fail("invalid_request", 400));
     const choice = typeof body.choice === "string" ? body.choice : "";
-    if (action === "select" && !uuid(choice))
+    if (action === "select" && !anyUuid(choice))
       return reply(fail("invalid_request", 400));
     const rows = (
       await query(

@@ -211,7 +211,7 @@ export function Consequences({
 
   return (
     <section className="consequences" aria-label="Consequence cards">
-      <Result notice={notice} />
+      {!(offer && picking) && <Result notice={notice} />}
       {confirmSheet}
       {home.owed > 0 && (
         <div className="owed-card">
@@ -361,6 +361,7 @@ export function Consequences({
           busy={busy}
           owed={home.owed}
           onClose={() => setPicking(false)}
+          notice={<Result notice={notice} />}
           onReroll={() =>
             void act(
               "redraw",

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Card = {
@@ -29,6 +29,7 @@ export function AugmentPicker({
   onLock,
   onReroll,
   onClose,
+  notice,
 }: {
   cards: Card[];
   canReroll: boolean;
@@ -37,6 +38,7 @@ export function AugmentPicker({
   onLock: (cardId: string) => void;
   onReroll: () => void;
   onClose: () => void;
+  notice?: ReactNode;
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -140,6 +142,7 @@ export function AugmentPicker({
             </button>
           ))}
         </div>
+        {notice}
         <div className="augment-footer">
           <button
             type="button"
@@ -156,7 +159,7 @@ export function AugmentPicker({
             disabled={busy || !chosen}
             onClick={() => chosen && onLock(chosen)}
           >
-            {busy ? "Locking…" : "Accept penalty"}
+            {busy && chosen ? "Locking…" : "Accept penalty"}
           </button>
         </div>
         <p className="augment-hint">
