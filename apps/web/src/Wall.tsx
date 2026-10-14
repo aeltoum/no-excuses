@@ -149,6 +149,8 @@ export function ProofFeed({
       done: string,
     ) => {
       setBusy(item.workoutCheckinId);
+      // Hide the choice the instant it's tapped; a failure puts it back.
+      setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
       try {
         await actOnProof(
           apiBaseUrl,
@@ -161,9 +163,13 @@ export function ProofFeed({
           setStamped(item.workoutCheckinId);
           window.setTimeout(() => setStamped(null), 900);
         }
-        setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
         setNotice({ kind: "success", text: done });
       } catch (error) {
+        setDecided((ids) => {
+          const next = new Set(ids);
+          next.delete(item.workoutCheckinId);
+          return next;
+        });
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
         setNotice({
@@ -239,59 +245,51 @@ export function ProofFeed({
             {label(item.activityType)} · {item.durationMinutes} min ·{" "}
             {label(item.perceivedIntensity)}
           </span>
-          {needsReview(item) && (
-            <fieldset className="proof-decide" aria-label="Review">
-              <button
-                type="button"
-                className="decide-yes"
-                disabled={disabled}
-                onClick={() => void act(item, "review", "verify", "Verified.")}
-              >
-                <span aria-hidden="true">✓</span> Verify
-              </button>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() =>
-                  void act(
-                    item,
-                    "review",
-                    "question",
-                    "Questioned. The Group votes for 48 hours.",
-                  )
-                }
-              >
-                <span aria-hidden="true">?</span> Question
-              </button>
-            </fieldset>
-          )}
-          {!needsReview(item) && needsVote(item) && (
-            <fieldset className="proof-decide" aria-label="Your vote">
-              {(
-                [
-                  ["accept", "✓", "Accept"],
-                  ["reject", "✕", "Reject"],
-                  ["cannot_assess", "–", "Can’t tell"],
-                ] as const
-              ).map(([choice, mark, text]) => (
-                <button
-                  type="button"
-                  key={choice}
-                  className={choice === "accept" ? "decide-yes" : undefined}
-                  disabled={disabled}
-                  onClick={() => void act(item, "vote", choice, "Vote saved.")}
-                >
-                  <span aria-hidden="true">{mark}</span> {text}
-                </button>
-              ))}
-            </fieldset>
-          )}
           {stamped === item.workoutCheckinId && (
             <span className="proof-stamp" aria-hidden="true">
               Verified
             </span>
           )}
         </div>
+        {(needsReview(item) || needsVote(item)) && (
+          // Referee light box: the photo sits on a base holding white and red lamps.
+          <fieldset
+            className="proof-decide"
+            aria-label={needsReview(item) ? "Review" : "Your vote"}
+          >
+            <button
+              type="button"
+              className="lamp-good"
+              disabled={disabled}
+              onClick={() =>
+                void (needsReview(item)
+                  ? act(item, "review", "verify", "Good lift. Verified.")
+                  : act(item, "vote", "accept", "Good lift. Vote saved."))
+              }
+            >
+              <span className="lamp" aria-hidden="true" />
+              Good lift
+            </button>
+            <button
+              type="button"
+              className="lamp-no"
+              disabled={disabled}
+              onClick={() =>
+                void (needsReview(item)
+                  ? act(
+                      item,
+                      "review",
+                      "question",
+                      "No lift. The Group votes for 48 hours.",
+                    )
+                  : act(item, "vote", "reject", "No lift. Vote saved."))
+              }
+            >
+              <span className="lamp" aria-hidden="true" />
+              No lift
+            </button>
+          </fieldset>
+        )}
         {item.reviewStatus === "questioned" && (
           <p className="proof-tally">
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}

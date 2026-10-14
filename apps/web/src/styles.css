@@ -1735,48 +1735,74 @@ button:disabled {
   padding: 0;
   border: 0;
 }
-/* Review choices float on the photo as one frosted pill; gone once chosen. */
-.proof-frame:has(.proof-decide) .proof-tag {
-  bottom: 72px;
+/* Review choices: a referee light box. The photo sits on a steel base holding a
+   white (good lift) and red (no lift) lamp; lamps glow on press and the base
+   disappears the instant a call is made. */
+.proof-frame:has(+ .proof-decide) {
+  border-radius: 16px 16px 0 0;
 }
 .proof-decide {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  left: 10px;
   display: flex;
-  gap: 4px;
-  margin: 0;
-  padding: 4px;
+  /* Cancels the post's grid gap so the base meets the photo. */
+  margin: -10px 0 0;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: rgb(26 27 29 / 55%);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  box-shadow: inset 0 0 0 1px rgb(242 242 238 / 14%);
+  border-top: 1px solid var(--empty-slot);
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(#2b2d30, #222326);
+  overflow: hidden;
 }
-.proof-frame .proof-decide button {
+.proof-decide button {
   flex: 1;
-  min-height: 44px;
-  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
+  border-radius: 0;
+  background: none;
   color: var(--chalk);
-  font-size: 0.875rem;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: background 0.15s ease-out;
+  font-weight: 800;
 }
-.proof-frame .proof-decide button:active:not(:disabled) {
-  background: rgb(242 242 238 / 14%);
+.proof-decide button + button {
+  border-left: 1px solid var(--rule);
 }
-.proof-frame .proof-decide .decide-yes {
-  background: var(--chalk);
-  color: var(--rubber);
-}
-.proof-frame .proof-decide button:disabled {
+.proof-decide button:disabled {
   opacity: 0.5;
+}
+.lamp {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 50%);
+  transition:
+    background 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+.lamp-good .lamp {
+  background: var(--empty-slot);
+}
+.lamp-no .lamp {
+  background: #5a3537;
+}
+.lamp-good:is(:hover, :active):not(:disabled) .lamp {
+  background: var(--chalk);
+  box-shadow:
+    0 0 0 4px rgb(242 242 238 / 12%),
+    0 0 16px rgb(242 242 238 / 60%);
+}
+.lamp-no:is(:hover, :active):not(:disabled) .lamp {
+  background: var(--error);
+  box-shadow:
+    0 0 0 4px rgb(229 72 77 / 16%),
+    0 0 16px rgb(229 72 77 / 60%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lamp {
+    transition: none;
+  }
 }
 .proof-actions legend {
   margin-bottom: 6px;

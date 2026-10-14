@@ -100,16 +100,11 @@ export function Weekly({
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
   const feedItems = useCallback((items: ProofItem[]) => {
-    setFeedAttention(
-      items.filter((item) => item.canReview || item.canVote).length,
+    const waiting = items.filter(
+      (item) => item.canReview || (item.canVote && !item.myVote),
     );
-    setAwaitingReview(
-      new Set(
-        items
-          .filter((item) => item.canReview || item.canVote)
-          .map((item) => item.authorMembershipId),
-      ),
-    );
+    setFeedAttention(waiting.length);
+    setAwaitingReview(new Set(waiting.map((item) => item.authorMembershipId)));
   }, []);
   // The big barbell docks into a slim header once it scrolls out of view.
   useEffect(() => {
