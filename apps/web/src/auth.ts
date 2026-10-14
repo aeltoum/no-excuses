@@ -112,8 +112,13 @@ export async function resolveLiveAccess(
 }
 
 // The SDK otherwise treats refresh rate limits as permanent credential rejection.
+// Auth calls also time out so a stalled token refresh cannot block launch.
 export const fetchAuth: typeof fetch = async (input, init) => {
-  const response = await fetch(input, init);
+  const timeout = AbortSignal.timeout(15_000);
+  const response = await fetch(input, {
+    ...init,
+    signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
+  });
   const url = new URL(
     typeof input === "string"
       ? input

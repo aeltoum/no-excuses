@@ -837,8 +837,9 @@ async function proof(request: Request, path: string): Promise<Response> {
       ]);
       const urls = new Map<string, string>();
       if (paths.length > 0) {
+        // A day-long URL lets the app reuse it, and the cached image, across loads.
         const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
-          expiresIn: 3600,
+          expiresIn: 86_400,
           paths,
         })) as Array<{ path?: string; signedURL?: string }>;
         for (const item of signed)

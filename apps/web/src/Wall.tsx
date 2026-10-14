@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { persistentMap } from "./persist";
 import {
   actOnProof,
   loadProofFeed,
@@ -8,6 +9,54 @@ import {
   type ProofItem,
 } from "./proof";
 import { Result, useNotice } from "./Result";
+
+const feedCache = persistentMap<ProofItem[]>("feed");
+
+// Expiry of a storage signed URL, read from its token; 0 when unknown.
+const urlExpiry = (url: string | null) => {
+  try {
+    const token = new URL(url ?? "").searchParams.get("token") ?? "";
+    const payload = token.split(".")[1] ?? "";
+    const claims = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return typeof claims.exp === "number" ? claims.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+};
+const usable = (url: string | null) =>
+  url !== null && urlExpiry(url) > Date.now() + 5 * 60_000;
+const photoPath = (url: string) => url.split("?")[0];
+
+// Each feed load re-signs photo URLs. Keeping a still-valid URL for the same
+// photo lets the browser reuse its cached image instead of downloading again.
+export function keepPhotoUrls(previous: ProofItem[], next: ProofItem[]) {
+  const known = new Map(previous.map((item) => [item.workoutCheckinId, item]));
+  const keep = (old: string | null | undefined, fresh: string | null) =>
+    old && fresh && photoPath(old) === photoPath(fresh) && usable(old)
+      ? old
+      : fresh;
+  return next.map((item) => {
+    const old = known.get(item.workoutCheckinId);
+    return {
+      ...item,
+      activityPhotoUrl: keep(old?.activityPhotoUrl, item.activityPhotoUrl),
+      presencePhotoUrl: keep(old?.presencePhotoUrl, item.presencePhotoUrl),
+    };
+  });
+}
+
+const cachedFeed = (cacheKey: string) =>
+  feedCache.get(cacheKey)?.map((item) => ({
+    ...item,
+    activityPhotoUrl: usable(item.activityPhotoUrl)
+      ? item.activityPhotoUrl
+      : null,
+    presencePhotoUrl: usable(item.presencePhotoUrl)
+      ? item.presencePhotoUrl
+      : null,
+  }));
 
 const label = (value: string) => value[0]?.toUpperCase() + value.slice(1);
 const remaining = (until: string | null) => {
@@ -38,17 +87,23 @@ export function ProofFeed({
   apiBaseUrl,
   token,
   revision,
+  cacheKey,
   onRevoked,
   onItems,
 }: {
   apiBaseUrl: string;
   token: string;
   revision: number;
+  cacheKey: string;
   onRevoked: () => void;
   onItems: (items: ProofItem[]) => void;
 }) {
-  const [items, setItems] = useState<ProofItem[]>([]);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [items, setItems] = useState<ProofItem[]>(
+    () => cachedFeed(cacheKey) ?? [],
+  );
+  const [state, setState] = useState<"loading" | "ready" | "error">(() =>
+    feedCache.has(cacheKey) ? "ready" : "loading",
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [stamped, setStamped] = useState<string | null>(null);
@@ -59,10 +114,16 @@ export function ProofFeed({
     void revision;
     void reload;
     let active = true;
+    const previous = cachedFeed(cacheKey);
+    if (previous) onItems(previous);
     loadProofFeed(apiBaseUrl, token)
-      .then((next) => {
+      .then((loaded) => {
         if (!active) return;
-        setItems(next);
+        const next = keepPhotoUrls(feedCache.get(cacheKey) ?? [], loaded);
+        feedCache.set(cacheKey, next);
+        setItems((current) =>
+          JSON.stringify(current) === JSON.stringify(next) ? current : next,
+        );
         onItems(next);
         setState("ready");
       })
@@ -70,12 +131,13 @@ export function ProofFeed({
         if (!active) return;
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
-        setState("error");
+        // Cached posts stay on screen when a refresh fails.
+        if (!previous) setState("error");
       });
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, revision, reload, onRevoked, onItems]);
+  }, [apiBaseUrl, token, revision, reload, cacheKey, onRevoked, onItems]);
 
   const act = useCallback(
     async (
@@ -152,6 +214,7 @@ export function ProofFeed({
               src={item.activityPhotoUrl}
               alt={`${item.mine ? "Your" : `${item.authorName}'s`} workout activity`}
               loading="lazy"
+              decoding="async"
             />
           )}
           {item.presencePhotoUrl && (
@@ -160,6 +223,7 @@ export function ProofFeed({
               src={item.presencePhotoUrl}
               alt={`${who} at the workout`}
               loading="lazy"
+              decoding="async"
             />
           )}
           <span className="proof-tag">

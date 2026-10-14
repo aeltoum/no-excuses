@@ -1,4 +1,4 @@
-import { ApiError } from "./api-client";
+import { ApiError, requestTimeoutMs } from "./api-client";
 
 export type ProofItem = {
   workoutCheckinId: string;
@@ -48,6 +48,7 @@ async function call<T>(
           : { "content-type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
   } catch {
     throw new ApiError("failure", "Connection failed. Try again.", true);
@@ -116,7 +117,12 @@ export async function uploadProofPhoto(
   try {
     response = await fetch(target.uploadUrl, {
       method: "PUT",
-      headers: { "content-type": "image/jpeg", "x-upsert": "false" },
+      headers: {
+        "content-type": "image/jpeg",
+        "x-upsert": "false",
+        // Proof photos never change once uploaded, so browsers may keep them.
+        "cache-control": "max-age=31536000",
+      },
       body: photo,
     });
   } catch {

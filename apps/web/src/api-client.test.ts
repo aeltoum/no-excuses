@@ -19,6 +19,12 @@ const workoutReceipt = {
   contractVersion: 1,
   data: { workoutCheckinId: uuid, currentWeekCount: 4 },
 };
+// Each attempt carries its own timeout signal; the request itself must repeat exactly.
+const sameRequest = (call: unknown[] | undefined) => {
+  const [url, init] = call as [string, RequestInit];
+  return [url, { ...init, signal: undefined }];
+};
+
 describe("browser API client", () => {
   it("submits log-now without a client clock timestamp", async () => {
     const { completedAt: _completedAt, ...logNow } = workout;
@@ -65,7 +71,9 @@ describe("browser API client", () => {
       ),
     ).resolves.toMatchObject({ data: { currentWeekCount: 4 } });
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+    expect(sameRequest(fetcher.mock.calls[0])).toEqual(
+      sameRequest(fetcher.mock.calls[1]),
+    );
   });
   it("replays an accepted workout after its response is lost without a second write", async () => {
     const receipts = new Map<string, unknown>();
@@ -88,7 +96,9 @@ describe("browser API client", () => {
       ).checkIn("token", workout, uuid),
     ).resolves.toEqual(workoutReceipt);
     expect(writes).toBe(1);
-    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+    expect(sameRequest(fetcher.mock.calls[0])).toEqual(
+      sameRequest(fetcher.mock.calls[1]),
+    );
   });
   it("recovers one retryable service response on the same submission", async () => {
     const fetcher = vi
@@ -115,7 +125,9 @@ describe("browser API client", () => {
       ),
     ).resolves.toEqual(workoutReceipt);
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[1]);
+    expect(sameRequest(fetcher.mock.calls[0])).toEqual(
+      sameRequest(fetcher.mock.calls[1]),
+    );
   });
   it("stops after two transport failures and preserves the caller's draft for manual retry", async () => {
     const fetcher = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
@@ -129,7 +141,9 @@ describe("browser API client", () => {
     await expect(api.checkIn("token", workout, uuid)).resolves.toEqual(
       workoutReceipt,
     );
-    expect(fetcher.mock.calls[0]).toEqual(fetcher.mock.calls[2]);
+    expect(sameRequest(fetcher.mock.calls[0])).toEqual(
+      sameRequest(fetcher.mock.calls[2]),
+    );
   });
   it.each([400, 401, 403, 409, 500])(
     "does not replay terminal HTTP %s",
