@@ -36,6 +36,9 @@ export class ApiError extends Error {
 }
 
 export const requestTimeoutMs = 20_000;
+// A Render free instance takes up to about a minute to wake. The retry waits
+// that long instead of aborting the very request that is waking the host.
+export const wakeTimeoutMs = 75_000;
 
 export function createApiClient(
   baseUrl: string,
@@ -56,7 +59,7 @@ export function createApiClient(
     let accessToken = getFreshToken ? await getFreshToken() : token;
     let response: Response;
     try {
-      const send = () =>
+      const send = (timeoutMs = requestTimeoutMs) =>
         fetcher(`${root}${path}`, {
           method: command?.method ?? "GET",
           headers: {
@@ -73,14 +76,14 @@ export function createApiClient(
               ? undefined
               : JSON.stringify(command.body),
           // A sleeping API host must surface as a retryable failure, never a hang.
-          signal: AbortSignal.timeout(requestTimeoutMs),
+          signal: AbortSignal.timeout(timeoutMs),
         });
       try {
         response = await send();
       } catch (error) {
         // Reads retry once: the first attempt often only wakes the host.
         if (command) throw error;
-        response = await send();
+        response = await send(wakeTimeoutMs);
       }
       if (response.status === 401 && !command && getFreshToken) {
         const nextToken = await getFreshToken();
