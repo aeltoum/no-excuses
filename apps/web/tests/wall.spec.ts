@@ -193,13 +193,13 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await page.getByRole("button", { name: "Verify" }).click();
   await expect(page.getByRole("status")).toHaveText("Verified.");
   await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
+  // A made choice takes its buttons with it.
+  await expect(page.getByRole("button", { name: "Verify" })).toHaveCount(0);
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   await page.getByRole("button", { name: "Reject" }).click();
-  await expect(page.getByRole("button", { name: "Reject" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("status")).toHaveText("Vote saved.");
+  await expect(page.getByRole("button", { name: "Reject" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Report photos" }).first().click();
   await page

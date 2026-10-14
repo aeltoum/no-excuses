@@ -107,6 +107,8 @@ export function ProofFeed({
   const [busy, setBusy] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [stamped, setStamped] = useState<string | null>(null);
+  // Posts the viewer just acted on; their buttons hide before the refetch lands.
+  const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
 
@@ -159,6 +161,7 @@ export function ProofFeed({
           setStamped(item.workoutCheckinId);
           window.setTimeout(() => setStamped(null), 900);
         }
+        setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
         setNotice({ kind: "success", text: done });
       } catch (error) {
         if (error instanceof ApiError && error.kind === "unauthorized")
@@ -178,7 +181,12 @@ export function ProofFeed({
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
-  const toReview = items.filter((item) => item.canReview || item.canVote);
+  // A choice already made, here or on another device, needs no buttons.
+  const needsReview = (item: ProofItem) =>
+    !decided.has(item.workoutCheckinId) && item.canReview;
+  const needsVote = (item: ProofItem) =>
+    !decided.has(item.workoutCheckinId) && item.canVote && !item.myVote;
+  const toReview = items.filter((item) => needsReview(item) || needsVote(item));
   const days = new Map<string, ProofItem[]>();
   for (const item of items.filter((entry) => !toReview.includes(entry))) {
     const key = dayLabel(item.submittedAt);
@@ -231,6 +239,53 @@ export function ProofFeed({
             {label(item.activityType)} · {item.durationMinutes} min ·{" "}
             {label(item.perceivedIntensity)}
           </span>
+          {needsReview(item) && (
+            <fieldset className="proof-decide" aria-label="Review">
+              <button
+                type="button"
+                className="decide-yes"
+                disabled={disabled}
+                onClick={() => void act(item, "review", "verify", "Verified.")}
+              >
+                <span aria-hidden="true">✓</span> Verify
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  void act(
+                    item,
+                    "review",
+                    "question",
+                    "Questioned. The Group votes for 48 hours.",
+                  )
+                }
+              >
+                <span aria-hidden="true">?</span> Question
+              </button>
+            </fieldset>
+          )}
+          {!needsReview(item) && needsVote(item) && (
+            <fieldset className="proof-decide" aria-label="Your vote">
+              {(
+                [
+                  ["accept", "✓", "Accept"],
+                  ["reject", "✕", "Reject"],
+                  ["cannot_assess", "–", "Can’t tell"],
+                ] as const
+              ).map(([choice, mark, text]) => (
+                <button
+                  type="button"
+                  key={choice}
+                  className={choice === "accept" ? "decide-yes" : undefined}
+                  disabled={disabled}
+                  onClick={() => void act(item, "vote", choice, "Vote saved.")}
+                >
+                  <span aria-hidden="true">{mark}</span> {text}
+                </button>
+              ))}
+            </fieldset>
+          )}
           {stamped === item.workoutCheckinId && (
             <span className="proof-stamp" aria-hidden="true">
               Verified
@@ -242,55 +297,6 @@ export function ProofFeed({
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}
             {item.eligibleVoters} voters · {remaining(item.decisionClosesAt)}
           </p>
-        )}
-        {item.canReview && (
-          <div className="proof-actions">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => void act(item, "review", "verify", "Verified.")}
-            >
-              Verify
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={disabled}
-              onClick={() =>
-                void act(
-                  item,
-                  "review",
-                  "question",
-                  "Questioned. The Group votes for 48 hours.",
-                )
-              }
-            >
-              Question
-            </button>
-          </div>
-        )}
-        {item.canVote && (
-          <fieldset className="proof-actions">
-            <legend>Your vote</legend>
-            {(
-              [
-                ["accept", "Accept"],
-                ["reject", "Reject"],
-                ["cannot_assess", "Can’t assess"],
-              ] as const
-            ).map(([choice, text]) => (
-              <button
-                type="button"
-                key={choice}
-                aria-pressed={item.myVote === choice}
-                className={choice === "accept" ? undefined : "secondary-button"}
-                disabled={disabled}
-                onClick={() => void act(item, "vote", choice, "Vote saved.")}
-              >
-                {text}
-              </button>
-            ))}
-          </fieldset>
         )}
         {item.mine && item.reviewStatus === "questioned" && (
           <div className="proof-actions">
