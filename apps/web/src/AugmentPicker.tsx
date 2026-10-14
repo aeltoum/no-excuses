@@ -104,18 +104,18 @@ export function AugmentPicker({
         >
           ×
         </button>
-        <div className="augment-tape" aria-hidden="true" />
-        <p className="augment-kicker">Penalty due · {owed} owed</p>
+        <p className="augment-kicker">
+          Penalty due · {owed} owed · 48 hours to finish
+        </p>
         <h2 id={titleId} tabIndex={-1}>
           Choose your punishment
         </h2>
         <div className="augment-hand" key={hand}>
-          {cards.map((card, index) => (
+          {cards.map((card) => (
             <button
               type="button"
               key={card.cardId}
               className={`augment-card${card.unlockedByFriend ? " tier-gold" : ""}`}
-              style={{ animationDelay: `${index * 140}ms` }}
               aria-pressed={chosen === card.cardId}
               disabled={busy}
               onClick={() => {
@@ -123,21 +123,20 @@ export function AugmentPicker({
                 buzz(35);
               }}
             >
-              <span className="augment-tier">
-                <span aria-hidden="true">⚠ </span>
-                {card.unlockedByFriend ? "Dealt by a friend" : "Penalty"}
+              <span className="augment-head">
+                {chosen === card.cardId ? (
+                  <span className="augment-stamp" aria-hidden="true">
+                    Yours
+                  </span>
+                ) : (
+                  <span className="augment-tier">
+                    {card.unlockedByFriend ? "From a friend" : "Penalty"}
+                  </span>
+                )}
               </span>
               <strong className="augment-title">{card.title}</strong>
               <span className="augment-rule" aria-hidden="true" />
               <span className="augment-text">{card.instructions}</span>
-              <span className="augment-due" aria-hidden="true">
-                48h
-              </span>
-              {chosen === card.cardId && (
-                <span className="augment-stamp" aria-hidden="true">
-                  Yours
-                </span>
-              )}
             </button>
           ))}
         </div>

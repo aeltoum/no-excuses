@@ -457,9 +457,7 @@ const weeklyLoop = async (
     }),
   ).toHaveCount(5);
   await expect(
-    dialog.getByText(
-      "Pick an activity and a time, take both photos, and confirm.",
-    ),
+    dialog.getByText("Pick an activity and a time, then take both photos."),
   ).toBeVisible();
   await expect(
     dialog.getByRole("button", { name: "Log workout" }),
@@ -472,11 +470,8 @@ const weeklyLoop = async (
     ),
   ).toEqual([]);
   await page.keyboard.press("Shift+Tab");
-  await expect(
-    dialog.getByLabel(
-      "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
-    ),
-  ).toBeFocused();
+  // With Log workout disabled, focus wraps to the last photo slot.
+  await expect(dialog.locator('input[type="file"]').nth(1)).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
@@ -501,15 +496,11 @@ const weeklyLoop = async (
   await dialog.getByRole("button", { name: "Strength" }).click();
   await expect(dialog.getByText("This one makes 3 of 4.")).toBeVisible();
   await expect(
-    dialog.getByText(
-      "Pick an activity and a time, take both photos, and confirm.",
-    ),
+    dialog.getByText("Pick an activity and a time, then take both photos."),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "45 min" }).click();
   await expect(
-    dialog.getByText(
-      "Pick an activity and a time, take both photos, and confirm.",
-    ),
+    dialog.getByText("Pick an activity and a time, then take both photos."),
   ).toBeVisible();
   const photoInputs = dialog.locator('input[type="file"]');
   await expect(photoInputs.nth(0)).toHaveAttribute("capture", "environment");
@@ -526,15 +517,8 @@ const weeklyLoop = async (
   await expect(
     dialog.getByRole("img", { name: "Your presence preview" }),
   ).toBeVisible();
-  await page
-    .getByLabel(
-      "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
-    )
-    .check();
   await expect(
-    dialog.getByText(
-      "Pick an activity and a time, take both photos, and confirm.",
-    ),
+    dialog.getByText("Pick an activity and a time, then take both photos."),
   ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Log workout" }),
@@ -551,10 +535,8 @@ const weeklyLoop = async (
       dialog.getByRole("button", { name: "45 min" }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
-      dialog.getByLabel(
-        "I did this workout. My Group can review these photos, and verified ones stay on the Wall for 90 days.",
-      ),
-    ).toBeChecked();
+      dialog.getByRole("img", { name: "Activity preview" }),
+    ).toBeVisible();
     await expect(
       dialog.getByRole("button", { name: "Moderate" }),
     ).toHaveAttribute("aria-pressed", "true");

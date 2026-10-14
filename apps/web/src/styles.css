@@ -1749,32 +1749,34 @@ button:disabled {
   text-decoration: underline;
 }
 
-/* Consequence cards on Home */
+/* Consequence cards on Home: flat rubber, chalk type, red only for the penalty itself. */
 .consequences {
   display: grid;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 24px;
 }
-.owed-card,
-.card-reviews li {
+.owed-card {
   display: grid;
   gap: 8px;
   padding: 16px;
-  border: 2px solid var(--error);
-  border-radius: 16px;
+  border-top: 3px solid var(--error);
+  border-radius: 8px;
   background: var(--surface);
 }
 .owed-card h2 {
   margin: 0;
-  font-size: 1.6rem;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
 }
 .owed-card p,
 .card-reviews p {
   margin: 0;
 }
 .owed-count {
-  color: var(--error);
-  font-size: 0.8rem;
+  color: var(--chalk);
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1785,69 +1787,60 @@ button:disabled {
 }
 .card-reviews {
   display: grid;
-  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .card-reviews li {
-  border-color: var(--rule);
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
 }
+
+/* Consequence hand: the rubber floor, a red rule, and flat penalty tiles. */
 .augment-layer {
   position: fixed;
   z-index: 30;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 16px;
-  background: radial-gradient(
-    circle at 50% 45%,
-    rgb(70 12 10 / 97%),
-    rgb(6 6 7 / 99%) 70%
-  );
-  animation: augment-fade 0.25s ease-out;
+  padding: 20px;
+  background: var(--rubber);
+  animation: augment-in 0.22s ease-out;
 }
 .augment-dialog {
   position: relative;
   width: min(100%, 560px);
   display: grid;
-  gap: 12px;
+  gap: 8px;
   justify-items: center;
+  padding-top: 16px;
+  border-top: 3px solid var(--error);
   text-align: center;
-}
-.augment-tape {
-  width: calc(100% + 32px);
-  height: 14px;
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--activity-class) 0 12px,
-    #111 12px 24px
-  );
-  opacity: 0.9;
 }
 .augment-dialog h2 {
   margin: 0;
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 2.6rem;
-  font-weight: 900;
-  line-height: 0.95;
-  letter-spacing: 0.02em;
+  font-size: 2.125rem;
+  font-weight: 800;
+  line-height: 1;
   text-transform: uppercase;
 }
 .augment-kicker {
-  margin: 4px 0 0;
-  color: var(--error);
+  margin: 0;
+  color: var(--chalk);
   font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .augment-close {
   position: absolute;
-  top: 18px;
-  right: 0;
-  min-height: 44px;
-  min-width: 44px;
+  top: -56px;
+  right: -8px;
+  min-height: 48px;
+  min-width: 48px;
   padding: 0;
   border: 0;
   background: none;
@@ -1858,175 +1851,116 @@ button:disabled {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 16px;
 }
 .augment-card {
-  --tier: #c4302b;
+  --tier: var(--error);
   position: relative;
-  overflow: hidden;
-  /* Playing-card proportions; grows only if a card's text needs the room. */
-  aspect-ratio: 5 / 7;
+  /* Portrait card; every card in the hand stretches to the tallest one. */
+  min-height: 168px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
-  padding: 12px 6px 26px;
-  border: 2px solid var(--tier);
-  border-radius: 10px;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      rgb(255 255 255 / 2.5%) 0 1px,
-      transparent 1px 4px
-    ),
-    linear-gradient(180deg, #1d1112 0%, #0c0c0d 100%);
-  box-shadow:
-    inset 0 0 0 4px #0c0c0d,
-    inset 0 0 0 5px color-mix(in srgb, var(--tier) 45%, transparent),
-    0 8px 18px rgb(0 0 0 / 60%);
+  padding: 14px 8px 6px;
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--tier);
+  border-radius: 8px;
+  background: var(--surface);
   color: var(--chalk);
   text-align: center;
   white-space: normal;
-  transition:
-    transform 0.16s ease-out,
-    box-shadow 0.16s ease-out,
-    filter 0.16s ease-out;
-  animation: augment-slam 0.38s cubic-bezier(0.3, 1.4, 0.6, 1) backwards;
+  transition: opacity 0.16s ease-out;
 }
 .augment-card.tier-gold {
-  --tier: var(--activity-class);
-  border-image: repeating-linear-gradient(
-      -45deg,
-      var(--activity-class) 0 8px,
-      #111 8px 16px
-    )
-    2;
+  --tier: var(--chalk);
 }
 .augment-hand:has([aria-pressed="true"]) .augment-card[aria-pressed="false"] {
-  filter: grayscale(0.6) brightness(0.6);
+  opacity: 0.5;
 }
 .augment-card[aria-pressed="true"] {
-  transform: translateY(-8px);
-  box-shadow:
-    inset 0 0 0 4px #0c0c0d,
-    inset 0 0 0 5px var(--tier),
-    0 0 0 2px var(--tier),
-    0 0 30px color-mix(in srgb, var(--error) 75%, transparent);
+  outline: 2px solid var(--chalk);
+  outline-offset: 2px;
 }
 .augment-title {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.2rem;
-  font-weight: 900;
+  font-size: 1.375rem;
+  font-weight: 800;
   line-height: 1;
-  text-transform: uppercase;
 }
 .augment-tier {
-  color: var(--tier);
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  color: var(--chalk);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   text-transform: uppercase;
 }
 .augment-rule {
-  width: 60%;
+  width: 40%;
   height: 1px;
-  background: var(--tier);
-  opacity: 0.7;
+  background: var(--rule);
 }
 .augment-text {
-  color: #c9c3c2;
-  font-size: 0.72rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
   font-weight: 400;
   line-height: 1.3;
 }
-.augment-due {
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  color: var(--tier);
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 0.85rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
+.augment-head {
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 2px;
 }
 .augment-stamp {
-  position: absolute;
-  top: 74%;
-  left: 50%;
-  padding: 2px 10px;
-  border: 3px solid var(--error);
-  border-radius: 4px;
+  padding: 0 6px;
+  border: 2px solid var(--error);
+  border-radius: 2px;
   color: var(--error);
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.15rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
   text-transform: uppercase;
-  background: rgb(12 12 13 / 85%);
-  transform: translate(-50%, -50%) rotate(-14deg);
-  animation: augment-stamp 0.22s cubic-bezier(0.3, 1.6, 0.6, 1);
+  transform: rotate(-6deg);
 }
 .augment-footer {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 16px;
 }
 .augment-reroll {
-  border-color: #5a3a38;
   background: transparent;
   color: var(--chalk);
 }
 .augment-lock {
   border-color: var(--error);
   background: var(--error);
-  color: #fff;
+  color: var(--chalk);
 }
 .augment-lock:disabled {
-  border-color: #5a3a38;
-  background: #2a1716;
-  color: #9a8c8a;
+  border-color: var(--rule);
+  background: var(--surface);
+  color: var(--muted);
 }
 .augment-hint {
-  margin: 0;
-  color: #a39896;
-  font-size: 0.8rem;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }
-@keyframes augment-slam {
-  0% {
-    opacity: 0;
-    transform: translateY(-60px) scale(1.25) rotate(-4deg);
-  }
-  70% {
-    opacity: 1;
-    transform: translateY(3px) scale(0.98) rotate(0.5deg);
-  }
-  85% {
-    transform: translateX(-2px);
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes augment-stamp {
+@keyframes augment-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(-14deg) scale(2);
-  }
-}
-@keyframes augment-fade {
-  from {
-    opacity: 0;
+    transform: translateY(12px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .augment-layer,
-  .augment-card,
-  .augment-stamp {
+  .augment-layer {
     animation: none;
   }
   .augment-card {
@@ -2038,7 +1972,7 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
   .augment-card {
-    aspect-ratio: auto;
+    min-height: 0;
   }
 }
 .visually-hidden {
@@ -2083,8 +2017,8 @@ button:disabled {
   align-items: flex-start;
   margin: 0 0 18px;
   padding: 14px 16px;
-  border: 1px solid var(--activity-class);
-  border-radius: 14px;
+  border-top: 3px solid var(--chalk);
+  border-radius: 8px;
   background: var(--surface);
 }
 .install-prompt p {
@@ -2108,18 +2042,20 @@ button:disabled {
   font-size: 1.4rem;
 }
 
-/* Consequence debt meter */
+/* Consequence debt meter: five slots in the Barbell's dashed-slot grammar. */
 .debt-meter {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .debt-label,
 .debt-value {
   font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.debt-label {
   text-transform: uppercase;
 }
 .debt-value {
@@ -2134,40 +2070,15 @@ button:disabled {
   gap: 4px;
 }
 .debt-cells i {
-  height: 12px;
-  border: 1px solid #5a3a38;
-  border-radius: 2px;
-  background: #1a1112;
+  height: 14px;
+  border: 1.5px dashed var(--empty-slot);
+  border-radius: 3px;
 }
 .debt-cells i.filled {
-  border-color: var(--error);
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--error) 0 5px,
-    #b8312f 5px 10px
-  );
-}
-.debt-low .debt-value {
-  color: var(--chalk);
+  border: 0;
+  background: var(--error);
 }
 .debt-high .debt-value,
 .debt-maxed .debt-value {
   color: var(--error);
-}
-.owed-card:has(.debt-high),
-.owed-card:has(.debt-maxed) {
-  background: linear-gradient(180deg, #2a1112 0%, var(--surface) 100%);
-}
-.owed-card:has(.debt-maxed) {
-  animation: debt-pulse 1.6s ease-in-out infinite;
-}
-@keyframes debt-pulse {
-  50% {
-    box-shadow: 0 0 22px rgb(229 72 77 / 55%);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .owed-card:has(.debt-maxed) {
-    animation: none;
-  }
 }
