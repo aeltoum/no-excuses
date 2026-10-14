@@ -1642,7 +1642,8 @@ export function App({
                 </span>
                 <span>
                   <strong>
-                    {displayNameScope.current === session?.user.id
+                    {displayNameScope.current === session?.user.id &&
+                    displayNameLoaded
                       ? displayName || "Name not set"
                       : "Loading…"}
                   </strong>
