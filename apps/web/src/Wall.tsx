@@ -149,6 +149,8 @@ export function ProofFeed({
       done: string,
     ) => {
       setBusy(item.workoutCheckinId);
+      // Hide the choice the instant it's tapped; a failure puts it back.
+      setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
       try {
         await actOnProof(
           apiBaseUrl,
@@ -161,9 +163,13 @@ export function ProofFeed({
           setStamped(item.workoutCheckinId);
           window.setTimeout(() => setStamped(null), 900);
         }
-        setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
         setNotice({ kind: "success", text: done });
       } catch (error) {
+        setDecided((ids) => {
+          const next = new Set(ids);
+          next.delete(item.workoutCheckinId);
+          return next;
+        });
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
         setNotice({
@@ -243,14 +249,7 @@ export function ProofFeed({
             <fieldset className="proof-decide" aria-label="Review">
               <button
                 type="button"
-                className="decide-yes"
-                disabled={disabled}
-                onClick={() => void act(item, "review", "verify", "Verified.")}
-              >
-                <span aria-hidden="true">✓</span> Verify
-              </button>
-              <button
-                type="button"
+                className="decide-no"
                 disabled={disabled}
                 onClick={() =>
                   void act(
@@ -261,7 +260,21 @@ export function ProofFeed({
                   )
                 }
               >
-                <span aria-hidden="true">?</span> Question
+                <span className="decide-mark" aria-hidden="true">
+                  ?
+                </span>
+                Question
+              </button>
+              <button
+                type="button"
+                className="decide-yes"
+                disabled={disabled}
+                onClick={() => void act(item, "review", "verify", "Verified.")}
+              >
+                <span className="decide-mark" aria-hidden="true">
+                  ✓
+                </span>
+                Verify
               </button>
             </fieldset>
           )}
@@ -269,19 +282,22 @@ export function ProofFeed({
             <fieldset className="proof-decide" aria-label="Your vote">
               {(
                 [
-                  ["accept", "✓", "Accept"],
-                  ["reject", "✕", "Reject"],
-                  ["cannot_assess", "–", "Can’t tell"],
+                  ["reject", "✕", "Reject", "decide-no"],
+                  ["cannot_assess", "–", "Can’t tell", "decide-skip"],
+                  ["accept", "✓", "Accept", "decide-yes"],
                 ] as const
-              ).map(([choice, mark, text]) => (
+              ).map(([choice, mark, text, tone]) => (
                 <button
                   type="button"
                   key={choice}
-                  className={choice === "accept" ? "decide-yes" : undefined}
+                  className={tone}
                   disabled={disabled}
                   onClick={() => void act(item, "vote", choice, "Vote saved.")}
                 >
-                  <span aria-hidden="true">{mark}</span> {text}
+                  <span className="decide-mark" aria-hidden="true">
+                    {mark}
+                  </span>
+                  {text}
                 </button>
               ))}
             </fieldset>

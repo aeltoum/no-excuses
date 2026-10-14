@@ -49,6 +49,11 @@ const item = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
+let answerReview = () => {};
+const releaseReview = new Promise<void>((resolve) => {
+  answerReview = resolve;
+});
+
 test("Home feed reviews, votes on, and reports friends' proof", async ({
   page,
 }, testInfo) => {
@@ -130,6 +135,8 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     const action = /^\/v1\/proof\/([^/]+)\/(\w+)$/.exec(path);
     if (action) {
       const choice = request.postDataJSON().choice;
+      // Like a cold API: the reply lags well behind the tap.
+      if (action[2] === "review") await releaseReview;
       actions.push(`${action[2]}:${choice}`);
       if (action[2] === "review")
         feed = feed.map((entry) =>
@@ -191,6 +198,10 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   });
 
   await page.getByRole("button", { name: "Verify" }).click();
+  // The choice disappears on tap, before the API answers.
+  await expect(page.getByRole("button", { name: "Verify" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Question" })).toHaveCount(0);
+  answerReview();
   await expect(page.getByRole("status")).toHaveText("Verified.");
   await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
   // A made choice takes its buttons with it.
