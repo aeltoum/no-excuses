@@ -148,28 +148,51 @@ export function ProofFeed({
       choice: string,
       done: string,
     ) => {
-      setBusy(item.workoutCheckinId);
-      // Hide the choice the instant it's tapped; a failure puts it back.
-      setDecided((ids) => new Set(ids).add(item.workoutCheckinId));
-      try {
-        await actOnProof(
-          apiBaseUrl,
-          token,
-          item.workoutCheckinId,
-          action,
-          choice,
+      const id = item.workoutCheckinId;
+      // Optimistic: show the outcome at once; a failure restores the post.
+      const instant = action === "review" || action === "vote";
+      const optimistic: ProofItem = !instant
+        ? item
+        : action === "vote"
+          ? {
+              ...item,
+              myVote: choice as ProofItem["myVote"],
+              acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
+              rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
+            }
+          : {
+              ...item,
+              reviewStatus: choice === "verify" ? "verified" : "questioned",
+            };
+      const swap = (next: ProofItem) =>
+        setItems((current) =>
+          current.map((entry) =>
+            entry.workoutCheckinId === id ? next : entry,
+          ),
         );
+      setBusy(id);
+      setDecided((ids) => new Set(ids).add(id));
+      const confirm = () => {
         if (action === "review" && choice === "verify") {
-          setStamped(item.workoutCheckinId);
+          setStamped(id);
           window.setTimeout(() => setStamped(null), 900);
         }
         setNotice({ kind: "success", text: done });
+      };
+      if (instant) {
+        swap(optimistic);
+        confirm();
+      }
+      try {
+        await actOnProof(apiBaseUrl, token, id, action, choice);
+        if (!instant) confirm();
       } catch (error) {
         setDecided((ids) => {
           const next = new Set(ids);
-          next.delete(item.workoutCheckinId);
+          next.delete(id);
           return next;
         });
+        swap(item);
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
         setNotice({
@@ -177,10 +200,10 @@ export function ProofFeed({
           text:
             error instanceof ApiError
               ? error.message
-              : "Action failed. Try again.",
+              : "Couldn’t save. Try again.",
         });
       } finally {
-        setBusy(null);
+        setBusy((current) => (current === id ? null : current));
         setReload((value) => value + 1);
       }
     },
@@ -200,7 +223,7 @@ export function ProofFeed({
   }
 
   const post = (item: ProofItem) => {
-    const disabled = busy !== null;
+    const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
     return (
       <li className="proof-post" key={item.workoutCheckinId}>
