@@ -9,6 +9,7 @@ import {
   WebAuthError,
 } from "./auth";
 import { PushToggle, unsubscribePush } from "./PushToggle";
+import { clearPersisted, persistentMap } from "./persist";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
@@ -123,7 +124,10 @@ export function App({
       return data.session.access_token;
     }),
   ).current;
-  const weeklyCache = useRef(new Map<string, WeeklySnapshot>()).current;
+  const weeklyCache = useRef(persistentMap<WeeklySnapshot>("weekly")).current;
+  const groupCache = useRef(
+    persistentMap<NonNullable<typeof groupRoster>>("group"),
+  ).current;
   // Last verified member on this device: reopen straight into the app and
   // verify in the background instead of blocking on network checks.
   const hint = useRef(readMemberHint()).current;
@@ -167,7 +171,7 @@ export function App({
     if (access === "signed-in") return;
     if (access !== "checking") pendingUser.current = null;
     if (access === "signed-out" || access === "revoked") writeMemberHint(null);
-    weeklyCache.clear();
+    clearPersisted();
     groupScope.current = "";
     groupRosterRef.current = null;
     displayNameScope.current = "";
@@ -175,7 +179,7 @@ export function App({
     setGroupRoster(null);
     setDisplayName("");
     setDisplayNameLoaded(false);
-  }, [access, weeklyCache]);
+  }, [access]);
   const [email, setEmail] = useState("");
   const [enrollmentToken, setEnrollmentToken] = useState("");
   const [code, setCode] = useState("");
@@ -473,6 +477,13 @@ export function App({
       return;
     let active = true;
     const scope = `${session.user.id}:${membership.groupId}:${membership.membershipId}`;
+    const stored = groupCache.get(scope);
+    if (groupScope.current !== scope && stored) {
+      groupScope.current = scope;
+      groupRosterRef.current = stored;
+      setGroupRoster(stored);
+      setGroupLoad("ready");
+    }
     const previousRoster = groupRosterRef.current;
     const hasCache = groupScope.current === scope && previousRoster !== null;
     if (!hasCache) {
@@ -492,6 +503,7 @@ export function App({
         ) {
           setGroupRoster(response.data);
           groupRosterRef.current = response.data;
+          groupCache.set(scope, response.data);
           if (hasCache) {
             setGroupChanged(true);
             window.clearTimeout(groupChangedTimer.current);
@@ -541,7 +553,16 @@ export function App({
       active = false;
       window.clearTimeout(groupChangedTimer.current);
     };
-  }, [access, api, groupRevision, membership, path, session, recheckAccess]);
+  }, [
+    access,
+    api,
+    groupCache,
+    groupRevision,
+    membership,
+    path,
+    session,
+    recheckAccess,
+  ]);
   useEffect(() => {
     if (codeSent) codeInputs.current[0]?.focus();
     else if (signInDoor) emailInput.current?.focus();

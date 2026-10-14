@@ -35,6 +35,8 @@ export class ApiError extends Error {
   }
 }
 
+export const requestTimeoutMs = 20_000;
+
 export function createApiClient(
   baseUrl: string,
   fetcher: typeof fetch = fetch,
@@ -70,8 +72,16 @@ export function createApiClient(
             command?.body === undefined
               ? undefined
               : JSON.stringify(command.body),
+          // A sleeping API host must surface as a retryable failure, never a hang.
+          signal: AbortSignal.timeout(requestTimeoutMs),
         });
-      response = await send();
+      try {
+        response = await send();
+      } catch (error) {
+        // Reads retry once: the first attempt often only wakes the host.
+        if (command) throw error;
+        response = await send();
+      }
       if (response.status === 401 && !command && getFreshToken) {
         const nextToken = await getFreshToken();
         if (nextToken !== accessToken) {

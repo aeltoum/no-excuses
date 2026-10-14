@@ -1,0 +1,18 @@
+name: Keep API warm
+
+# Render's free plan sleeps the API after 15 idle minutes and takes 30-60 s to
+# wake. A ping every 10 minutes keeps it up; one always-on service fits in the
+# plan's 750 free instance hours a month.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl --silent --show-error --max-time 90 --retry 2 "${{ vars.VITE_API_BASE_URL }}/v1/health"

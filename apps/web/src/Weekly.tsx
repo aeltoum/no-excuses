@@ -949,6 +949,7 @@ export function Weekly({
                   apiBaseUrl={apiBaseUrl}
                   token={token}
                   revision={feedRevision}
+                  cacheKey={cacheKey}
                   onRevoked={feedRevoked}
                   onItems={feedItems}
                 />
