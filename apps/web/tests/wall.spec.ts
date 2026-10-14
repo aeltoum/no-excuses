@@ -197,20 +197,22 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     path: testInfo.outputPath("wall-review.png"),
   });
 
-  await page.getByRole("button", { name: "Verify" }).click();
+  // Both posts carry a light box: the pending review first, then the vote.
+  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(1);
+  await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Good lift" }).first().click();
   // The choice disappears on tap, before the API answers.
-  await expect(page.getByRole("button", { name: "Verify" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Question" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
   answerReview();
-  await expect(page.getByRole("status")).toHaveText("Verified.");
+  await expect(page.getByRole("status")).toHaveText("Good lift. Verified.");
   await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
   // A made choice takes its buttons with it.
-  await expect(page.getByRole("button", { name: "Verify" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
-  await page.getByRole("button", { name: "Reject" }).click();
-  await expect(page.getByRole("status")).toHaveText("Vote saved.");
-  await expect(page.getByRole("button", { name: "Reject" })).toHaveCount(0);
+  await page.getByRole("button", { name: "No lift" }).click();
+  await expect(page.getByRole("status")).toHaveText("No lift. Vote saved.");
+  await expect(page.getByRole("button", { name: "No lift" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Report photos" }).first().click();
   await page
