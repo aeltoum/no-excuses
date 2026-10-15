@@ -919,7 +919,7 @@ const anyUuid = (value: unknown): value is string =>
   typeof value === "string" &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const consequenceAction =
-  /^\/v1\/consequences\/(redraw|select|claim|pause|resume|respond)$/;
+  /^\/v1\/consequences\/(redraw|select|claim|request_pause|vote_pause|resume|respond)$/;
 async function consequences(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });

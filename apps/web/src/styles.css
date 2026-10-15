@@ -2412,3 +2412,59 @@ body:has(.home-log-button) .result.event-notice {
     position: static;
   }
 }
+
+/* Log gate: an owed Consequence card racks the bar. The button wears a collar clamp
+   instead of the plus, and the sheet names the card standing between you and the log. */
+.home-log-button.is-locked {
+  border: 2px dashed var(--error);
+  background: var(--rubber);
+  color: var(--chalk);
+}
+.log-collar {
+  display: inline-block;
+  width: 10px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--error);
+  box-shadow:
+    -6px 0 0 -2px var(--bar-collar),
+    6px 0 0 -2px var(--bar-collar);
+  vertical-align: middle;
+}
+.log-lock {
+  display: grid;
+  gap: 16px;
+  padding-top: 4px;
+}
+.log-lock p {
+  margin: 0;
+}
+.log-lock-lede {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  max-width: 34ch;
+}
+.log-lock-card {
+  padding: 18px 16px 16px 20px;
+  border-left: 8px solid var(--error);
+  border-radius: 4px 8px 8px 4px;
+  background: var(--rubber);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: clamp(2rem, 9vw, 2.75rem);
+  font-weight: 900;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+}
+.log-lock-card-empty {
+  color: var(--muted);
+}
+.log-lock-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+  max-width: 44ch;
+}
+.consequences:focus-visible {
+  outline: 2px solid var(--chalk);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
