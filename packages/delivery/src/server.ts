@@ -125,8 +125,10 @@ async function query(
     const access = await client.query(
       "select app_private.actor_account_id() as id",
     );
+    // A token issued before the account's access cutoff (e.g. after removal)
+    // is stale, not forbidden: 401 makes the client sign in for a fresh one.
     if (!access.rows[0]?.id)
-      throw Object.assign(new Error("Access denied"), { code: "42501" });
+      throw Object.assign(new Error("Access denied"), { code: "28000" });
     const response = await client.query(sql, values);
     await client.query("commit");
     return response;
@@ -335,6 +337,7 @@ async function enroll(
 
 function dbError(error: unknown): ApiResponse {
   const code = (error as { code?: string }).code;
+  if (code === "28000") return fail("unauthorized", 401);
   if (code === "42501" || code === "P0002") return fail("denied", 403);
   if (code === "23505" || code === "23514")
     return fail("idempotency_conflict", 409);
