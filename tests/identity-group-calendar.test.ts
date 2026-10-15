@@ -431,6 +431,28 @@ describe("M2 identity, Group authority, and accountability calendar", () => {
     ]);
   });
 
+  it("gives a third member joining an active Group a reduced current-week target", async () => {
+    const db = await migratedDatabase();
+    await seedSetupGroup(db);
+    await authenticate(db, ids.peerAuth, "2026-03-05T18:00:00Z");
+    await db.query(`select app_private.accept_group_invitation(
+      '${digest}', '${ids.peerMembership}', 3, 2, '2026-03-05T18:00:00Z')`);
+    const thirdDigest = "b".repeat(64);
+    await db.exec(`insert into app_private.group_invitations
+      (invitation_id, group_id, email, token_digest, issued_by_membership_id, issued_at, expires_at)
+      values ('50000000-0000-4000-8000-000000000003', '${ids.group}', 'third@example.test',
+        '${thirdDigest}', '${ids.adminMembership}', '2026-03-05T19:00:00Z', '2026-03-12T19:00:00Z')`);
+    await authenticate(db, ids.thirdAuth, "2026-03-06T12:00:00Z");
+    await db.query(`select app_private.accept_group_invitation(
+      '${thirdDigest}', '${ids.thirdMembership}', 4, 1, '2026-03-06T12:00:00Z')`);
+    const progress = await db.query(`select membership_id, locked_target
+      from app_private.current_week_progress('${ids.group}', '2026-03-06T13:00:00Z')
+      where membership_id = '${ids.thirdMembership}'`);
+    expect(progress.rows).toEqual([
+      { membership_id: ids.thirdMembership, locked_target: 1 },
+    ]);
+  });
+
   it("keeps continuing member-weeks active when departure leaves two members", async () => {
     const db = await migratedDatabase();
     await seedSetupGroup(db);
