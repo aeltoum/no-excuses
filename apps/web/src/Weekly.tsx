@@ -6,7 +6,7 @@ import type {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
-import { Consequences } from "./Consequences";
+import { Consequences, type LogBlock } from "./Consequences";
 import { InstallPrompt } from "./InstallPrompt";
 import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
 import { Result, useNotice } from "./Result";
@@ -141,6 +141,8 @@ export function Weekly({
       }
     };
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [logBlock, setLogBlock] = useState<LogBlock>(null);
+  const [lockOpen, setLockOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
   const [logError, setLogError] = useState<string | null>(null);
@@ -552,6 +554,7 @@ export function Weekly({
                   onRevoked={feedRevoked}
                   onGroupOwed={setGroupOwed}
                   onAttention={setCardAttention}
+                  onLogBlock={setLogBlock}
                 />
               )}
               {own && progress.length > 1 && (
@@ -592,19 +595,73 @@ export function Weekly({
               {own && (
                 <>
                   <button
-                    className="home-log-button"
+                    className={`home-log-button${logBlock ? " is-locked" : ""}`}
                     type="button"
-                    aria-label="Log workout"
+                    aria-label={
+                      logBlock
+                        ? "Log workout, locked until your Consequence card is done"
+                        : "Log workout"
+                    }
                     onClick={(event) => {
                       event.currentTarget.focus();
-                      setSheetOpen(true);
+                      if (logBlock) setLockOpen(true);
+                      else setSheetOpen(true);
                     }}
                   >
-                    <span className="log-plus" aria-hidden="true">
-                      +
-                    </span>{" "}
+                    {logBlock ? (
+                      <span className="log-collar" aria-hidden="true" />
+                    ) : (
+                      <span className="log-plus" aria-hidden="true">
+                        +
+                      </span>
+                    )}{" "}
                     Log
                   </button>
+                  <Sheet
+                    open={lockOpen}
+                    title="Bar’s racked"
+                    onDismiss={() => setLockOpen(false)}
+                  >
+                    <div className="log-lock">
+                      <p className="log-lock-lede">
+                        Pay your Consequence card before you log another
+                        workout.
+                      </p>
+                      {logBlock?.title ? (
+                        <p className="log-lock-card">{logBlock.title}</p>
+                      ) : (
+                        <p className="log-lock-card log-lock-card-empty">
+                          Pick your card
+                        </p>
+                      )}
+                      <p className="log-lock-note">
+                        Tap “I did it” once it’s done. Logging unlocks the
+                        moment you submit, so you’re not stuck waiting on
+                        friends to approve.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLockOpen(false);
+                          requestAnimationFrame(() => {
+                            const cards =
+                              document.getElementById("consequence-cards");
+                            cards?.scrollIntoView({
+                              behavior: window.matchMedia(
+                                "(prefers-reduced-motion: reduce)",
+                              ).matches
+                                ? "auto"
+                                : "smooth",
+                              block: "center",
+                            });
+                            cards?.focus({ preventScroll: true });
+                          });
+                        }}
+                      >
+                        {logBlock?.title ? "Go to my card" : "Choose my card"}
+                      </button>
+                    </div>
+                  </Sheet>
                   <Sheet
                     open={sheetOpen}
                     title="Log a workout"
@@ -751,9 +808,12 @@ export function Weekly({
                             )
                               onRevoked();
                             setLogError(
-                              error instanceof ApiError
-                                ? error.message
-                                : "Workout could not be logged.",
+                              error instanceof ApiError &&
+                                error.kind === "denied"
+                                ? "Finish your Consequence card before logging workouts."
+                                : error instanceof ApiError
+                                  ? error.message
+                                  : "Workout could not be logged.",
                             );
                           })
                           .finally(() => setBusy(false));

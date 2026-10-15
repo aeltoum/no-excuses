@@ -21,6 +21,11 @@ export type ConsequenceHome = {
     expiresAt: string;
     approvals: number;
     approvalsNeeded: number;
+    pauseRequest: {
+      approvals: number;
+      rejections: number;
+      approvalsNeeded: number;
+    } | null;
   } | null;
   reviews: {
     claimId: string;
@@ -29,9 +34,25 @@ export type ConsequenceHome = {
     instructions: string;
     myResponse: string | null;
   }[];
+  pauseReviews: {
+    pauseRequestId: string;
+    memberName: string;
+    title: string;
+    myVote: "approve" | "reject" | null;
+  }[];
+  logBlocked: boolean;
   groupOwed: Record<string, number>;
 };
-type Action = "redraw" | "select" | "claim" | "pause" | "resume" | "respond";
+type Action =
+  | "redraw"
+  | "select"
+  | "claim"
+  | "request_pause"
+  | "vote_pause"
+  | "resume"
+  | "respond";
+// What blocks workout logging: the owed card's title, or null once proof is in.
+export type LogBlock = { title: string | null } | null;
 
 async function request(
   baseUrl: string,
@@ -61,7 +82,13 @@ async function request(
   const data = ((await response.json()) as { data?: unknown }).data;
   if (!data || typeof data !== "object" || !("owed" in data))
     throw new ApiError("failure", "Couldn’t load your cards.", true);
-  return data as ConsequenceHome;
+  // Older API builds omit the pause and log-gate fields.
+  const home = data as ConsequenceHome;
+  return {
+    ...home,
+    pauseReviews: home.pauseReviews ?? [],
+    logBlocked: home.logBlocked ?? false,
+  };
 }
 
 // The picker pops up on its own once per hand; afterwards it opens from Home.
@@ -121,12 +148,14 @@ export function Consequences({
   onRevoked,
   onGroupOwed,
   onAttention,
+  onLogBlock,
 }: {
   apiBaseUrl: string;
   token: string;
   onRevoked: () => void;
   onGroupOwed: (owed: Record<string, number>) => void;
   onAttention: (count: number) => void;
+  onLogBlock: (block: LogBlock) => void;
 }) {
   const [home, setHome] = useState<ConsequenceHome | null>(null);
   const [busy, setBusy] = useState(false);
@@ -176,9 +205,11 @@ export function Consequences({
     if (!home) return;
     onAttention(
       (home.offer ? 1 : 0) +
-        home.reviews.filter((review) => review.myResponse === null).length,
+        home.reviews.filter((review) => review.myResponse === null).length +
+        home.pauseReviews.filter((review) => review.myVote === null).length,
     );
-  }, [home, onAttention]);
+    onLogBlock(home.logBlocked ? { title: home.attempt?.title ?? null } : null);
+  }, [home, onAttention, onLogBlock]);
 
   const act = async (
     action: Action,
@@ -206,11 +237,22 @@ export function Consequences({
     }
   };
 
-  if (!home || (home.owed === 0 && home.reviews.length === 0)) return null;
+  if (
+    !home ||
+    (home.owed === 0 &&
+      home.reviews.length === 0 &&
+      home.pauseReviews.length === 0)
+  )
+    return null;
   const { offer, attempt } = home;
 
   return (
-    <section className="consequences" aria-label="Consequence cards">
+    <section
+      id="consequence-cards"
+      className="consequences"
+      aria-label="Consequence cards"
+      tabIndex={-1}
+    >
       {!(offer && picking) && <Result notice={notice} />}
       {confirmSheet}
       {home.owed > 0 && (
@@ -254,36 +296,46 @@ export function Consequences({
                 >
                   I did it
                 </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={async () => {
-                    if (
-                      await ask({
-                        title: "Pause this card?",
-                        body: "Pause it because you can’t do it safely right now. No reason needed. The deadline stops until you’re ready.",
-                        confirm: "Pause card",
-                      })
-                    )
-                      void act(
-                        "pause",
-                        attempt.attemptId,
-                        "",
-                        "Paused. Take care of yourself.",
-                      );
-                  }}
-                >
-                  Can’t do it safely
-                </button>
+                {!attempt.pauseRequest && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (
+                        await ask({
+                          title: "Request a pause?",
+                          body: "Your Group votes on it. Two friends must approve before the card pauses. The deadline keeps running until then.",
+                          confirm: "Request pause",
+                        })
+                      )
+                        void act(
+                          "request_pause",
+                          attempt.attemptId,
+                          "",
+                          "Pause requested. Waiting for friends to approve.",
+                        );
+                    }}
+                  >
+                    Request a pause
+                  </button>
+                )}
               </div>
+              {attempt.pauseRequest && (
+                <p className="owed-deadline">
+                  Pause requested: {attempt.pauseRequest.approvals} of{" "}
+                  {attempt.pauseRequest.approvalsNeeded} approvals. The deadline
+                  keeps running until it’s approved.
+                </p>
+              )}
             </>
           )}
           {attempt?.status === "safety_paused" && (
             <>
               <h2>{attempt.title}</h2>
               <p className="owed-deadline">
-                Paused for safety. When you’re ready you’ll get a fresh pick.
+                Paused with your Group’s approval. When you’re ready you’ll get
+                a fresh pick.
               </p>
               <button
                 type="button"
@@ -343,6 +395,46 @@ export function Consequences({
                         review.claimId,
                         choice,
                         "Response saved.",
+                      )
+                    }
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {home.pauseReviews.length > 0 && (
+        <ul className="card-reviews" aria-label="Pause requests to approve">
+          {home.pauseReviews.map((review) => (
+            <li key={review.pauseRequestId}>
+              <p>
+                <strong>{review.memberName}</strong> asked to pause{" "}
+                <strong>{review.title}</strong>
+              </p>
+              <div className="proof-actions">
+                {(
+                  [
+                    ["approve", "Approve pause"],
+                    ["reject", "Deny"],
+                  ] as const
+                ).map(([choice, text]) => (
+                  <button
+                    type="button"
+                    key={choice}
+                    aria-pressed={review.myVote === choice}
+                    className={
+                      choice === "approve" ? undefined : "secondary-button"
+                    }
+                    disabled={busy || review.myVote !== null}
+                    onClick={() =>
+                      void act(
+                        "vote_pause",
+                        review.pauseRequestId,
+                        choice,
+                        "Vote saved.",
                       )
                     }
                   >

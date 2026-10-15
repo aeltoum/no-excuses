@@ -36,8 +36,11 @@ type Home = {
     expiresAt: string;
     approvals: number;
     approvalsNeeded: number;
+    pauseRequest?: { approvals: number; approvalsNeeded: number } | null;
   } | null;
   reviews: { claimId: string; memberName: string; title: string }[];
+  pauseReviews: { pauseRequestId: string; memberName: string }[];
+  logBlocked: boolean;
   groupOwed: Record<string, number>;
 };
 
@@ -146,6 +149,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
       expiresAt: "2026-03-11T01:00:00+00:00",
     });
 
+    expect(selected.logBlocked).toBe(true);
     const attemptId = selected.attempt?.attemptId as string;
     const claimed = await command(db, 0, "claim", attemptId);
     expect(claimed.attempt).toMatchObject({
@@ -153,6 +157,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
       approvals: 0,
       approvalsNeeded: 2,
     });
+    expect(claimed.logBlocked).toBe(false);
     const peer = await home(db, 1);
     expect(peer.reviews).toMatchObject([
       { memberName: "Alex", title: picked?.title },
@@ -166,6 +171,33 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     expect(done.owed).toBe(1);
     expect(done.attempt).toBeNull();
     expect(done.offer?.canRedraw).toBe(true);
+    expect(done.logBlocked).toBe(true);
+  });
+
+  it("denies a pause request once enough members reject it", async () => {
+    const db = await database();
+    await owe(db);
+    await advance(db, "2026-03-09T00:30Z");
+    const offer = (await home(db, 0)).offer;
+    const attemptId = (
+      await command(
+        db,
+        0,
+        "select",
+        offer?.offerId as string,
+        offer?.cards[0]?.cardId,
+      )
+    ).attempt?.attemptId as string;
+    await command(db, 0, "request_pause", attemptId);
+    const requestId = (await home(db, 1)).pauseReviews[0]
+      ?.pauseRequestId as string;
+    await command(db, 1, "vote_pause", requestId, "reject");
+    await command(db, 2, "vote_pause", requestId, "reject");
+    const after = await home(db, 0);
+    expect(after.attempt?.status).toBe("active");
+    expect(after.attempt?.pauseRequest).toBeNull();
+    expect(after.logBlocked).toBe(true);
+    expect((await home(db, 1)).pauseReviews).toEqual([]);
   });
 
   it("adds another owed card when the 48-hour deadline passes", async () => {
@@ -205,7 +237,26 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
         offer?.cards[0]?.cardId,
       )
     ).attempt?.attemptId as string;
-    await command(db, 0, "pause", attemptId);
+    await expect(command(db, 0, "pause", attemptId)).rejects.toThrow(
+      "Consequence action unavailable",
+    );
+    const requested = await command(db, 0, "request_pause", attemptId);
+    expect(requested.attempt).toMatchObject({
+      status: "active",
+      pauseRequest: { approvals: 0, approvalsNeeded: 2 },
+    });
+    const peer = await home(db, 1);
+    expect(peer.pauseReviews).toMatchObject([{ memberName: "Alex" }]);
+    const requestId = peer.pauseReviews[0]?.pauseRequestId as string;
+    await expect(
+      command(db, 0, "vote_pause", requestId, "approve"),
+    ).rejects.toThrow("Consequence action unavailable");
+    await command(db, 1, "vote_pause", requestId, "approve");
+    expect((await home(db, 0)).attempt?.status).toBe("active");
+    await command(db, 2, "vote_pause", requestId, "approve");
+    const paused = await home(db, 0);
+    expect(paused.attempt?.status).toBe("safety_paused");
+    expect(paused.logBlocked).toBe(false);
     await advance(db, "2026-03-20Z");
     expect((await home(db, 0, "2026-03-20Z")).owed).toBe(1);
     const resumed = await command(
