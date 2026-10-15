@@ -323,6 +323,7 @@ const weeklyLoop = async (
         reviews: [],
         groupOwed: {},
       });
+    if (path === "/v1/nudges") return respond([]);
     if (path === "/v1/proof/feed") {
       feedLoads++;
       return respond([]);

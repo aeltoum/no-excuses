@@ -22,7 +22,12 @@ export type ProofItem = {
   canVote: boolean;
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
+  reactions: Partial<Record<Reaction, number>>;
+  myReaction: Reaction | null;
 };
+
+export const reactionKinds = ["strong", "fire", "cheer"] as const;
+export type Reaction = (typeof reactionKinds)[number];
 
 export type ProofAction =
   | "review"
@@ -83,6 +88,30 @@ export const actOnProof = (
   call<{ status: string }>(baseUrl, token, `/v1/proof/${id}/${action}`, {
     method: "POST",
     body: { choice },
+  });
+
+export const reactToProof = (
+  baseUrl: string,
+  token: string,
+  id: string,
+  reaction: Reaction | null,
+) =>
+  call<{ reaction: Reaction | null }>(baseUrl, token, `/v1/proof/${id}/react`, {
+    method: "POST",
+    body: { reaction },
+  });
+
+export const loadNudged = (baseUrl: string, token: string) =>
+  call<string[]>(baseUrl, token, "/v1/nudges", { method: "GET" });
+
+export const nudgeMember = (
+  baseUrl: string,
+  token: string,
+  membershipId: string,
+) =>
+  call<{ membershipId: string }>(baseUrl, token, "/v1/nudges", {
+    method: "POST",
+    body: { membershipId },
   });
 
 // Re-encoding through a canvas strips EXIF (including location) and bounds the upload size.

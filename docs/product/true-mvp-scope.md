@@ -71,7 +71,8 @@ Excluded means deferred, not rejected.
 
 ## Activated deferred slices
 
-Owner approval on 2026-10-13 activated three deferred slices on the live PWA. Their
+Owner approval on 2026-10-13 activated three deferred slices, and approval on 2026-10-15
+activated lightweight reactions and nudges on the live PWA. Their
 behavior is now active scope; the excluded list below applies only to what these slices
 leave out.
 
@@ -80,6 +81,7 @@ leave out.
 | Notifications | Web Push for a friend's check-in or proof to review, a last-24-hours reminder when under target, weekly Met/Missed, questioned-report votes and outcomes, new Card offers, 12 hours left on a card, and friends' card claims. | Push only; no digests, email, or in-app notification center. iPhone delivery requires a Home Screen install, so Home shows an install tip on iPhone Safari. | #215 |
 | Proof photos and peer verification (lean v1) | Every check-in carries one camera Activity photo and one Member-presence photo with media-sharing consent. Verified after one other member verifies or 24 unquestioned hours; Questioned goes to a 48-hour strict-majority Group decision; Rejected owes a Consequence card; Unsupported does not count. Only Verified completions settle a week, and settlement waits for open reviews. Home is the proof feed; Verified proof stays 90 days. | Photo required on every check-in; live camera capture, re-encoded on device to strip metadata. Report-only moderation: a report hides the pair until the Group admin restores or removes it; no automated screening. Timed Workout sessions, multi-capture selection, descriptions, and appeals remain deferred. | #216 |
 | Consequence system | Missed weeks and Rejected reports owe cards (backlog cap 5). The member is dealt three cards, may reroll the hand once, has 48 hours after locking one in, and two other members approve the claim. Missed deadlines owe another card; a safety pause stops the deadline. Owed counts are Group-visible. | Catalog release 2: 14 heavy physical cards with no lower-impact variant. Obligations recorded before cards were playable were waived at launch. | #215, #217 |
+| Lightweight reactions and nudges | Members react to other members' proof with one of strong, fire, or cheer (one changeable reaction per member per post; counts are Group-visible) and nudge a member who is behind their current weekly target, once per sender, recipient, and UTC day. Each sends an Immediate social push to the recipient only: the first at once, later ones within 15 minutes bundled, at most three social pushes per rolling day; extra items stay in-app. | Reactions do not verify proof. Free-text motivational messages, playful responses, the daily Social and competition digest, separate social push controls, and Blocking remain deferred. | Slice 1 |
 
 ## Deferred-feature preservation rule
 
@@ -131,7 +133,7 @@ deferred labels or references instead.
 
 Likely slices, ordered by learning value rather than commitment:
 
-1. Lightweight reactions/reminders.
+1. Lightweight reactions/reminders. (Active: reactions and nudges.)
 2. Streaks and richer weekly history.
 3. Exceptions.
 4. Proof photos and Wall, with required safety/privacy/media lifecycle. (Active, lean v1.)

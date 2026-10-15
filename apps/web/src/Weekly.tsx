@@ -8,7 +8,13 @@ import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
 import { InstallPrompt } from "./InstallPrompt";
-import { compressPhoto, type ProofItem, uploadProofPhoto } from "./proof";
+import {
+  compressPhoto,
+  loadNudged,
+  nudgeMember,
+  type ProofItem,
+  uploadProofPhoto,
+} from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
@@ -65,6 +71,7 @@ export function Weekly({
   const changedTimer = useRef<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useNotice();
+  const [nudged, setNudged] = useState<ReadonlySet<string>>(new Set());
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
   const [target, setTarget] = useState(
@@ -241,6 +248,46 @@ export function Weekly({
       window.clearTimeout(changedTimer.current);
     };
   }, [api, token, groupId, route, retry, cache, cacheKey, setNotice]);
+  // Only fetch who was nudged when some friend is still behind target.
+  const nudgeable = progress.some(
+    (item) =>
+      item.membershipId !== membership?.membershipId &&
+      item.completedWorkoutCount < item.lockedTarget,
+  );
+  useEffect(() => {
+    if (route !== "/home" || !groupId || !nudgeable) return;
+    let active = true;
+    loadNudged(apiBaseUrl, token)
+      .then((ids) => active && setNudged(new Set(ids)))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [apiBaseUrl, token, route, groupId, nudgeable]);
+  const nudge = async (membershipId: string) => {
+    setNudged((ids) => new Set(ids).add(membershipId));
+    try {
+      await nudgeMember(apiBaseUrl, token, membershipId);
+      setNotice({ kind: "success", text: "Nudge sent." });
+    } catch (error) {
+      // Already nudged today (409) still counts as sent.
+      if (error instanceof ApiError && error.kind === "conflict") return;
+      setNudged((ids) => {
+        const next = new Set(ids);
+        next.delete(membershipId);
+        return next;
+      });
+      if (error instanceof ApiError && error.kind === "unauthorized")
+        onRevoked();
+      setNotice({
+        kind: "error",
+        text:
+          error instanceof ApiError
+            ? error.message
+            : "Couldn’t nudge. Try again.",
+      });
+    }
+  };
   const refresh = () => {
     setNotice(null);
     setRefreshWarning(false);
@@ -588,6 +635,23 @@ export function Weekly({
                             : ""}
                           {awaitingReview.has(item.membershipId) && " · review"}
                         </span>
+                        {item.completedWorkoutCount < item.lockedTarget && (
+                          <button
+                            type="button"
+                            className="secondary-button friend-nudge"
+                            disabled={nudged.has(item.membershipId)}
+                            aria-label={
+                              nudged.has(item.membershipId)
+                                ? `Nudged ${item.displayName} today`
+                                : `Nudge ${item.displayName}`
+                            }
+                            onClick={() => void nudge(item.membershipId)}
+                          >
+                            {nudged.has(item.membershipId)
+                              ? "Nudged ✓"
+                              : "Nudge"}
+                          </button>
+                        )}
                       </li>
                     ))}
                 </ul>
