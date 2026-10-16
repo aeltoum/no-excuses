@@ -202,7 +202,17 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     expect(today).toEqual([memberships[1]]);
   });
 
-  it("pushes the recipient at once, bundles within 15 minutes, caps at three a day", async () => {
+  it("nudges a member whose only report was rejected", async () => {
+    const db = await database();
+    const id = await submit(db, 2);
+    await db.query(
+      "update app_private.workout_checkins set review_status = 'rejected' where workout_checkin_id = $1",
+      [id],
+    );
+    await nudge(db, 0, 2);
+  });
+
+  it("pushes the recipient at once, bundles within 15 minutes, with no daily cap", async () => {
     const db = await database();
     await subscribe(db, 0);
     const id = await submit(db, 0);
@@ -230,6 +240,6 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     await social(db, "2026-03-05T11:40Z");
     await react(db, 2, second, "🔥");
     await social(db, "2026-03-05T12:00Z");
-    expect(await outbox(db, 0)).toHaveLength(3);
+    expect(await outbox(db, 0)).toHaveLength(4);
   });
 });
