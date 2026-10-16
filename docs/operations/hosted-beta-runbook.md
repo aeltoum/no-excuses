@@ -24,6 +24,15 @@ pnpm exec supabase migration list --linked
 unset SUPABASE_ACCESS_TOKEN
 ```
 
+After first provisioning, every push to `main` runs `.github/workflows/deploy.yml`: a dry run
+lists pending migrations, then the `migrate` job waits for owner approval in the `production`
+GitHub environment before applying them. The web deploy follows the migration, and Render
+deploys the API only after this commit's checks pass. Setup once: create the `production`
+environment with the owner as required reviewer, and store the hosted Postgres connection
+string (Supabase **Connect** → session pooler URI with the database password) as the secret
+`SUPABASE_DB_URL`. Approve only when the dry run lists committed forward migrations alone. The
+manual commands above remain the first-provisioning and recovery path.
+
 Review dry-run output: only committed forward migrations may appear. Stop on unexpected remote
 history, destructive SQL, or target mismatch. Never run `db:reset`, `db:test:postgres`,
 `db:test:pwa-settlement`, fixtures, or migration tests against hosted database.
