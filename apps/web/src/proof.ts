@@ -22,12 +22,13 @@ export type ProofItem = {
   canVote: boolean;
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
-  reactions: Partial<Record<Reaction, number>>;
-  myReaction: Reaction | null;
+  reactions: ReactionCount[];
+  myReactions: string[];
 };
 
-export const reactionKinds = ["strong", "fire", "cheer"] as const;
-export type Reaction = (typeof reactionKinds)[number];
+export type ReactionCount = { emoji: string; count: number };
+// Members may leave up to this many distinct emoji on one post.
+export const reactionLimit = 6;
 
 export type ProofAction =
   | "review"
@@ -94,12 +95,15 @@ export const reactToProof = (
   baseUrl: string,
   token: string,
   id: string,
-  reaction: Reaction | null,
+  emoji: string,
+  on: boolean,
 ) =>
-  call<{ reaction: Reaction | null }>(baseUrl, token, `/v1/proof/${id}/react`, {
-    method: "POST",
-    body: { reaction },
-  });
+  call<{ emoji: string; on: boolean }>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/react`,
+    { method: "POST", body: { emoji, on } },
+  );
 
 export const loadNudged = (baseUrl: string, token: string) =>
   call<string[]>(baseUrl, token, "/v1/nudges", { method: "GET" });

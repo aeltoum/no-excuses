@@ -7,10 +7,9 @@ import {
   loadProofFeed,
   type ProofAction,
   type ProofItem,
-  type Reaction,
-  reactionKinds,
   reactToProof,
 } from "./proof";
+import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
@@ -61,11 +60,9 @@ const cachedFeed = (cacheKey: string) =>
       : null,
   }));
 
-const reactionEmoji: Record<Reaction, string> = {
-  strong: "💪",
-  fire: "🔥",
-  cheer: "👏",
-};
+// Feeds cached before custom reactions held a preset-keyed object.
+const reactionList = (item: ProofItem) =>
+  Array.isArray(item.reactions) ? item.reactions : [];
 
 const label = (value: string) => value[0]?.toUpperCase() + value.slice(1);
 const remaining = (until: string | null) => {
@@ -219,24 +216,44 @@ export function ProofFeed({
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
-  // Optimistic: the tap shows at once; a failure restores the previous reaction.
+  // Optimistic: the tap shows at once; a failure undoes just that emoji.
   const react = useCallback(
-    async (item: ProofItem, reaction: Reaction) => {
+    async (item: ProofItem, emoji: string, on: boolean) => {
       const id = item.workoutCheckinId;
-      const next = item.myReaction === reaction ? null : reaction;
-      const counts = { ...item.reactions };
-      if (item.myReaction)
-        counts[item.myReaction] = (counts[item.myReaction] ?? 1) - 1;
-      if (next) counts[next] = (counts[next] ?? 0) + 1;
-      const swap = (entry: ProofItem) =>
-        setItems((current) =>
-          current.map((post) => (post.workoutCheckinId === id ? entry : post)),
+      const apply = (post: ProofItem, add: boolean): ProofItem => {
+        const step = add ? 1 : -1;
+        const listed = reactionList(post).some(
+          (entry) => entry.emoji === emoji,
         );
-      swap({ ...item, reactions: counts, myReaction: next });
+        const reactions = (
+          listed
+            ? reactionList(post).map((entry) =>
+                entry.emoji === emoji
+                  ? { ...entry, count: entry.count + step }
+                  : entry,
+              )
+            : [...reactionList(post), { emoji, count: 1 }]
+        ).filter((entry) => entry.count > 0);
+        const mine = post.myReactions ?? [];
+        return {
+          ...post,
+          reactions,
+          myReactions: add
+            ? [...mine, emoji]
+            : mine.filter((entry) => entry !== emoji),
+        };
+      };
+      const update = (add: boolean) =>
+        setItems((current) =>
+          current.map((post) =>
+            post.workoutCheckinId === id ? apply(post, add) : post,
+          ),
+        );
+      update(on);
       try {
-        await reactToProof(apiBaseUrl, token, id, next);
+        await reactToProof(apiBaseUrl, token, id, emoji, on);
       } catch (error) {
-        swap(item);
+        update(!on);
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
         setNotice({
@@ -354,36 +371,14 @@ export function ProofFeed({
             </button>
           </fieldset>
         )}
-        {!item.hidden &&
-          (!item.mine ||
-            Object.values(item.reactions ?? {}).some((n) => n > 0)) && (
-            <fieldset className="proof-reactions" aria-label="Reactions">
-              {reactionKinds.map((kind) => {
-                const count = item.reactions?.[kind] ?? 0;
-                return item.mine ? (
-                  count > 0 && (
-                    <span key={kind} className="proof-reaction">
-                      <span aria-hidden="true">{reactionEmoji[kind]}</span>{" "}
-                      {count}
-                      <span className="visually-hidden"> {kind}</span>
-                    </span>
-                  )
-                ) : (
-                  <button
-                    key={kind}
-                    type="button"
-                    className="proof-reaction"
-                    aria-pressed={item.myReaction === kind}
-                    aria-label={`${label(kind)}${count ? `, ${count}` : ""}`}
-                    onClick={() => void react(item, kind)}
-                  >
-                    <span aria-hidden="true">{reactionEmoji[kind]}</span>
-                    {count > 0 && <span aria-hidden="true"> {count}</span>}
-                  </button>
-                );
-              })}
-            </fieldset>
-          )}
+        {!item.hidden && (!item.mine || reactionList(item).length > 0) && (
+          <Reactions
+            reactions={reactionList(item)}
+            mine={item.myReactions ?? []}
+            readOnly={item.mine}
+            onToggle={(emoji, on) => void react(item, emoji, on)}
+          />
+        )}
         {item.reviewStatus === "questioned" && (
           <p className="proof-tally">
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}
