@@ -190,6 +190,51 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await add.click();
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
+  // The page behind an open sheet stays put.
+  await add.click();
+  await expect(sheet).toBeVisible();
+  const scrollY = await page.evaluate(() => window.scrollY);
+  expect(scrollY).toBeGreaterThan(0);
+  await page.mouse.move(195, 40);
+  await page.mouse.wheel(0, 600);
+  await page.keyboard.press("PageDown");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+  // Category tabs are line icons with names; a horizontal swipe changes tab.
+  const tabs = sheet.getByRole("tablist", { name: "Categories" });
+  await expect(tabs.getByRole("tab")).toHaveCount(9);
+  await expect(tabs).toHaveText("", { useInnerText: true });
+  const smileys = tabs.getByRole("tab", { name: "Smileys and emoticons" });
+  const people = tabs.getByRole("tab", { name: "People and body" });
+  await expect(smileys).toHaveAttribute("aria-selected", "true");
+  const box = (locator: typeof tabs) =>
+    locator
+      .boundingBox()
+      .then((value) => value ?? { x: 0, y: 0, width: 0, height: 0 });
+  const navBox = await box(tabs);
+  const lastBox = await box(tabs.getByRole("tab").last());
+  expect(lastBox.width).toBeGreaterThan(0);
+  expect(lastBox.x + lastBox.width).toBeLessThanOrEqual(
+    navBox.x + navBox.width + 1,
+  );
+  const grid = await box(sheet.getByRole("tabpanel"));
+  const swipe = async (from: number, to: number) => {
+    const y = grid.y + grid.height / 2;
+    await page.mouse.move(grid.x + from, y);
+    await page.mouse.down();
+    await page.mouse.move(grid.x + to, y + 8, { steps: 5 });
+    await page.mouse.up();
+  };
+  await swipe(250, 100);
+  await expect(people).toHaveAttribute("aria-selected", "true");
+  await swipe(100, 250);
+  await expect(smileys).toHaveAttribute("aria-selected", "true");
+  await swipe(100, 250);
+  await expect(smileys).toHaveAttribute("aria-selected", "true");
+  await page.screenshot({ path: testInfo.outputPath("reactions-sheet.png") });
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(add).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
   await add.click();
   await sheet.getByRole("combobox", { name: "Search" }).fill("kenya");
   await sheet.getByRole("option", { name: /Kenya/ }).click();

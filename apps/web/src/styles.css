@@ -866,6 +866,7 @@ button:disabled {
   width: min(100%, 560px);
   max-height: min(90dvh, 760px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
   border: 1px solid var(--rule);
   border-bottom: 0;
