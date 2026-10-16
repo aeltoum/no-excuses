@@ -790,7 +790,9 @@ async function push(request: Request): Promise<Response> {
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
-const reactionKinds = ["strong", "fire", "cheer"];
+// One standard emoji, including skin tones, flags, and joined sequences.
+const singleEmoji =
+  /^(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*(?:\u200D\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*)*)$/u;
 async function proof(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });
@@ -889,25 +891,30 @@ async function proof(request: Request, path: string): Promise<Response> {
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
               urls.get(row.presence_photo_path as string) ?? null,
-            reactions: reactions.get(row.workout_checkin_id)?.counts ?? {},
-            myReaction:
-              reactions.get(row.workout_checkin_id)?.my_reaction ?? null,
+            reactions: reactions.get(row.workout_checkin_id)?.counts ?? [],
+            myReactions:
+              reactions.get(row.workout_checkin_id)?.my_reactions ?? [],
           })),
         ),
       );
     }
     const reacted = proofReaction.exec(path);
     if (reacted && request.method === "POST") {
-      const reaction = body.reaction ?? null;
-      if (reaction !== null && !reactionKinds.includes(String(reaction)))
+      const { emoji, on } = body;
+      if (
+        typeof emoji !== "string" ||
+        !singleEmoji.test(emoji) ||
+        typeof on !== "boolean"
+      )
         return reply(fail("invalid_request", 400));
-      await query(actor, "select app_private.react_to_proof($1,$2,$3)", [
+      await query(actor, "select app_private.react_to_proof($1,$2,$3,$4)", [
         reacted[1],
-        reaction,
+        emoji,
+        on,
         now,
       ]);
-      setImmediate(() => void deliverPush());
-      return reply(ok({ workoutCheckinId: reacted[1], reaction }));
+      if (on) setImmediate(() => void deliverPush());
+      return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
     }
     const match = proofAction.exec(path);
     if (match && request.method === "POST") {

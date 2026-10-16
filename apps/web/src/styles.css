@@ -2469,17 +2469,24 @@ body:has(.home-log-button) .result.event-notice {
   border-radius: 8px;
 }
 
-/* Reactions under each proof post: quiet chips; the viewer's own pick fills yellow. */
+/* Reactions under each proof post: quiet chips; the viewer's own picks fill yellow.
+   The add chip opens a tray of gym-floor picks plus a field for any emoji. */
+.proof-reactions-wrap {
+  position: relative;
+}
 .proof-reactions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0;
   padding: 0;
   border: 0;
 }
-.proof-reaction {
+.proof-reactions .proof-reaction {
   display: inline-flex;
+  gap: 6px;
   align-items: center;
+  justify-content: center;
   width: auto;
   min-width: 44px;
   min-height: 36px;
@@ -2492,9 +2499,99 @@ body:has(.home-log-button) .result.event-notice {
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
-.proof-reaction[aria-pressed="true"] {
+.proof-reaction-count {
+  font-weight: 600;
+}
+.proof-reactions .proof-reaction[aria-pressed="true"] {
   border-color: var(--class);
   background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+.proof-reactions .proof-reaction-add {
+  padding: 0 10px;
+  border-style: dashed;
+  border-color: var(--empty-slot);
+  background: transparent;
+  color: var(--muted);
+}
+.proof-reactions .proof-reaction-add[aria-expanded="true"] {
+  border-style: solid;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.reaction-tray {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(100%, 340px);
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--class);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  animation: tray-rise 140ms ease-out;
+}
+@keyframes tray-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-tray {
+    animation: none;
+  }
+}
+.reaction-tray-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.reaction-tray .reaction-tray-grid button {
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.reaction-tray .reaction-tray-grid button:hover {
+  background: var(--rubber);
+}
+.reaction-tray .reaction-tray-grid button[aria-pressed="true"] {
+  border-color: var(--class);
+  background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+.reaction-tray .reaction-tray-custom {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.reaction-tray-custom label {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.reaction-tray .reaction-tray-custom input {
+  min-height: 40px;
+  font-size: 1.1rem;
+}
+.reaction-tray .reaction-tray-custom button {
+  width: auto;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 14px;
+  white-space: nowrap;
 }
 .friend-nudge {
   width: 100%;

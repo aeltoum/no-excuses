@@ -46,8 +46,8 @@ const item = (overrides: Record<string, unknown>) => ({
   canVote: false,
   activityPhotoUrl: photo,
   presencePhotoUrl: photo,
-  reactions: {},
-  myReaction: null,
+  reactions: [],
+  myReactions: [],
   ...overrides,
 });
 
@@ -107,7 +107,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
         item({
           reviewStatus: "verified",
           canReview: false,
-          reactions: { fire: 2 },
+          reactions: [{ emoji: "🔥", count: 2 }],
         }),
         item({
           workoutCheckinId: questionedId,
@@ -116,7 +116,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
           mine: true,
           reviewStatus: "verified",
           canReview: false,
-          reactions: { strong: 1 },
+          reactions: [{ emoji: "💪", count: 1 }],
         }),
       ]);
     if (path === "/v1/consequences")
@@ -137,8 +137,9 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
         failNextReaction = false;
         return route.fulfill({ status: 500, json: {} });
       }
-      calls.push(`react:${request.postDataJSON().reaction}`);
-      return ok({ reaction: request.postDataJSON().reaction });
+      const { emoji, on } = request.postDataJSON();
+      calls.push(`react:${emoji}:${on}`);
+      return ok({ emoji, on });
     }
     return route.fulfill({ status: 404, json: {} });
   });
@@ -151,12 +152,13 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
-  // Own proof shows counts only; friends' proof offers the three reactions.
+  // Own proof shows counts only; friends' proof takes any emoji, several at once.
   const reactions = page.getByRole("group", { name: "Reactions" });
   await expect(reactions).toHaveCount(2);
   await expect(reactions.nth(1).getByRole("button")).toHaveCount(0);
-  await expect(reactions.nth(1)).toContainText("1");
-  const fire = reactions.first().getByRole("button", { name: "Fire, 2" });
+  await expect(reactions.nth(1)).toContainText("💪1");
+  const friend = reactions.first();
+  const fire = friend.getByRole("button", { name: "🔥, 2" });
   await expect(fire).toHaveAttribute("aria-pressed", "false");
   // A failed reaction rolls back.
   await fire.click();
@@ -165,16 +167,40 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   );
   await expect(fire).toHaveAttribute("aria-pressed", "false");
   await fire.click();
-  const pressed = reactions.first().getByRole("button", { name: "Fire, 3" });
-  await expect(pressed).toHaveAttribute("aria-pressed", "true");
-  // Switching moves the viewer's single reaction.
-  await reactions.first().getByRole("button", { name: "Strong" }).click();
-  await expect(
-    reactions.first().getByRole("button", { name: "Strong, 1" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    reactions.first().getByRole("button", { name: "Fire, 2" }),
-  ).toHaveAttribute("aria-pressed", "false");
+  await expect(friend.getByRole("button", { name: "🔥, 3" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  // The tray adds a quick pick alongside the existing reaction.
+  const add = friend.getByRole("button", { name: "Add reaction" });
+  await add.click();
+  const tray = page.getByRole("group", { name: "Pick a reaction" });
+  await tray.getByRole("button", { name: "React 🦍" }).click();
+  await expect(tray).toHaveCount(0);
+  await expect(friend.getByRole("button", { name: "🦍, 1" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(friend.getByRole("button", { name: "🔥, 3" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  // Any emoji typed in the tray works too; Escape closes it.
+  await add.click();
+  await expect(tray.getByRole("button", { name: "React 💪" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(tray).toHaveCount(0);
+  await expect(add).toBeFocused();
+  await add.click();
+  await tray.getByLabel("Any emoji").fill("🇰🇪");
+  await tray.getByRole("button", { name: "React 🇰🇪" }).click();
+  // Tapping your own emoji takes it back.
+  await friend.getByRole("button", { name: "🔥, 3" }).click();
+  await expect(friend.getByRole("button", { name: "🔥, 2" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(friend.getByRole("button", { name: "🇰🇪, 1" })).toBeVisible();
 
   // Only members behind target can be nudged, once.
   const friends = page.getByRole("list", { name: "Friends this week" });
@@ -187,8 +213,10 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     friends.getByRole("button", { name: "Nudged Maya today" }),
   ).toBeDisabled();
   expect(calls).toEqual([
-    "react:fire",
-    "react:strong",
+    "react:🔥:true",
+    "react:🦍:true",
+    "react:🇰🇪:true",
+    "react:🔥:false",
     `nudge:${friendMembershipId}`,
   ]);
   expect(
