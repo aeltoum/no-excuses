@@ -9,6 +9,9 @@ Record final Cloudflare, Render, and Supabase URLs plus deployed Git commit in r
 Use provider subdomains. Substitute final assigned URLs consistently if requested names are
 unavailable.
 
+For subsequent `main` releases, use [production releases](production-release.md). GitHub
+coordinates migrations, Render, and Cloudflare Pages. The steps below provision the initial beta.
+
 ## 1. Supabase and migrations
 
 Create one Free project in AWS `us-east-1` (North Virginia). Save its project ref and database
@@ -52,7 +55,7 @@ to Supabase default SMTP.
 ## 3. Render API
 
 Create Blueprint from repository `render.yaml`. Confirm one web service only: Free plan, Virginia,
-Node `24.19.0`, configured build/start commands, `/v1/health`, checks-passed auto-deploy. Do not add
+Node `24.19.0`, configured build/start commands, `/v1/health`, and Auto-Deploy Off. GitHub triggers exact-commit API releases after migrations. Do not add
 a Render database, disk, worker, cron job, or paid feature.
 
 Set these Render environment values:
@@ -72,7 +75,10 @@ exactly `PWA_ORIGIN`; preview deployments must use synthetic data and a non-prod
 
 ## 4. Cloudflare Pages
 
-Create one Pages Free project from repository. Use repository root as build root, command
+Create one Pages Free project. For ongoing production releases, use the GitHub Actions direct
+upload workflow described in [production releases](production-release.md). Disable any
+independent Cloudflare Git production build so it cannot publish before the API. For an initial
+build, use repository root as build root, command
 `pnpm install --frozen-lockfile && pnpm --filter @no-excuses/web build`, and output directory
 `apps/web/dist`. `_redirects` is copied into build output and rewrites direct SPA routes to
 `index.html`.

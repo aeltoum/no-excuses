@@ -82,6 +82,8 @@ override and reviewed digest.
 - Open a pull request before merging into `main`.
 - Record durable project guidance in this repository instead of relying on chat history.
 
+Production release ordering and one-time provider setup: [production releases](docs/operations/production-release.md).
+
 ## Work from another device
 
 Clone once:

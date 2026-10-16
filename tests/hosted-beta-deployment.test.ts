@@ -25,7 +25,7 @@ describe("hosted beta deployment configuration", () => {
       "startCommand: node dist/api/delivery/src/server.js",
     );
     expect(blueprint).toContain("healthCheckPath: /v1/health");
-    expect(blueprint).toContain("autoDeployTrigger: checksPass");
+    expect(blueprint).toContain("autoDeployTrigger: 'off'");
 
     for (const key of [
       "DATABASE_URL",
