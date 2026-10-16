@@ -26,6 +26,7 @@ irreversible-action confirmations, or sequences where terse fragments risk misin
 - Keep commits focused.
 - Open a pull request into `main`.
 - Do not rewrite shared branch history.
+- Do not add Claude session links (`claude.ai/code/session_…`) to commit messages or pull request descriptions.
 
 ## Agent skills
 
