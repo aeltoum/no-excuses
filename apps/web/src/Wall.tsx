@@ -5,6 +5,7 @@ import { persistentMap } from "./persist";
 import {
   actOnProof,
   loadProofFeed,
+  loadReactors,
   type ProofAction,
   type ProofItem,
   reactToProof,
@@ -377,6 +378,9 @@ export function ProofFeed({
             mine={item.myReactions ?? []}
             readOnly={item.mine}
             onToggle={(emoji, on) => void react(item, emoji, on)}
+            loadReactors={() =>
+              loadReactors(apiBaseUrl, token, item.workoutCheckinId)
+            }
           />
         )}
         {item.reviewStatus === "questioned" && (

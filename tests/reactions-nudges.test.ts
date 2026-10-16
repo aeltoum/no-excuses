@@ -182,6 +182,76 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     await expect(react(db, 1, id, "🥇")).rejects.toThrow("Up to 6");
   });
 
+  it("lists who reacted, in order, to the viewer's Group only", async () => {
+    const db = await database();
+    const id = await submit(db, 0);
+    await as(db, 2);
+    await db.query(
+      "select app_private.react_to_proof($1, '🔥', true, '2026-03-05T11:00Z')",
+      [id],
+    );
+    await as(db, 1);
+    await db.query(
+      "select app_private.react_to_proof($1, '🦍', true, '2026-03-05T11:01Z')",
+      [id],
+    );
+    await db.query(
+      "select app_private.react_to_proof($1, '🔥', true, '2026-03-05T11:02Z')",
+      [id],
+    );
+    const list = async () =>
+      (
+        await db.query<{ mine: boolean }>(
+          "select reaction, display_name, mine from app_private.proof_reactors($1, '2026-03-05T12:00Z')",
+          [id],
+        )
+      ).rows;
+    expect(await list()).toEqual([
+      { reaction: "🔥", display_name: "Casey", mine: false },
+      { reaction: "🦍", display_name: "Blair", mine: true },
+      { reaction: "🔥", display_name: "Blair", mine: true },
+    ]);
+    // The author sees the same list; nobody is "mine".
+    await as(db, 0);
+    expect((await list()).map((row) => row.mine)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    // Ended memberships drop out.
+    await db.query(
+      "update app_private.memberships set ended_at = '2026-03-05T11:30Z', end_reason = 'left' where membership_id = $1",
+      [memberships[2]],
+    );
+    expect(await list()).toEqual([
+      { reaction: "🦍", display_name: "Blair", mine: false },
+      { reaction: "🔥", display_name: "Blair", mine: false },
+    ]);
+    // Another Group cannot read it, nor can an unknown proof be listed.
+    const outsider = "30000000-0000-4000-8000-000000000009";
+    await db.exec(`
+      insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at, display_name) values
+        ('20000000-0000-4000-8000-000000000009', '${outsider}', 'z@example.test', '2026-03-01Z', 'Zed');
+      insert into app_private.groups (group_id, name, time_zone, status, activation_at) values
+        ('10000000-0000-4000-8000-000000000009', 'Others', 'UTC', 'active', '2026-03-02Z');
+      insert into app_private.memberships
+        (membership_id, account_id, group_id, joined_at, recurring_target) values
+        ('40000000-0000-4000-8000-000000000009', '20000000-0000-4000-8000-000000000009',
+         '10000000-0000-4000-8000-000000000009', '2026-03-01Z', 1);
+    `);
+    await db.query("select set_config('app.auth_user_id', $1, false)", [
+      outsider,
+    ]);
+    await expect(list()).rejects.toThrow("Reactions unavailable");
+    await as(db, 1);
+    await expect(
+      db.query(
+        "select * from app_private.proof_reactors($1, '2026-03-05T12:00Z')",
+        [randomUUID()],
+      ),
+    ).rejects.toThrow("Reactions unavailable");
+  });
+
   it("nudges only members behind target, once per day", async () => {
     const db = await database();
     await submit(db, 2);

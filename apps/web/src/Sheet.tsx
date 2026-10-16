@@ -64,7 +64,12 @@ export function Sheet({
       }
     };
     document.addEventListener("keydown", onKeyDown);
+    // Lock the page behind the sheet; the sheet and picker keep their own scrolling.
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
     return () => {
+      root.style.overflow = overflow;
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
       openerRef.current?.focus();

@@ -790,6 +790,7 @@ async function push(request: Request): Promise<Response> {
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
+const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
 // One standard emoji, including skin tones, flags, and joined sequences.
 const singleEmoji =
   /^(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*(?:\u200D\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*)*)$/u;
@@ -894,6 +895,24 @@ async function proof(request: Request, path: string): Promise<Response> {
             reactions: reactions.get(row.workout_checkin_id)?.counts ?? [],
             myReactions:
               reactions.get(row.workout_checkin_id)?.my_reactions ?? [],
+          })),
+        ),
+      );
+    }
+    const reactors = proofReactors.exec(path);
+    if (reactors && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.proof_reactors($1,$2)", [
+          reactors[1],
+          now,
+        ])
+      ).rows;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            emoji: row.reaction,
+            name: row.display_name,
+            mine: row.mine,
           })),
         ),
       );
