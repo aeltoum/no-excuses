@@ -13,6 +13,8 @@
   "dependencies": {
     "@no-excuses/contracts": "link:../../packages/contracts",
     "@supabase/supabase-js": "2.116.0",
+    "emoji-picker-element": "1.29.1",
+    "emoji-picker-element-data": "1.8.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

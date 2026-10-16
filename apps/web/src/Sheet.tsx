@@ -51,7 +51,8 @@ export function Sheet({
       }
       const first = controls[0];
       const last = controls.at(-1);
-      if (!controls.includes(document.activeElement as HTMLElement)) {
+      // Widgets with their own shadow DOM (the emoji picker) keep focus inside the sheet.
+      if (!dialogRef.current.contains(document.activeElement)) {
         event.preventDefault();
         (event.shiftKey ? last : first)?.focus();
       } else if (event.shiftKey && document.activeElement === first) {
