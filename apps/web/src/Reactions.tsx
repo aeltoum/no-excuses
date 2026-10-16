@@ -93,6 +93,7 @@ type Props = {
   readOnly: boolean;
   onToggle: (emoji: string, on: boolean) => void;
   loadReactors: () => Promise<Reactor[]>;
+  cachedReactors: () => Reactor[] | undefined;
 };
 
 type Who =
@@ -109,6 +110,7 @@ function ReactorsSheet({
   onSelect,
   onToggle,
   loadReactors,
+  cachedReactors,
   onDismiss,
 }: Props & {
   selected: string | null;
@@ -119,17 +121,20 @@ function ReactorsSheet({
   const request = useRef(0);
   const loadRef = useRef(loadReactors);
   loadRef.current = loadReactors;
+  const cacheRef = useRef(cachedReactors);
+  cacheRef.current = cachedReactors;
   const open = selected !== null;
-  // Only the latest request may settle the list.
+  // Cached names show at once and refresh quietly; only the latest request may settle the list.
   const load = useCallback(() => {
     const id = ++request.current;
-    setWho({ status: "loading" });
+    const cached = cacheRef.current();
+    setWho(cached ? { status: "ready", rows: cached } : { status: "loading" });
     loadRef.current().then(
       (rows) => {
         if (request.current === id) setWho({ status: "ready", rows });
       },
       () => {
-        if (request.current === id) setWho({ status: "error" });
+        if (request.current === id && !cached) setWho({ status: "error" });
       },
     );
   }, []);
@@ -178,6 +183,15 @@ function ReactorsSheet({
       ? who.rows.filter((row) => row.emoji === selected && !row.mine)
       : []),
   ];
+  // Placeholder rows hold the names' space so nothing above them moves when they arrive.
+  const pending =
+    who.status === "loading"
+      ? Math.max(
+          0,
+          (tabList.find((entry) => entry.emoji === selected)?.count ?? 0) -
+            (reacted ? 1 : 0),
+        )
+      : 0;
   return (
     <Sheet open={open} title="Reactions" onDismiss={onDismiss}>
       <div
@@ -205,10 +219,48 @@ function ReactorsSheet({
         ))}
       </div>
       <div role="tabpanel" ref={panel} aria-label={`Reacted ${selected ?? ""}`}>
-        {who.status === "loading" && (
-          <p className="sheet-hint" role="status">
-            Loading…
-          </p>
+        {/* Your own controls come from local state and sit above the names, which load in later. */}
+        {!readOnly && selected && !reacted && (
+          <button
+            type="button"
+            className="reactor-action reactor-add"
+            disabled={mine.length >= reactionLimit}
+            onClick={() => onToggle(selected, true)}
+          >
+            {mine.length >= reactionLimit
+              ? `Up to ${reactionLimit} reactions`
+              : `React with ${selected}`}
+          </button>
+        )}
+        {rows.length + pending > 0 && (
+          <ul className="reactor-list">
+            {rows.map((row, index) => (
+              <li
+                key={row.mine ? "you" : `${row.name}-${index}`}
+                className={row.mine ? "reactor-mine" : undefined}
+              >
+                <span className="reactor-name">
+                  {row.mine ? "You" : row.name}
+                </span>
+                {row.mine && !readOnly && (
+                  <button
+                    type="button"
+                    className="reactor-action"
+                    aria-label={`Remove your ${row.emoji}`}
+                    onClick={() => onToggle(row.emoji, false)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </li>
+            ))}
+            {Array.from({ length: pending }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: placeholders have no identity.
+              <li key={index} className="reactor-placeholder">
+                {index === 0 && <span role="status">Loading names…</span>}
+              </li>
+            ))}
+          </ul>
         )}
         {who.status === "error" && (
           <div className="reactor-error" role="alert">
@@ -218,47 +270,8 @@ function ReactorsSheet({
             </button>
           </div>
         )}
-        {who.status === "ready" && (
-          <>
-            {rows.length === 0 ? (
-              <p className="sheet-hint">No reactions yet.</p>
-            ) : (
-              <ul className="reactor-list">
-                {rows.map((row, index) => (
-                  <li
-                    key={row.mine ? "you" : `${row.name}-${index}`}
-                    className={row.mine ? "reactor-mine" : undefined}
-                  >
-                    <span className="reactor-name">
-                      {row.mine ? "You" : row.name}
-                    </span>
-                    {row.mine && !readOnly && (
-                      <button
-                        type="button"
-                        className="reactor-action"
-                        aria-label={`Remove your ${row.emoji}`}
-                        onClick={() => onToggle(row.emoji, false)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {!readOnly && selected && !reacted && (
-              <button
-                type="button"
-                className="reactor-action reactor-add"
-                disabled={mine.length >= reactionLimit}
-                onClick={() => onToggle(selected, true)}
-              >
-                {mine.length >= reactionLimit
-                  ? `Up to ${reactionLimit} reactions`
-                  : `React with ${selected}`}
-              </button>
-            )}
-          </>
+        {who.status !== "error" && rows.length + pending === 0 && (
+          <p className="sheet-hint">No reactions yet.</p>
         )}
       </div>
     </Sheet>
@@ -302,6 +315,7 @@ export function Reactions({
   readOnly,
   onToggle,
   loadReactors,
+  cachedReactors,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -331,6 +345,8 @@ export function Reactions({
             aria-haspopup="dialog"
             aria-pressed={readOnly ? undefined : mine.includes(emoji)}
             aria-label={`${emoji}, ${count}`}
+            // Names start loading on press, ahead of the click that opens the drawer.
+            onPointerDown={() => void loadReactors().catch(() => {})}
             onClick={() => setViewing(emoji)}
           >
             <span aria-hidden="true">{emoji}</span>
@@ -401,6 +417,7 @@ export function Reactions({
         onSelect={setViewing}
         onToggle={onToggle}
         loadReactors={loadReactors}
+        cachedReactors={cachedReactors}
         onDismiss={closeViewing}
       />
     </>

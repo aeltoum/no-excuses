@@ -1,4 +1,5 @@
 import { ApiError, requestTimeoutMs } from "./api-client";
+import { onClearPersisted } from "./persist";
 
 export type ProofItem = {
   workoutCheckinId: string;
@@ -107,18 +108,38 @@ export const reactToProof = (
 
 export type Reactor = { emoji: string; name: string; mine: boolean };
 
-export async function loadReactors(baseUrl: string, token: string, id: string) {
-  const rows = await call<unknown>(
-    baseUrl,
-    token,
-    `/v1/proof/${id}/reactions`,
-    {
-      method: "GET",
-    },
-  );
-  if (!Array.isArray(rows))
-    throw new ApiError("failure", "Couldn’t load reactions.", true);
-  return rows as Reactor[];
+// Names cached per proof for the session; one request per proof at a time.
+const reactorCache = new Map<string, Reactor[]>();
+const reactorRequests = new Map<string, Promise<Reactor[]>>();
+// Requests from before a sign-out neither fill the cache nor serve the next member.
+let reactorGeneration = 0;
+onClearPersisted(() => {
+  reactorGeneration++;
+  reactorCache.clear();
+  reactorRequests.clear();
+});
+
+export const cachedReactors = (id: string) => reactorCache.get(id);
+
+export function loadReactors(baseUrl: string, token: string, id: string) {
+  const pending = reactorRequests.get(id);
+  if (pending) return pending;
+  const generation = reactorGeneration;
+  const request = call<unknown>(baseUrl, token, `/v1/proof/${id}/reactions`, {
+    method: "GET",
+  })
+    .then((rows) => {
+      if (!Array.isArray(rows))
+        throw new ApiError("failure", "Couldn’t load reactions.", true);
+      if (generation === reactorGeneration)
+        reactorCache.set(id, rows as Reactor[]);
+      return rows as Reactor[];
+    })
+    .finally(() => {
+      if (reactorRequests.get(id) === request) reactorRequests.delete(id);
+    });
+  reactorRequests.set(id, request);
+  return request;
 }
 
 export const loadNudged = (baseUrl: string, token: string) =>
