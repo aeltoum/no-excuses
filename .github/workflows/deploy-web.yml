@@ -1,19 +1,24 @@
-name: Deploy web
+name: Deploy production
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+# All production mutations share one lock. Never cancel an applying migration.
 concurrency:
-  group: deploy-web
+  group: production-release
   cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 45
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,12 +27,54 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @no-excuses/web build
+      - name: Check release configuration
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          for key in SUPABASE_DB_URL RENDER_API_KEY RENDER_SERVICE_ID CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID VITE_API_BASE_URL VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY; do
+            if [ -z "${!key}" ]; then echo "Missing configuration: $key"; exit 1; fi
+          done
+      - run: pnpm check
+      - run: pnpm api:build
+      - name: Build web before changing production
+        run: pnpm --filter @no-excuses/web build
         env:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-      - run: >-
+      - name: Verify Render release control before database changes
+        run: node scripts/deploy-render.mjs --check
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      - name: Apply committed forward migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pnpm exec supabase migration list --db-url "$SUPABASE_DB_URL"
+          pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+          pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --yes
+          pnpm exec supabase migration list --db-url "$SUPABASE_DB_URL"
+      - name: Deploy exact API commit and wait for Live
+        run: node scripts/deploy-render.mjs
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      - name: Check API health
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          curl --fail --silent --show-error --max-time 90 --retry 2 "$API_BASE_URL/v1/health" > /tmp/health.json
+          node --input-type=module -e 'import {readFileSync} from "node:fs"; const result = JSON.parse(readFileSync("/tmp/health.json", "utf8")); if (result.status !== "ok") throw new Error("API health failed");'
+      - name: Publish web only after database and API succeed
+        run: >-
           npx wrangler@3 pages deploy apps/web/dist
           --project-name no-excuses --branch main
           --commit-hash ${{ github.sha }}

@@ -1,22 +1,23 @@
 name: Repair migration history
 
-# Manual-only. Marks migrations already present in the hosted database as applied in
-# Supabase's migration history, so `db push` stops re-running them. Never runs migration SQL.
-# Applied state comes from app_private.schema_versions; a file that records no version counts
-# as applied when a later file's version is applied.
+# One-time reconciliation of two verified manually applied migrations. Never
+# infer application from max(schema_versions), and never execute migration SQL.
 on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: production-release
   cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   repair:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: production
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,25 +26,19 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Mark applied migrations
+      - name: Disable independent Render Auto-Deploy once
+        run: node scripts/deploy-render.mjs --disable-auto-deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      - name: Verify exact schema, grants, data invariant, and history
+        run: node scripts/verify-migration-history.mjs --database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Reconcile only the verified October 17 and 18 entries
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          set -euo pipefail
-          max=$(psql "$SUPABASE_DB_URL" -Atc "select coalesce(max(version), 0) from app_private.schema_versions")
-          echo "Highest applied schema version: $max"
-          applied=() queued=()
-          for f in supabase/migrations/*.sql; do
-            ts=$(basename "$f" | cut -d_ -f1)
-            v=$(grep -oE "schema_versions \(version\) values \([0-9]+\)" "$f" | grep -oE "[0-9]+" || true)
-            if [ -z "$v" ]; then queued+=("$ts"); continue; fi
-            if [ "$v" -le "$max" ]; then applied+=("${queued[@]}" "$ts"); fi
-            queued=()
-          done
-          if [ ${#applied[@]} -eq 0 ]; then echo "Nothing to mark."; exit 0; fi
-          echo "Marking applied: ${applied[*]}"
-          pnpm exec supabase migration repair --db-url "$SUPABASE_DB_URL" --status applied "${applied[@]}"
-      - name: Pending migrations after repair
-        run: pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          pnpm exec supabase migration repair --db-url "$SUPABASE_DB_URL" --status applied 20261017000000 20261018000000
+          pnpm exec supabase migration list --db-url "$SUPABASE_DB_URL"
+          pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --dry-run

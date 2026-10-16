@@ -7,7 +7,7 @@ services:
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm api:build
     startCommand: node dist/api/delivery/src/server.js
     healthCheckPath: /v1/health
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: 'off'
     envVars:
       - key: NODE_VERSION
         value: 24.19.0
