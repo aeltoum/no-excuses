@@ -171,12 +171,13 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     "aria-pressed",
     "true",
   );
-  // The tray adds a quick pick alongside the existing reaction.
+  // The picker sheet adds a gym favorite alongside the existing reaction.
   const add = friend.getByRole("button", { name: "Add reaction" });
   await add.click();
-  const tray = page.getByRole("group", { name: "Pick a reaction" });
-  await tray.getByRole("button", { name: "React 🦍" }).click();
-  await expect(tray).toHaveCount(0);
+  const sheet = page.getByRole("dialog", { name: "React" });
+  await sheet.getByRole("button", { name: "React 🦍" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(add).toBeFocused();
   await expect(friend.getByRole("button", { name: "🦍, 1" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -185,15 +186,14 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     "aria-pressed",
     "true",
   );
-  // Any emoji typed in the tray works too; Escape closes it.
+  // Any emoji is a search and a tap away; Escape closes the sheet.
   await add.click();
-  await expect(tray.getByRole("button", { name: "React 💪" })).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(tray).toHaveCount(0);
-  await expect(add).toBeFocused();
+  await expect(sheet).toHaveCount(0);
   await add.click();
-  await tray.getByLabel("Any emoji").fill("🇰🇪");
-  await tray.getByRole("button", { name: "React 🇰🇪" }).click();
+  await sheet.getByRole("combobox", { name: "Search" }).fill("kenya");
+  await sheet.getByRole("option", { name: /Kenya/ }).click();
+  await expect(sheet).toHaveCount(0);
   // Tapping your own emoji takes it back.
   await friend.getByRole("button", { name: "🔥, 3" }).click();
   await expect(friend.getByRole("button", { name: "🔥, 2" })).toHaveAttribute(

@@ -2471,9 +2471,6 @@ body:has(.home-log-button) .result.event-notice {
 
 /* Reactions under each proof post: quiet chips; the viewer's own picks fill yellow.
    The add chip opens a tray of gym-floor picks plus a field for any emoji. */
-.proof-reactions-wrap {
-  position: relative;
-}
 .proof-reactions {
   display: flex;
   flex-wrap: wrap;
@@ -2518,80 +2515,62 @@ body:has(.home-log-button) .result.event-notice {
   border-color: var(--ink);
   color: var(--ink);
 }
-.reaction-tray {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 8px);
-  left: 0;
-  width: min(100%, 340px);
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--rule);
-  border-top: 3px solid var(--class);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
-  animation: tray-rise 140ms ease-out;
-}
-@keyframes tray-rise {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .reaction-tray {
-    animation: none;
-  }
-}
-.reaction-tray-grid {
+.reaction-quick {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 4px;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
 }
-.reaction-tray .reaction-tray-grid button {
-  min-height: 44px;
+.reaction-quick button {
+  min-height: 48px;
   margin: 0;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   line-height: 1;
 }
-.reaction-tray .reaction-tray-grid button:hover {
+.reaction-quick button:hover {
   background: var(--rubber);
 }
-.reaction-tray .reaction-tray-grid button[aria-pressed="true"] {
+.reaction-quick button[aria-pressed="true"] {
   border-color: var(--class);
   background: color-mix(in srgb, var(--class) 18%, var(--surface));
 }
-.reaction-tray .reaction-tray-custom {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  margin: 12px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--rule);
+/* The full picker wears the app's rubber and chalk; the yellow indicator matches picked chips. */
+.emoji-picker-holder {
+  min-height: 360px;
 }
-.reaction-tray-custom label {
-  display: grid;
-  flex: 1;
-  gap: 4px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.8rem;
+.emoji-picker-holder emoji-picker {
+  width: 100%;
+  height: min(52dvh, 420px);
+  --background: var(--rubber);
+  --border-color: var(--rule);
+  --border-radius: 10px;
+  --button-active-background: var(--rule);
+  --button-hover-background: var(--surface);
+  --category-font-color: var(--muted);
+  --indicator-color: var(--class);
+  --input-border-color: var(--empty-slot);
+  --input-border-radius: 6px;
+  --input-font-color: var(--ink);
+  --input-font-size: 1rem;
+  --input-padding: 0.5rem 0.75rem;
+  --input-placeholder-color: var(--muted);
+  --num-columns: 8;
+  --emoji-size: 1.6rem;
+  --category-emoji-size: 1.2rem;
+  --category-emoji-padding: 0.4rem;
+  --outline-color: var(--safety);
+  font-family: Archivo, system-ui, sans-serif;
 }
-.reaction-tray .reaction-tray-custom input {
-  min-height: 40px;
-  font-size: 1.1rem;
-}
-.reaction-tray .reaction-tray-custom button {
-  width: auto;
-  min-height: 40px;
-  margin: 0;
-  padding: 0 14px;
-  white-space: nowrap;
+@media (max-width: 420px) {
+  .emoji-picker-holder emoji-picker {
+    --num-columns: 7;
+  }
 }
 .friend-nudge {
   width: 100%;
