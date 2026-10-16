@@ -3,11 +3,18 @@ import type {
   FinalizedWeeklyHistoryItem,
   WeeklyTargetContext,
 } from "@no-excuses/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
 import { InstallPrompt } from "./InstallPrompt";
+import { onClearPersisted } from "./persist";
 import {
   compressPhoto,
   loadNudged,
@@ -29,6 +36,122 @@ export type WeeklySnapshot = {
 };
 
 type ProofPhoto = { id: string; blob: Blob; url: string };
+type Activity = "strength" | "cardio" | "class" | "sport" | "mixed";
+
+// A workout logged on this device that the server has not confirmed yet. Its
+// photos stay in memory for the session so Retry never asks for them again.
+type Outgoing = {
+  id: string;
+  key: string;
+  membershipId: string;
+  activityType: Activity;
+  minutes: number;
+  intensity: "low" | "moderate" | "high";
+  activity: ProofPhoto;
+  presence: ProofPhoto;
+  paths: { activity?: string; presence?: string };
+  status: "sending" | "failed" | "sent";
+  error?: string;
+  // The server answered with a definite rejection, so nothing was logged.
+  rejected?: boolean;
+  count?: number;
+};
+let outbox: Outgoing[] = [];
+const outboxListeners = new Set<() => void>();
+const setOutbox = (next: Outgoing[]) => {
+  outbox = next;
+  for (const listener of outboxListeners) listener();
+};
+const patchOutgoing = (id: string, patch: Partial<Outgoing>) =>
+  setOutbox(
+    outbox.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
+  );
+const subscribeOutbox = (listener: () => void) => {
+  outboxListeners.add(listener);
+  return () => {
+    outboxListeners.delete(listener);
+  };
+};
+const dropOutgoing = (id: string) => {
+  for (const entry of outbox.filter((item) => item.id === id)) {
+    URL.revokeObjectURL(entry.activity.url);
+    URL.revokeObjectURL(entry.presence.url);
+  }
+  setOutbox(outbox.filter((entry) => entry.id !== id));
+};
+onClearPersisted(() => {
+  for (const entry of outbox) dropOutgoing(entry.id);
+});
+
+// Uploads both photos and submits the check-in in the background. A retry
+// reuses the uploaded paths, workout ID and idempotency key, so it can never
+// log the same workout twice.
+function sendOutgoing(
+  entry: Outgoing,
+  api: Api,
+  apiBaseUrl: string,
+  token: string,
+  onRevoked: () => void,
+) {
+  patchOutgoing(entry.id, { status: "sending", error: undefined });
+  const upload = async (kind: "activity" | "presence") => {
+    const known = entry.paths[kind];
+    if (known) return known;
+    const path = await uploadProofPhoto(
+      apiBaseUrl,
+      token,
+      kind,
+      entry[kind].blob,
+    );
+    entry.paths[kind] = path;
+    return path;
+  };
+  void Promise.all([upload("activity"), upload("presence")])
+    .then(([activityPhotoPath, presencePhotoPath]) =>
+      api.checkIn(
+        token,
+        {
+          workoutCheckinId: entry.id,
+          activityType: entry.activityType,
+          durationMinutes: entry.minutes,
+          perceivedIntensity: entry.intensity,
+          selfReportAttested: true,
+          activityPhotoPath,
+          presencePhotoPath,
+          mediaConsent: true,
+        },
+        entry.key,
+      ),
+    )
+    .then((response) => {
+      if (response.data.workoutCheckinId !== entry.id)
+        throw new ApiError(
+          "failure",
+          "Check-in response did not match this workout.",
+        );
+      patchOutgoing(entry.id, {
+        status: "sent",
+        count: response.data.currentWeekCount,
+      });
+    })
+    .catch((error) => {
+      if (error instanceof ApiError && error.kind === "unauthorized")
+        onRevoked();
+      patchOutgoing(entry.id, {
+        status: "failed",
+        rejected:
+          error instanceof ApiError &&
+          !error.retryable &&
+          error.kind !== "unauthorized",
+        error:
+          error instanceof ApiError && error.kind === "denied"
+            ? "Finish your Consequence card before logging workouts."
+            : error instanceof ApiError
+              ? error.message
+              : "Workout could not be logged.",
+      });
+    });
+}
 
 export function Weekly({
   apiBaseUrl,
@@ -69,6 +192,7 @@ export function Weekly({
   const [stale, setStale] = useState(false);
   const [changed, setChanged] = useState(false);
   const changedTimer = useRef<number | undefined>(undefined);
+  // Only the refresh buttons wait on a request; everything else is instant.
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useNotice();
   const [nudged, setNudged] = useState<ReadonlySet<string>>(new Set());
@@ -79,9 +203,7 @@ export function Weekly({
   );
   const [targetContext, setTargetContext] =
     useState<WeeklyTargetContext | null>(saved?.targetContext ?? null);
-  const [activityType, setActivityType] = useState<
-    "strength" | "cardio" | "class" | "sport" | "mixed" | null
-  >(null);
+  const [activityType, setActivityType] = useState<Activity | null>(null);
   const [duration, setDuration] = useState("");
   const [otherDuration, setOtherDuration] = useState(false);
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
@@ -92,7 +214,9 @@ export function Weekly({
     presence?: ProofPhoto;
   }>({});
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const uploaded = useRef(new Map<string, string>());
+  const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
+    (entry) => entry.membershipId === membership?.membershipId,
+  );
   const [feedRevision, setFeedRevision] = useState(0);
   const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
     () => new Set(),
@@ -152,17 +276,13 @@ export function Weekly({
   const [lockOpen, setLockOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
-  const [logError, setLogError] = useState<string | null>(null);
   const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
   const groupId = membership?.groupId;
-  const draft = useRef<{
-    signature: string;
-    key: string;
-    id: string;
-  } | null>(null);
   const targetDraft = useRef<{ signature: string; key: string } | null>(null);
+  // The target count being saved, so the same save cannot run twice.
+  const targetSaving = useRef<number | null>(null);
   useEffect(() => {
     if (state !== "ready") return;
     const current = cache.get(cacheKey);
@@ -177,6 +297,47 @@ export function Weekly({
         error instanceof ApiError ? error.message : "Action failed. Try again.",
     });
   };
+  // A confirmed check-in replaces its local entry with the server's count.
+  const sent = sending.filter((entry) => entry.status === "sent");
+  useEffect(() => {
+    if (sent.length === 0 || !groupId || !membership) return;
+    const last = sent[sent.length - 1];
+    setProgress((items) =>
+      items.map((item) =>
+        item.membershipId === membership.membershipId
+          ? {
+              ...item,
+              completedWorkoutCount: last?.count ?? item.completedWorkoutCount,
+              activityTypes: [
+                ...item.activityTypes,
+                ...sent.map((entry) => entry.activityType),
+              ],
+            }
+          : item,
+      ),
+    );
+    for (const entry of sent) dropOutgoing(entry.id);
+    setFeedRevision((value) => value + 1);
+    const target = progress.find(
+      (item) => item.membershipId === membership.membershipId,
+    )?.lockedTarget;
+    setNotice({
+      kind: "success",
+      text: `Workout logged. ${last?.count} of ${target} this week. It counts once a friend verifies it or 24 hours pass.`,
+    });
+    // Refresh in the background; the screen already shows the server count.
+    void api
+      .progress(token, groupId)
+      .then((response) => {
+        setProgress(response.data);
+        setRefreshWarning(false);
+      })
+      .catch((error) => {
+        if (error instanceof ApiError && error.kind === "unauthorized")
+          revokeRef.current();
+        setRefreshWarning(true);
+      });
+  });
   useEffect(() => {
     void retry;
     let active = true;
@@ -329,9 +490,19 @@ export function Weekly({
         </a>
       </section>
     );
-  const own = progress.find(
+  // Workouts still sending count at once; a failed one drops back out.
+  const ownSaved = progress.find(
     (item) => item.membershipId === membership.membershipId,
   );
+  const counted = sending.filter((entry) => entry.status !== "failed");
+  const own = ownSaved && {
+    ...ownSaved,
+    completedWorkoutCount: ownSaved.completedWorkoutCount + counted.length,
+    activityTypes: [
+      ...ownSaved.activityTypes,
+      ...counted.map((entry) => entry.activityType),
+    ],
+  };
   const home = route === "/home";
   const boundary = targetContext?.nextWeekStartsAt
     ? new Date(targetContext.nextWeekStartsAt)
@@ -602,6 +773,7 @@ export function Weekly({
                   onGroupOwed={setGroupOwed}
                   onAttention={setCardAttention}
                   onLogBlock={setLogBlock}
+                  cacheKey={cacheKey}
                 />
               )}
               {own && progress.length > 1 && (
@@ -729,7 +901,6 @@ export function Weekly({
                   <Sheet
                     open={sheetOpen}
                     title="Log a workout"
-                    dismissible={!busy}
                     onDismiss={() => setSheetOpen(false)}
                   >
                     <div className="sheet-preview">
@@ -756,131 +927,35 @@ export function Weekly({
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (
-                          busy ||
                           !logReady ||
                           !activityType ||
                           !photos.activity ||
                           !photos.presence
                         )
                           return;
-                        const minutes = Number(duration);
-                        const activityPhoto = photos.activity;
-                        const presencePhoto = photos.presence;
-                        const signature = `${membership.membershipId}:${activityType}:${minutes}:${intensity}:${activityPhoto.id}:${presencePhoto.id}`;
-                        if (
-                          !draft.current ||
-                          draft.current.signature !== signature
-                        )
-                          draft.current = {
-                            signature,
-                            key: crypto.randomUUID(),
-                            id: crypto.randomUUID(),
-                          };
-                        const current = draft.current;
-                        setBusy(true);
-                        setLogError(null);
-                        // Uploaded paths are reused on retry so a failed submit never re-uploads.
-                        const upload = async (
-                          kind: "activity" | "presence",
-                          photo: ProofPhoto,
-                        ) => {
-                          const known = uploaded.current.get(photo.id);
-                          if (known) return known;
-                          const path = await uploadProofPhoto(
-                            apiBaseUrl,
-                            token,
-                            kind,
-                            photo.blob,
-                          );
-                          uploaded.current.set(photo.id, path);
-                          return path;
+                        const entry: Outgoing = {
+                          id: crypto.randomUUID(),
+                          key: crypto.randomUUID(),
+                          membershipId: membership.membershipId,
+                          activityType,
+                          minutes: Number(duration),
+                          intensity,
+                          activity: photos.activity,
+                          presence: photos.presence,
+                          paths: {},
+                          status: "sending",
                         };
-                        void Promise.all([
-                          upload("activity", activityPhoto),
-                          upload("presence", presencePhoto),
-                        ])
-                          .then(([activityPhotoPath, presencePhotoPath]) =>
-                            api.checkIn(
-                              token,
-                              {
-                                workoutCheckinId: current.id,
-                                activityType,
-                                durationMinutes: minutes,
-                                perceivedIntensity: intensity,
-                                selfReportAttested: true,
-                                activityPhotoPath,
-                                presencePhotoPath,
-                                mediaConsent: true,
-                              },
-                              current.key,
-                            ),
-                          )
-                          .then(async (response) => {
-                            if (response.data.workoutCheckinId !== current.id)
-                              throw new ApiError(
-                                "failure",
-                                "Check-in response did not match this workout.",
-                              );
-                            draft.current = null;
-                            const loggedActivity = activityType;
-                            setProgress((items) =>
-                              items.map((item) =>
-                                item.membershipId === membership.membershipId
-                                  ? {
-                                      ...item,
-                                      completedWorkoutCount:
-                                        response.data.currentWeekCount,
-                                      activityTypes: [
-                                        ...item.activityTypes,
-                                        loggedActivity,
-                                      ],
-                                    }
-                                  : item,
-                              ),
-                            );
-                            setSheetOpen(false);
-                            setActivityType(null);
-                            setDuration("");
-                            setOtherDuration(false);
-                            URL.revokeObjectURL(activityPhoto.url);
-                            URL.revokeObjectURL(presencePhoto.url);
-                            setPhotos({});
-                            setFeedRevision((value) => value + 1);
-                            setNotice({
-                              kind: "success",
-                              text: `Workout logged. ${response.data.currentWeekCount} of ${own.lockedTarget} this week. It counts once a friend verifies it or 24 hours pass.`,
-                            });
-                            try {
-                              setProgress(
-                                (await api.progress(token, membership.groupId))
-                                  .data,
-                              );
-                              setRefreshWarning(false);
-                            } catch (error) {
-                              if (
-                                error instanceof ApiError &&
-                                error.kind === "unauthorized"
-                              )
-                                onRevoked();
-                              setRefreshWarning(true);
-                            }
-                          })
-                          .catch((error) => {
-                            if (
-                              error instanceof ApiError &&
-                              error.kind === "unauthorized"
-                            )
-                              onRevoked();
-                            setLogError(
-                              error instanceof ApiError &&
-                                error.kind === "denied"
-                                ? "Finish your Consequence card before logging workouts."
-                                : error instanceof ApiError
-                                  ? error.message
-                                  : "Workout could not be logged.",
-                            );
-                          })
-                          .finally(() => setBusy(false));
+                        // Optimistic: close the sheet and count it now; the
+                        // upload and check-in finish in the background.
+                        setOutbox([...outbox, entry]);
+                        setSheetOpen(false);
+                        setActivityType(null);
+                        setDuration("");
+                        setOtherDuration(false);
+                        setPhotos({});
+                        sendOutgoing(entry, api, apiBaseUrl, token, () =>
+                          revokeRef.current(),
+                        );
                       }}
                     >
                       <fieldset>
@@ -900,7 +975,6 @@ export function Weekly({
                               key={activity}
                               className={`activity-plate activity-${activity}`}
                               aria-pressed={activityType === activity}
-                              disabled={busy}
                               onClick={() => setActivityType(activity)}
                             >
                               {activity[0].toUpperCase() + activity.slice(1)}
@@ -918,7 +992,6 @@ export function Weekly({
                               aria-pressed={
                                 !otherDuration && duration === String(minutes)
                               }
-                              disabled={busy}
                               onClick={() => {
                                 setOtherDuration(false);
                                 setDuration(String(minutes));
@@ -930,7 +1003,6 @@ export function Weekly({
                           <button
                             type="button"
                             aria-pressed={otherDuration}
-                            disabled={busy}
                             onClick={() => {
                               setOtherDuration(true);
                               setDuration("");
@@ -949,7 +1021,6 @@ export function Weekly({
                             min="1"
                             step="1"
                             value={duration}
-                            disabled={busy}
                             onChange={(event) =>
                               setDuration(event.target.value)
                             }
@@ -965,7 +1036,6 @@ export function Weekly({
                                 type="button"
                                 key={level}
                                 aria-pressed={intensity === level}
-                                disabled={busy}
                                 onClick={() => setIntensity(level)}
                               >
                                 {level[0].toUpperCase() + level.slice(1)}
@@ -1021,7 +1091,6 @@ export function Weekly({
                                 type="file"
                                 accept="image/*"
                                 capture={facing}
-                                disabled={busy}
                                 onChange={(event) =>
                                   void choosePhoto(kind)(event)
                                 }
@@ -1035,17 +1104,12 @@ export function Weekly({
                           </p>
                         )}
                       </fieldset>
-                      <button type="submit" disabled={busy || !logReady}>
-                        {busy ? "Logging…" : "Log workout"}
+                      <button type="submit" disabled={!logReady}>
+                        Log workout
                       </button>
                       {!logReady && (
                         <p className="sheet-hint">
                           Pick an activity and a time, then take both photos.
-                        </p>
-                      )}
-                      {logError && (
-                        <p className="result error" role="alert">
-                          {logError} Your choices are kept; try again.
                         </p>
                       )}
                     </form>
@@ -1061,6 +1125,93 @@ export function Weekly({
                 >
                   {busy ? "Refreshing…" : "Refresh count"}
                 </button>
+              )}
+              {own && sending.length > 0 && (
+                <ul
+                  className="proof-list proof-outbox"
+                  aria-label="Your workouts sending"
+                >
+                  {sending.map((entry) => (
+                    <li className="proof-post" key={entry.id}>
+                      <header>
+                        <span className="proof-avatar" aria-hidden="true">
+                          YO
+                        </span>
+                        <strong>You</strong>
+                        <span
+                          className={`proof-status ${entry.status === "failed" ? "proof-questioned" : "proof-pending"}`}
+                        >
+                          {entry.status === "failed"
+                            ? "Couldn’t upload"
+                            : "Uploading…"}
+                        </span>
+                      </header>
+                      <div className="proof-frame">
+                        <img
+                          className="proof-main"
+                          src={entry.activity.url}
+                          alt="Your workout activity"
+                        />
+                        <img
+                          className="proof-inset"
+                          src={entry.presence.url}
+                          alt="You at the workout"
+                        />
+                        <span className="proof-tag">
+                          <i
+                            className={`activity-swatch activity-${entry.activityType}`}
+                          />
+                          {entry.activityType[0]?.toUpperCase()}
+                          {entry.activityType.slice(1)} · {entry.minutes} min
+                        </span>
+                      </div>
+                      {entry.status === "failed" && (
+                        <>
+                          <p className="result error" role="alert">
+                            {entry.error}
+                          </p>
+                          <div className="proof-actions">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                sendOutgoing(
+                                  entry,
+                                  api,
+                                  apiBaseUrl,
+                                  token,
+                                  () => revokeRef.current(),
+                                )
+                              }
+                            >
+                              Retry
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => {
+                                dropOutgoing(entry.id);
+                                if (entry.rejected) return;
+                                // A lost response may follow a logged workout.
+                                setNotice({
+                                  kind: "success",
+                                  text: "Discarded here. It may already be logged; your count will update.",
+                                });
+                                void api
+                                  .progress(token, membership.groupId)
+                                  .then((response) =>
+                                    setProgress(response.data),
+                                  )
+                                  .catch(() => setRefreshWarning(true));
+                              }}
+                            >
+                              Discard
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
               {own && (
                 <ProofFeed
@@ -1087,8 +1238,8 @@ export function Weekly({
                 className="target-form"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (busy) return;
                   const count = Number(target);
+                  if (targetSaving.current === count) return;
                   if (!Number.isSafeInteger(count) || count < 1) {
                     setNotice({
                       kind: "error",
@@ -1105,11 +1256,18 @@ export function Weekly({
                       signature,
                       key: crypto.randomUUID(),
                     };
-                  setBusy(true);
-                  setNotice(null);
+                  // Optimistic: the saved target shows now; a failure restores
+                  // the previous one.
+                  const previous = targetContext;
+                  targetSaving.current = count;
+                  setTargetContext(
+                    (current) =>
+                      current && { ...current, recurringTarget: count },
+                  );
+                  setNotice({ kind: "success", text: savedTargetText(count) });
                   void api
                     .setTarget(token, count, targetDraft.current.key)
-                    .then(async (response) => {
+                    .then((response) => {
                       if (
                         response.data.membershipId !== membership.membershipId
                       )
@@ -1118,30 +1276,37 @@ export function Weekly({
                           "Target response did not match this membership.",
                         );
                       targetDraft.current = null;
-                      setNotice({
-                        kind: "success",
-                        text: savedTargetText(response.data.weeklyTarget),
-                      });
-                      try {
-                        setProgress(
-                          (await api.progress(token, membership.groupId)).data,
-                        );
-                        setRefreshWarning(false);
-                      } catch (error) {
-                        if (
-                          error instanceof ApiError &&
-                          error.kind === "unauthorized"
-                        )
-                          onRevoked();
-                        setRefreshWarning(true);
-                        setNotice({
-                          kind: "success",
-                          text: savedTargetText(response.data.weeklyTarget),
+                      // Progress refreshes in the background.
+                      void api
+                        .progress(token, membership.groupId)
+                        .then((progressResponse) => {
+                          setProgress(progressResponse.data);
+                          setRefreshWarning(false);
+                        })
+                        .catch((error) => {
+                          if (
+                            error instanceof ApiError &&
+                            error.kind === "unauthorized"
+                          )
+                            onRevoked();
+                          setRefreshWarning(true);
                         });
-                      }
                     })
-                    .catch(updateError)
-                    .finally(() => setBusy(false));
+                    .catch((error) => {
+                      setTargetContext((current) =>
+                        current && previous
+                          ? {
+                              ...current,
+                              recurringTarget: previous.recurringTarget,
+                            }
+                          : current,
+                      );
+                      updateError(error);
+                    })
+                    .finally(() => {
+                      if (targetSaving.current === count)
+                        targetSaving.current = null;
+                    });
                 }}
               >
                 <fieldset className="target-control">
@@ -1150,7 +1315,7 @@ export function Weekly({
                     className="target-adjust"
                     type="button"
                     aria-label="Decrease weekly target"
-                    disabled={busy || targetCount <= 1}
+                    disabled={targetCount <= 1}
                     onClick={() =>
                       setTarget(String(Math.max(1, targetCount - 1)))
                     }
@@ -1165,7 +1330,6 @@ export function Weekly({
                     className="target-adjust"
                     type="button"
                     aria-label="Increase weekly target"
-                    disabled={busy}
                     onClick={() => setTarget(String(targetCount + 1))}
                   >
                     +
@@ -1178,12 +1342,10 @@ export function Weekly({
                     week.
                   </p>
                 )}
-                <button type="submit" disabled={busy}>
-                  {busy
-                    ? "Saving…"
-                    : targetContext?.memberCount === 1
-                      ? "Save first target"
-                      : "Save for next week"}
+                <button type="submit">
+                  {targetContext?.memberCount === 1
+                    ? "Save first target"
+                    : "Save for next week"}
                 </button>
                 <p className="target-guidance">
                   We suggest at least 2. There’s no reward for a higher number.

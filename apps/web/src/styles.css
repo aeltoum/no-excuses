@@ -2662,3 +2662,6 @@ body:has(.home-log-button) .result.event-notice {
   padding: 0 8px;
   font-size: 0.8rem;
 }
+.proof-outbox {
+  margin-top: 18px;
+}

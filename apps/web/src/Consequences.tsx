@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { persistentMap } from "./persist";
 import { Result, useNotice } from "./Result";
 
 type Card = {
@@ -91,6 +92,9 @@ async function request(
   };
 }
 
+// Last known cards per member and Group, shown at once on reopen.
+const homeCache = persistentMap<ConsequenceHome>("consequences");
+
 // The picker pops up on its own once per hand; afterwards it opens from Home.
 const seenKey = "no-excuses:seen-card-offer";
 const readSeen = () => {
@@ -149,16 +153,22 @@ export function Consequences({
   onGroupOwed,
   onAttention,
   onLogBlock,
+  cacheKey,
 }: {
   apiBaseUrl: string;
   token: string;
+  cacheKey: string;
   onRevoked: () => void;
   onGroupOwed: (owed: Record<string, number>) => void;
   onAttention: (count: number) => void;
   onLogBlock: (block: LogBlock) => void;
 }) {
-  const [home, setHome] = useState<ConsequenceHome | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [home, setHome] = useState<ConsequenceHome | null>(
+    () => homeCache.get(cacheKey) ?? null,
+  );
+  // Controls waiting on the server, by action and target.
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const busy = (key: string) => pending.has(key);
   const [picking, setPicking] = useState(false);
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
@@ -183,6 +193,7 @@ export function Consequences({
     request(apiBaseUrl, token, "/v1/consequences")
       .then((next) => {
         if (!active) return;
+        homeCache.set(cacheKey, next);
         setHome(next);
         onGroupOwed(next.groupOwed);
         const offerId = next.offer?.offerId;
@@ -199,7 +210,7 @@ export function Consequences({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, onRevoked, onGroupOwed]);
+  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed]);
 
   useEffect(() => {
     if (!home) return;
@@ -211,13 +222,29 @@ export function Consequences({
     onLogBlock(home.logBlocked ? { title: home.attempt?.title ?? null } : null);
   }, [home, onAttention, onLogBlock]);
 
+  useEffect(() => {
+    if (home) onGroupOwed(home.groupOwed);
+  }, [home, onGroupOwed]);
+
+  // With `change`, the outcome shows at once and a failure undoes only that
+  // change; without it, only this control waits for the server.
   const act = async (
     action: Action,
     target: string,
     choice: string,
     done: string,
+    change?: {
+      apply: (current: ConsequenceHome) => ConsequenceHome;
+      undo: (current: ConsequenceHome) => ConsequenceHome;
+    },
   ) => {
-    setBusy(true);
+    const key = `${action}:${target}`;
+    if (pending.has(key)) return false;
+    setPending((current) => new Set(current).add(key));
+    if (change) {
+      setHome((current) => current && change.apply(current));
+      setNotice({ kind: "success", text: done });
+    }
     try {
       const next = await request(
         apiBaseUrl,
@@ -225,15 +252,20 @@ export function Consequences({
         `/v1/consequences/${action}`,
         { target, choice },
       );
+      homeCache.set(cacheKey, next);
       setHome(next);
-      onGroupOwed(next.groupOwed);
-      setNotice({ kind: "success", text: done });
+      if (!change) setNotice({ kind: "success", text: done });
       return true;
     } catch (error) {
+      if (change) setHome((current) => current && change.undo(current));
       fail(error);
       return false;
     } finally {
-      setBusy(false);
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -277,7 +309,7 @@ export function Consequences({
               <div className="proof-actions">
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy(`claim:${attempt.attemptId}`)}
                   onClick={async () => {
                     if (
                       await ask({
@@ -300,7 +332,7 @@ export function Consequences({
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={busy}
+                    disabled={busy(`request_pause:${attempt.attemptId}`)}
                     onClick={async () => {
                       if (
                         await ask({
@@ -314,6 +346,26 @@ export function Consequences({
                           attempt.attemptId,
                           "",
                           "Pause requested. Waiting for friends to approve.",
+                          {
+                            apply: (current) => ({
+                              ...current,
+                              attempt: current.attempt && {
+                                ...current.attempt,
+                                pauseRequest: {
+                                  approvals: 0,
+                                  rejections: 0,
+                                  approvalsNeeded: 2,
+                                },
+                              },
+                            }),
+                            undo: (current) => ({
+                              ...current,
+                              attempt: current.attempt && {
+                                ...current.attempt,
+                                pauseRequest: null,
+                              },
+                            }),
+                          },
                         );
                     }}
                   >
@@ -339,13 +391,19 @@ export function Consequences({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy(`resume:${attempt.attemptId}`)}
                 onClick={() =>
                   void act(
                     "resume",
                     attempt.attemptId,
                     "",
                     "Ready. Pick a fresh card.",
+                    {
+                      // The fresh hand comes from the server.
+                      apply: (current) => ({ ...current, attempt: null }),
+                      undo: (current) =>
+                        current.attempt ? current : { ...current, attempt },
+                    },
                   )
                 }
               >
@@ -388,13 +446,31 @@ export function Consequences({
                     className={
                       choice === "approve" ? undefined : "secondary-button"
                     }
-                    disabled={busy || review.myResponse !== null}
+                    disabled={review.myResponse !== null}
                     onClick={() =>
                       void act(
                         "respond",
                         review.claimId,
                         choice,
                         "Response saved.",
+                        {
+                          apply: (current) => ({
+                            ...current,
+                            reviews: current.reviews.map((entry) =>
+                              entry.claimId === review.claimId
+                                ? { ...entry, myResponse: choice }
+                                : entry,
+                            ),
+                          }),
+                          undo: (current) => ({
+                            ...current,
+                            reviews: current.reviews.map((entry) =>
+                              entry.claimId === review.claimId
+                                ? { ...entry, myResponse: null }
+                                : entry,
+                            ),
+                          }),
+                        },
                       )
                     }
                   >
@@ -428,13 +504,31 @@ export function Consequences({
                     className={
                       choice === "approve" ? undefined : "secondary-button"
                     }
-                    disabled={busy || review.myVote !== null}
+                    disabled={review.myVote !== null}
                     onClick={() =>
                       void act(
                         "vote_pause",
                         review.pauseRequestId,
                         choice,
                         "Vote saved.",
+                        {
+                          apply: (current) => ({
+                            ...current,
+                            pauseReviews: current.pauseReviews.map((entry) =>
+                              entry.pauseRequestId === review.pauseRequestId
+                                ? { ...entry, myVote: choice }
+                                : entry,
+                            ),
+                          }),
+                          undo: (current) => ({
+                            ...current,
+                            pauseReviews: current.pauseReviews.map((entry) =>
+                              entry.pauseRequestId === review.pauseRequestId
+                                ? { ...entry, myVote: null }
+                                : entry,
+                            ),
+                          }),
+                        },
                       )
                     }
                   >
@@ -450,7 +544,9 @@ export function Consequences({
         <AugmentPicker
           cards={offer.cards}
           canReroll={offer.canRedraw}
-          busy={busy}
+          busy={
+            busy(`redraw:${offer.offerId}`) || busy(`select:${offer.offerId}`)
+          }
           owed={home.owed}
           onClose={() => setPicking(false)}
           notice={<Result notice={notice} />}
