@@ -26,6 +26,11 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Disable independent Render Auto-Deploy once
+        run: node scripts/deploy-render.mjs --disable-auto-deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
       - name: Verify exact schema, grants, data invariant, and history
         run: node scripts/verify-migration-history.mjs --database
         env:

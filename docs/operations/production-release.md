@@ -32,13 +32,14 @@ Repository Actions variables:
   `VITE_SUPABASE_ANON_KEY`: existing web settings. The anon key is public; privileged keys
   belong only in server secrets.
 
-In Render's service Settings, set Auto-Deploy to Off. `render.yaml` also records `off` for
-Blueprint syncs. GitHub now triggers API deployments. Leaving Render's separate On Commit
+The one-time Repair migration history workflow sets Render Auto-Deploy to Off through the
+Render API and confirms the setting. You can also set it in the service Settings.
+`render.yaml` records `off` for Blueprint syncs. GitHub now triggers API deployments. Leaving Render's separate On Commit
 path enabled can deploy an API before its migration; After CI Checks Pass would wait for
 this same workflow while it waits for Render. The workflow refuses either setting.
 
-Keep Render's existing database/Auth/Storage/VAPID environment variables. This workflow
-applies database schema, not Supabase Auth, Storage bucket, or provider dashboard settings.
+Keep Render's existing database/Auth/Storage/VAPID environment variables. Recurring releases
+apply database schema without changing Supabase Auth, Storage buckets, or provider settings.
 The `production` GitHub environment must allow `main` and have no required reviewer if
 unattended releases are desired. Branch protection and required PR checks remain separate.
 
@@ -69,11 +70,12 @@ If any comparison fails, inspect the exact difference before proceeding.
 
 Both production workflows run only from `main`. Activate them in this order:
 
-1. Add the required GitHub secrets and variables, then turn Render Auto-Deploy Off.
-2. Merge the coordinated-release PR. Its first Deploy production run stops at the existing
-   migration-history conflict, before the API or PWA deployment.
-3. Run Repair migration history from `main`. It repeats all nine checks against the database
-   secret and reconciles exactly the October 17 and 18 entries.
+1. Add the required GitHub secrets and variables.
+2. Merge the coordinated-release PR. Its first Deploy production run refuses independent
+   Render Auto-Deploy if still enabled, before database changes or deployments. If Auto-Deploy
+   is already Off, the run instead stops at the existing migration-history conflict.
+3. Run Repair migration history from `main`. It disables independent Render Auto-Deploy,
+   confirms Off, then repeats all nine database checks and reconciles exactly October 17 and 18.
 4. Confirm its dry-run lists only `20261019000000_reactions_nudges.sql`, then rerun Deploy production.
 
 The repair workflow fails closed after reconciliation because its expected pre-repair history
@@ -94,5 +96,6 @@ requires its own retest.
 
 Provider references: [Render commit-specific deploys](https://render.com/docs/deploys),
 [Render API trigger deploy](https://api-docs.render.com/reference/create-deploy),
+[Render API update service](https://api-docs.render.com/reference/update-service),
 [Render Blueprint Auto-Deploy](https://render.com/docs/blueprint-spec#autodeploytrigger),
 [Supabase migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).

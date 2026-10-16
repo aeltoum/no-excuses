@@ -24,7 +24,13 @@ async function request(path, method = "GET", body) {
     throw new Error(`Render ${method} failed: HTTP ${response.status}`);
   return response.json();
 }
-const service = await request("");
+let service = await request("");
+// One-time setup only. Regular releases keep the preflight read-only.
+const disableAutoDeploy = process.argv.includes("--disable-auto-deploy");
+if (disableAutoDeploy) {
+  await request("", "PATCH", { autoDeployTrigger: "off" });
+  service = await request("");
+}
 if (
   service.autoDeployTrigger !== undefined
     ? service.autoDeployTrigger !== "off"
@@ -33,7 +39,7 @@ if (
   throw new Error(
     "Disable Render Auto-Deploy first; GitHub controls release ordering",
   );
-if (process.argv.includes("--check")) process.exit(0);
+if (disableAutoDeploy || process.argv.includes("--check")) process.exit(0);
 const deploy = await request("/deploys", "POST", { commitId: GITHUB_SHA });
 if (typeof deploy.id !== "string")
   throw new Error("Render returned no deploy ID");

@@ -13,6 +13,7 @@ function run(responses: unknown[], env = {}, argv: string[] = []) {
   const fetcher = vi.fn(async (url: string, init: RequestInit) => {
     calls.push({ url, init });
     const next = responses.shift();
+    if (next instanceof Response) return next;
     return { ok: true, json: async () => next };
   });
   const finished = new Error("exit:0");
@@ -76,6 +77,56 @@ describe("coordinated Render deployment", () => {
     );
     await expect(result).rejects.toBe(finished);
     expect(calls.map((call) => call.init.method)).toEqual(["GET"]);
+  });
+  it("disables independent auto-deploy once and confirms it without deploying", async () => {
+    const { result, calls, finished } = run(
+      [
+        { autoDeployTrigger: "commit" },
+        { autoDeployTrigger: "off" },
+        { autoDeployTrigger: "off" },
+      ],
+      {},
+      ["--disable-auto-deploy"],
+    );
+    await expect(result).rejects.toBe(finished);
+    expect(calls.map((call) => call.init.method)).toEqual([
+      "GET",
+      "PATCH",
+      "GET",
+    ]);
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      autoDeployTrigger: "off",
+    });
+    expect(
+      calls.every(
+        (call) => call.url === "https://api.render.com/v1/services/srv-test",
+      ),
+    ).toBe(true);
+  });
+  it("stops setup when Render rejects the setting change", async () => {
+    const { result, calls } = run(
+      [
+        { autoDeployTrigger: "commit" },
+        new Response("permission denied", { status: 403 }),
+      ],
+      {},
+      ["--disable-auto-deploy"],
+    );
+    await expect(result).rejects.toThrow("Render PATCH failed: HTTP 403");
+    expect(calls.map((call) => call.init.method)).toEqual(["GET", "PATCH"]);
+  });
+  it("stops setup if Render still reports independent auto-deploy enabled", async () => {
+    const { result, calls } = run(
+      [{ autoDeployTrigger: "commit" }, {}, { autoDeployTrigger: "commit" }],
+      {},
+      ["--disable-auto-deploy"],
+    );
+    await expect(result).rejects.toThrow("Disable Render Auto-Deploy first");
+    expect(calls.map((call) => call.init.method)).toEqual([
+      "GET",
+      "PATCH",
+      "GET",
+    ]);
   });
   it("prefers the current auto-deploy field over the legacy field", async () => {
     const { result, calls } = run([
