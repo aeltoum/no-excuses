@@ -186,6 +186,28 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   const strong = own.getByRole("button", { name: "💪, 1" });
   const drawer = page.getByRole("dialog", { name: "Reactions" });
   const emojiTabs = drawer.getByRole("tablist", { name: "Emoji" });
+  const expectClear = async (
+    notice: ReturnType<typeof page.getByRole>,
+    actions: ReturnType<typeof page.getByRole>[],
+  ) => {
+    const noticeBox = await notice.boundingBox();
+    for (const target of [
+      drawer.getByRole("heading", { name: "Reactions" }),
+      drawer.getByRole("button", { name: "Close" }),
+      emojiTabs,
+      ...actions,
+    ]) {
+      const other = await target.boundingBox();
+      expect(noticeBox && other).toBeTruthy();
+      if (!noticeBox || !other) continue;
+      expect(
+        noticeBox.x < other.x + other.width &&
+          other.x < noticeBox.x + noticeBox.width &&
+          noticeBox.y < other.y + other.height &&
+          other.y < noticeBox.y + noticeBox.height,
+      ).toBe(false);
+    }
+  };
   const names = drawer.locator(".reactor-name");
   await strong.click();
   // The first load fails and offers a retry.
@@ -212,16 +234,23 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await fire.click();
   await expect(names).toHaveText(["Jordan", "Sam"]);
   const reactFire = drawer.getByRole("button", { name: "React with 🔥" });
-  // A failed reaction rolls back.
-  await reactFire.click();
-  await expect(page.getByRole("alert")).toHaveText(
-    "Something went wrong. Try again.",
-  );
+  // A failed reaction rolls back; focus stays on the restored control.
+  await reactFire.focus();
+  await page.keyboard.press("Enter");
+  const notice = page.getByRole("alert");
+  await expect(notice).toHaveText("Something went wrong. Try again.");
   await expect(fire).toHaveAttribute("aria-pressed", "false");
   await expect(names).toHaveText(["Jordan", "Sam"]);
-  await reactFire.click();
+  await expect(reactFire).toBeFocused();
+  // The notice leaves the drawer's title, Close and action clear.
+  await expectClear(notice, [reactFire]);
+  await page.screenshot({ path: testInfo.outputPath("reactions-notice.png") });
+  await page.keyboard.press("Space");
   await expect(names).toHaveText(["You", "Jordan", "Sam"]);
   await expect(reactFire).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "Remove your 🔥" }),
+  ).toBeFocused();
   await expect(emojiTabs.getByRole("tab", { name: "🔥, 3" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
@@ -257,16 +286,35 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await expect(fireTab).toHaveAttribute("aria-selected", "true");
   await expect(fireTab).toBeFocused();
   await expect(names).toHaveText(["You", "Jordan", "Sam"]);
-  await page.screenshot({ path: "/tmp/claude-0/worker-drawer.png" });
+  await page.screenshot({ path: testInfo.outputPath("reactions-drawer.png") });
   await page.keyboard.press("ArrowRight");
   await expect(gorillaTab).toHaveAttribute("aria-selected", "true");
-  await drawer.getByRole("button", { name: "Remove your 🦍" }).click();
+  // In a short drawer a failed removal's notice still clears the header, tabs and action.
+  const removeGorilla = drawer.getByRole("button", { name: "Remove your 🦍" });
+  failNextReaction = true;
+  await removeGorilla.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toHaveText(
+    "Something went wrong. Try again.",
+  );
+  await expect(removeGorilla).toBeFocused();
+  await expectClear(page.getByRole("alert"), [removeGorilla]);
+  await page.screenshot({
+    path: testInfo.outputPath("reactions-notice-short.png"),
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expectClear(page.getByRole("alert"), [removeGorilla]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.keyboard.press("Enter");
   await expect(gorillaTab).toHaveCount(0);
   await expect(emojiTabs.getByRole("tab", { name: "🦍, 0" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
   await expect(gorilla).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "React with 🦍" }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   // Any emoji is a search and a tap away; Escape closes the sheet.
@@ -353,7 +401,9 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     drawer.getByRole("button", { name: "React with 🇰🇪" }),
   ).toBeVisible();
   await expect(kenya).toHaveCount(0);
-  await page.screenshot({ path: "/tmp/claude-0/worker-drawer-empty.png" });
+  await page.screenshot({
+    path: testInfo.outputPath("reactions-drawer-empty.png"),
+  });
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(add).toBeFocused();

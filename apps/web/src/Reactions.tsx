@@ -162,6 +162,14 @@ function ReactorsSheet({
         ?.focus(),
     );
   };
+  // Toggling swaps the focused button for its counterpart; keep focus on that control.
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open && document.activeElement === document.body)
+      panel.current
+        ?.querySelector<HTMLElement>(".reactor-action:not(:disabled)")
+        ?.focus();
+  });
   // The viewer's row follows the optimistic chip state, so a failed save rolls it back too.
   const reacted = selected !== null && mine.includes(selected);
   const rows = [
@@ -196,7 +204,7 @@ function ReactorsSheet({
           </button>
         ))}
       </div>
-      <div role="tabpanel" aria-label={`Reacted ${selected ?? ""}`}>
+      <div role="tabpanel" ref={panel} aria-label={`Reacted ${selected ?? ""}`}>
         {who.status === "loading" && (
           <p className="sheet-hint" role="status">
             Loading…

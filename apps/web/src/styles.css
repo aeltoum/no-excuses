@@ -2364,8 +2364,17 @@ button:disabled {
 body:has(.home-log-button) .result.event-notice {
   bottom: calc(148px + env(safe-area-inset-bottom));
 }
-.sheet .result.event-notice {
-  bottom: calc(16px + env(safe-area-inset-bottom));
+/* Inside a sheet the notice joins the sheet's flow, clear of its header and actions.
+   The extra class outranks the Home offset above, which would push it up the sheet. */
+.sheet-layer .sheet .result.event-notice {
+  position: sticky;
+  bottom: 0;
+  left: auto;
+  width: auto;
+  margin-top: 16px;
+  transform: none;
+  box-shadow: none;
+  animation: none;
 }
 @keyframes notice-rise {
   from {
