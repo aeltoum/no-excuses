@@ -61,6 +61,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   });
   const calls: string[] = [];
   let failNextReaction = true;
+  let failNextReactors = true;
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("http://127.0.0.1:54321/auth/v1/**", (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -102,6 +103,17 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
           activityTypes: ["cardio"],
         },
       ]);
+    // Home's background loads, which a longer session reaches.
+    if (path.endsWith("/finalized-weekly-history")) return ok([]);
+    if (path.endsWith("/weekly-target"))
+      return ok({
+        membershipId,
+        recurringTarget: 3,
+        lockedTarget: 3,
+        nextWeekStartsAt: null,
+        memberCount: 3,
+        timeZone: "UTC",
+      });
     if (path === "/v1/proof/feed")
       return ok([
         item({
@@ -132,6 +144,20 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
       calls.push(`nudge:${request.postDataJSON().membershipId}`);
       return ok({ membershipId: request.postDataJSON().membershipId });
     }
+    if (path.endsWith("/reactions")) {
+      if (failNextReactors) {
+        failNextReactors = false;
+        return route.fulfill({ status: 500, json: {} });
+      }
+      return ok(
+        path.includes(pendingId)
+          ? [
+              { emoji: "🔥", name: "Jordan", mine: false },
+              { emoji: "🔥", name: "Sam", mine: false },
+            ]
+          : [{ emoji: "💪", name: "Maya", mine: false }],
+      );
+    }
     if (path.endsWith("/react")) {
       if (failNextReaction) {
         failNextReaction = false;
@@ -152,21 +178,54 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
-  // Own proof shows counts only; friends' proof takes any emoji, several at once.
+  // Chips open a drawer of who reacted; on your own proof it is view-only.
   const reactions = page.getByRole("group", { name: "Reactions" });
   await expect(reactions).toHaveCount(2);
-  await expect(reactions.nth(1).getByRole("button")).toHaveCount(0);
-  await expect(reactions.nth(1)).toContainText("💪1");
+  const own = reactions.nth(1);
+  await expect(own.getByRole("button")).toHaveCount(1);
+  const strong = own.getByRole("button", { name: "💪, 1" });
+  const drawer = page.getByRole("dialog", { name: "Reactions" });
+  const emojiTabs = drawer.getByRole("tablist", { name: "Emoji" });
+  const names = drawer.locator(".reactor-name");
+  await strong.click();
+  // The first load fails and offers a retry.
+  await expect(drawer.getByRole("alert")).toContainText(
+    "Couldn’t load reactions.",
+  );
+  await drawer.getByRole("button", { name: "Try again" }).click();
+  await expect(names).toHaveText(["Maya"]);
+  await expect(emojiTabs.getByRole("tab", { name: "💪, 1" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    drawer.getByRole("button", { name: /Remove|React with/ }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(strong).toBeFocused();
+
+  // On friends' proof the drawer adds or removes your own emoji.
   const friend = reactions.first();
   const fire = friend.getByRole("button", { name: "🔥, 2" });
   await expect(fire).toHaveAttribute("aria-pressed", "false");
-  // A failed reaction rolls back.
   await fire.click();
+  await expect(names).toHaveText(["Jordan", "Sam"]);
+  const reactFire = drawer.getByRole("button", { name: "React with 🔥" });
+  // A failed reaction rolls back.
+  await reactFire.click();
   await expect(page.getByRole("alert")).toHaveText(
     "Something went wrong. Try again.",
   );
   await expect(fire).toHaveAttribute("aria-pressed", "false");
-  await fire.click();
+  await expect(names).toHaveText(["Jordan", "Sam"]);
+  await reactFire.click();
+  await expect(names).toHaveText(["You", "Jordan", "Sam"]);
+  await expect(reactFire).toHaveCount(0);
+  await expect(emojiTabs.getByRole("tab", { name: "🔥, 3" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(friend.getByRole("button", { name: "🔥, 3" })).toBeFocused();
   await expect(friend.getByRole("button", { name: "🔥, 3" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -186,6 +245,30 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     "aria-pressed",
     "true",
   );
+  // Tabs switch by arrow key; removing your only 🦍 empties its tab and drops the chip.
+  const gorilla = friend.getByRole("button", { name: "🦍, 1" });
+  await gorilla.click();
+  const gorillaTab = emojiTabs.getByRole("tab", { name: "🦍, 1" });
+  const fireTab = emojiTabs.getByRole("tab", { name: "🔥, 3" });
+  await expect(gorillaTab).toHaveAttribute("aria-selected", "true");
+  await expect(names).toHaveText(["You"]);
+  await gorillaTab.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(fireTab).toHaveAttribute("aria-selected", "true");
+  await expect(fireTab).toBeFocused();
+  await expect(names).toHaveText(["You", "Jordan", "Sam"]);
+  await page.screenshot({ path: "/tmp/claude-0/worker-drawer.png" });
+  await page.keyboard.press("ArrowRight");
+  await expect(gorillaTab).toHaveAttribute("aria-selected", "true");
+  await drawer.getByRole("button", { name: "Remove your 🦍" }).click();
+  await expect(gorillaTab).toHaveCount(0);
+  await expect(emojiTabs.getByRole("tab", { name: "🦍, 0" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(gorilla).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
   // Any emoji is a search and a tap away; Escape closes the sheet.
   await add.click();
   await page.keyboard.press("Escape");
@@ -239,13 +322,41 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await sheet.getByRole("combobox", { name: "Search" }).fill("kenya");
   await sheet.getByRole("option", { name: /Kenya/ }).click();
   await expect(sheet).toHaveCount(0);
-  // Tapping your own emoji takes it back.
+  // Remove in the drawer takes your emoji back.
   await friend.getByRole("button", { name: "🔥, 3" }).click();
+  await drawer.getByRole("button", { name: "Remove your 🔥" }).click();
+  await expect(names).toHaveText(["Jordan", "Sam"]);
+  await page.keyboard.press("Escape");
   await expect(friend.getByRole("button", { name: "🔥, 2" })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
   await expect(friend.getByRole("button", { name: "🇰🇪, 1" })).toBeVisible();
+  // Removing your last emoji keeps the drawer open on an empty tab; a failure rolls back in place.
+  const kenya = friend.getByRole("button", { name: "🇰🇪, 1" });
+  await kenya.click();
+  await expect(names).toHaveText(["You"]);
+  failNextReaction = true;
+  await drawer.getByRole("button", { name: "Remove your 🇰🇪" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Something went wrong. Try again.",
+  );
+  await expect(names).toHaveText(["You"]);
+  await expect(kenya).toBeVisible();
+  await drawer.getByRole("button", { name: "Remove your 🇰🇪" }).click();
+  await expect(drawer).toContainText("No reactions yet.");
+  await expect(emojiTabs.getByRole("tab", { name: "🇰🇪, 0" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    drawer.getByRole("button", { name: "React with 🇰🇪" }),
+  ).toBeVisible();
+  await expect(kenya).toHaveCount(0);
+  await page.screenshot({ path: "/tmp/claude-0/worker-drawer-empty.png" });
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(add).toBeFocused();
 
   // Only members behind target can be nudged, once.
   const friends = page.getByRole("list", { name: "Friends this week" });
@@ -260,8 +371,10 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   expect(calls).toEqual([
     "react:🔥:true",
     "react:🦍:true",
+    "react:🦍:false",
     "react:🇰🇪:true",
     "react:🔥:false",
+    "react:🇰🇪:false",
     `nudge:${friendMembershipId}`,
   ]);
   expect(

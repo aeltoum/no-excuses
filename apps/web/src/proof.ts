@@ -105,6 +105,22 @@ export const reactToProof = (
     { method: "POST", body: { emoji, on } },
   );
 
+export type Reactor = { emoji: string; name: string; mine: boolean };
+
+export async function loadReactors(baseUrl: string, token: string, id: string) {
+  const rows = await call<unknown>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/reactions`,
+    {
+      method: "GET",
+    },
+  );
+  if (!Array.isArray(rows))
+    throw new ApiError("failure", "Couldn’t load reactions.", true);
+  return rows as Reactor[];
+}
+
 export const loadNudged = (baseUrl: string, token: string) =>
   call<string[]>(baseUrl, token, "/v1/nudges", { method: "GET" });
 

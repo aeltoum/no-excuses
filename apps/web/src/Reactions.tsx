@@ -1,6 +1,6 @@
 import emojiData from "emoji-picker-element-data/en/emojibase/data.json?url";
-import { useEffect, useRef, useState } from "react";
-import { type ReactionCount, reactionLimit } from "./proof";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactionCount, type Reactor, reactionLimit } from "./proof";
 import { Sheet } from "./Sheet";
 
 // Quick picks drawn from the gym floor; the full picker below searches every emoji.
@@ -92,7 +92,170 @@ type Props = {
   // The author sees counts only.
   readOnly: boolean;
   onToggle: (emoji: string, on: boolean) => void;
+  loadReactors: () => Promise<Reactor[]>;
 };
+
+type Who =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; rows: Reactor[] };
+
+// Like Discord: tabs per emoji, then who reacted with the chosen one.
+function ReactorsSheet({
+  reactions,
+  mine,
+  readOnly,
+  selected,
+  onSelect,
+  onToggle,
+  loadReactors,
+  onDismiss,
+}: Props & {
+  selected: string | null;
+  onSelect: (emoji: string) => void;
+  onDismiss: () => void;
+}) {
+  const [who, setWho] = useState<Who>({ status: "loading" });
+  const request = useRef(0);
+  const loadRef = useRef(loadReactors);
+  loadRef.current = loadReactors;
+  const open = selected !== null;
+  // Only the latest request may settle the list.
+  const load = useCallback(() => {
+    const id = ++request.current;
+    setWho({ status: "loading" });
+    loadRef.current().then(
+      (rows) => {
+        if (request.current === id) setWho({ status: "ready", rows });
+      },
+      () => {
+        if (request.current === id) setWho({ status: "error" });
+      },
+    );
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    load();
+    return () => {
+      request.current++;
+    };
+  }, [open, load]);
+  // The chosen tab stays while empty, so a removal (or its rollback) happens in place.
+  const tabList =
+    selected === null || reactions.some((entry) => entry.emoji === selected)
+      ? reactions
+      : [...reactions, { emoji: selected, count: 0 }];
+
+  const tabs = useRef<HTMLDivElement>(null);
+  const onTabKey = (event: React.KeyboardEvent) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const index = tabList.findIndex((entry) => entry.emoji === selected);
+    const next =
+      tabList[(index + step + tabList.length) % tabList.length]?.emoji;
+    if (!next) return;
+    onSelect(next);
+    requestAnimationFrame(() =>
+      tabs.current
+        ?.querySelector<HTMLElement>('[aria-selected="true"]')
+        ?.focus(),
+    );
+  };
+  // The viewer's row follows the optimistic chip state, so a failed save rolls it back too.
+  const reacted = selected !== null && mine.includes(selected);
+  const rows = [
+    ...(reacted ? [{ emoji: selected, name: "You", mine: true }] : []),
+    ...(who.status === "ready"
+      ? who.rows.filter((row) => row.emoji === selected && !row.mine)
+      : []),
+  ];
+  return (
+    <Sheet open={open} title="Reactions" onDismiss={onDismiss}>
+      <div
+        className="reactor-tabs"
+        role="tablist"
+        aria-label="Emoji"
+        ref={tabs}
+        onKeyDown={onTabKey}
+      >
+        {tabList.map(({ emoji, count }) => (
+          <button
+            key={emoji}
+            type="button"
+            role="tab"
+            aria-selected={emoji === selected}
+            aria-label={`${emoji}, ${count}`}
+            tabIndex={emoji === selected ? 0 : -1}
+            onClick={() => onSelect(emoji)}
+          >
+            <span aria-hidden="true">{emoji}</span>
+            <span className="proof-reaction-count" aria-hidden="true">
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" aria-label={`Reacted ${selected ?? ""}`}>
+        {who.status === "loading" && (
+          <p className="sheet-hint" role="status">
+            Loading…
+          </p>
+        )}
+        {who.status === "error" && (
+          <div className="reactor-error" role="alert">
+            <p className="sheet-hint">Couldn’t load reactions.</p>
+            <button type="button" className="reactor-action" onClick={load}>
+              Try again
+            </button>
+          </div>
+        )}
+        {who.status === "ready" && (
+          <>
+            {rows.length === 0 ? (
+              <p className="sheet-hint">No reactions yet.</p>
+            ) : (
+              <ul className="reactor-list">
+                {rows.map((row, index) => (
+                  <li
+                    key={row.mine ? "you" : `${row.name}-${index}`}
+                    className={row.mine ? "reactor-mine" : undefined}
+                  >
+                    <span className="reactor-name">
+                      {row.mine ? "You" : row.name}
+                    </span>
+                    {row.mine && !readOnly && (
+                      <button
+                        type="button"
+                        className="reactor-action"
+                        aria-label={`Remove your ${row.emoji}`}
+                        onClick={() => onToggle(row.emoji, false)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!readOnly && selected && !reacted && (
+              <button
+                type="button"
+                className="reactor-action reactor-add"
+                disabled={mine.length >= reactionLimit}
+                onClick={() => onToggle(selected, true)}
+              >
+                {mine.length >= reactionLimit
+                  ? `Up to ${reactionLimit} reactions`
+                  : `React with ${selected}`}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
 
 // The full picker loads on first open and reads emoji data served from our own origin.
 function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
@@ -125,8 +288,23 @@ function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   return <div ref={holder} className="emoji-picker-holder" />;
 }
 
-export function Reactions({ reactions, mine, readOnly, onToggle }: Props) {
+export function Reactions({
+  reactions,
+  mine,
+  readOnly,
+  onToggle,
+  loadReactors,
+}: Props) {
   const [open, setOpen] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  // Focus goes back to the chip; if that chip is gone, to Add reaction.
+  const closeViewing = useCallback(() => {
+    setViewing(null);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) addRef.current?.focus();
+    });
+  }, []);
   const full = mine.length >= reactionLimit;
   const pick = (emoji: string) => {
     if (mine.includes(emoji)) onToggle(emoji, false);
@@ -137,32 +315,26 @@ export function Reactions({ reactions, mine, readOnly, onToggle }: Props) {
   return (
     <>
       <fieldset className="proof-reactions" aria-label="Reactions">
-        {reactions.map(({ emoji, count }) =>
-          readOnly ? (
-            <span key={emoji} className="proof-reaction">
-              <span aria-hidden="true">{emoji}</span>
-              <span className="proof-reaction-count">{count}</span>
+        {reactions.map(({ emoji, count }) => (
+          <button
+            key={emoji}
+            type="button"
+            className="proof-reaction"
+            aria-haspopup="dialog"
+            aria-pressed={readOnly ? undefined : mine.includes(emoji)}
+            aria-label={`${emoji}, ${count}`}
+            onClick={() => setViewing(emoji)}
+          >
+            <span aria-hidden="true">{emoji}</span>
+            <span className="proof-reaction-count" aria-hidden="true">
+              {count}
             </span>
-          ) : (
-            <button
-              key={emoji}
-              type="button"
-              className="proof-reaction"
-              aria-pressed={mine.includes(emoji)}
-              aria-label={`${emoji}, ${count}`}
-              disabled={full && !mine.includes(emoji)}
-              onClick={() => onToggle(emoji, !mine.includes(emoji))}
-            >
-              <span aria-hidden="true">{emoji}</span>
-              <span className="proof-reaction-count" aria-hidden="true">
-                {count}
-              </span>
-            </button>
-          ),
-        )}
+          </button>
+        ))}
         {!readOnly && (
           <button
             type="button"
+            ref={addRef}
             className="proof-reaction proof-reaction-add"
             aria-haspopup="dialog"
             aria-label={full ? "Reaction limit reached" : "Add reaction"}
@@ -213,6 +385,16 @@ export function Reactions({ reactions, mine, readOnly, onToggle }: Props) {
         </fieldset>
         <EmojiPicker onPick={pick} />
       </Sheet>
+      <ReactorsSheet
+        reactions={reactions}
+        mine={mine}
+        readOnly={readOnly}
+        selected={viewing}
+        onSelect={setViewing}
+        onToggle={onToggle}
+        loadReactors={loadReactors}
+        onDismiss={closeViewing}
+      />
     </>
   );
 }
