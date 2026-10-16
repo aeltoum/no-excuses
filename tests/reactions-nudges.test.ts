@@ -202,6 +202,16 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     expect(today).toEqual([memberships[1]]);
   });
 
+  it("nudges a member whose only report was rejected", async () => {
+    const db = await database();
+    const id = await submit(db, 2);
+    await db.query(
+      "update app_private.workout_checkins set review_status = 'rejected' where workout_checkin_id = $1",
+      [id],
+    );
+    await nudge(db, 0, 2);
+  });
+
   it("pushes the recipient at once, bundles within 15 minutes, caps at three a day", async () => {
     const db = await database();
     await subscribe(db, 0);
