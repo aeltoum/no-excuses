@@ -205,6 +205,7 @@ async function deliverPush() {
   try {
     await pool.query("select app_private.enqueue_push_notifications(now())");
     await pool.query("select app_private.enqueue_consequence_push(now())");
+    await pool.query("select app_private.enqueue_social_push(now())");
     const pending = await pool.query(
       "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
     );
@@ -788,6 +789,8 @@ async function push(request: Request): Promise<Response> {
 
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
+const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
+const reactionKinds = ["strong", "fire", "cheer"];
 async function proof(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });
@@ -834,6 +837,15 @@ async function proof(request: Request, path: string): Promise<Response> {
       const rows = (
         await query(actor, "select * from app_private.proof_feed($1)", [now])
       ).rows;
+      const reactions = new Map(
+        (
+          await query(
+            actor,
+            "select * from app_private.proof_reaction_summary($1)",
+            [now],
+          )
+        ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
       const paths = rows.flatMap((row) => [
         row.activity_photo_path as string,
         row.presence_photo_path as string,
@@ -877,9 +889,25 @@ async function proof(request: Request, path: string): Promise<Response> {
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
               urls.get(row.presence_photo_path as string) ?? null,
+            reactions: reactions.get(row.workout_checkin_id)?.counts ?? {},
+            myReaction:
+              reactions.get(row.workout_checkin_id)?.my_reaction ?? null,
           })),
         ),
       );
+    }
+    const reacted = proofReaction.exec(path);
+    if (reacted && request.method === "POST") {
+      const reaction = body.reaction ?? null;
+      if (reaction !== null && !reactionKinds.includes(String(reaction)))
+        return reply(fail("invalid_request", 400));
+      await query(actor, "select app_private.react_to_proof($1,$2,$3)", [
+        reacted[1],
+        reaction,
+        now,
+      ]);
+      setImmediate(() => void deliverPush());
+      return reply(ok({ workoutCheckinId: reacted[1], reaction }));
     }
     const match = proofAction.exec(path);
     if (match && request.method === "POST") {
@@ -911,6 +939,43 @@ async function proof(request: Request, path: string): Promise<Response> {
       return reply(ok({ workoutCheckinId: id, status: rows[0]?.status }));
     }
     return reply(fail("not_found", 404));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
+async function nudges(request: Request): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  const now = new Date().toISOString();
+  try {
+    if (request.method === "GET") {
+      const rows = (
+        await query(actor, "select app_private.nudged_today($1) as id", [now])
+      ).rows;
+      return reply(ok(rows.map((row) => row.id as string)));
+    }
+    let body: { membershipId?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+    if (!anyUuid(body?.membershipId))
+      return reply(fail("invalid_request", 400));
+    await query(actor, "select app_private.nudge_member($1,$2)", [
+      body.membershipId,
+      now,
+    ]);
+    setImmediate(() => void deliverPush());
+    return reply(ok({ membershipId: body.membershipId }));
   } catch (error) {
     return reply(dbError(error));
   }
@@ -1013,12 +1078,14 @@ const server = createServer(async (incoming, outgoing) => {
           : path === "/v1/push" &&
               ["GET", "POST", "DELETE"].includes(request.method)
             ? await push(request)
-            : path.startsWith("/v1/proof/")
-              ? await proof(request, path)
-              : path === "/v1/consequences" ||
-                  path.startsWith("/v1/consequences/")
-                ? await consequences(request, path)
-                : await route(request);
+            : path === "/v1/nudges" && ["GET", "POST"].includes(request.method)
+              ? await nudges(request)
+              : path.startsWith("/v1/proof/")
+                ? await proof(request, path)
+                : path === "/v1/consequences" ||
+                    path.startsWith("/v1/consequences/")
+                  ? await consequences(request, path)
+                  : await route(request);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",

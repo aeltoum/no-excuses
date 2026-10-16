@@ -2468,3 +2468,38 @@ body:has(.home-log-button) .result.event-notice {
   outline-offset: 4px;
   border-radius: 8px;
 }
+
+/* Reactions under each proof post: quiet chips; the viewer's own pick fills yellow. */
+.proof-reactions {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.proof-reaction {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: 44px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+.proof-reaction[aria-pressed="true"] {
+  border-color: var(--class);
+  background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+.friend-nudge {
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 0.8rem;
+}

@@ -46,6 +46,8 @@ const item = (overrides: Record<string, unknown>) => ({
   canVote: false,
   activityPhotoUrl: photo,
   presencePhotoUrl: photo,
+  reactions: {},
+  myReaction: null,
   ...overrides,
 });
 
@@ -125,6 +127,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
         timeZone: "America/Chicago",
       });
     if (path === "/v1/proof/feed") return ok(feed);
+    if (path === "/v1/nudges") return ok([]);
     if (path === "/v1/consequences")
       return ok({
         owed: 0,
@@ -175,7 +178,9 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   const homeTab = page.getByRole("link", { name: /^Home/ });
   await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
   const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends.getByRole("listitem")).toHaveText(["Maya2/3 · review"]);
+  await expect(friends.getByRole("listitem")).toHaveText([
+    "Maya2/3 · reviewNudge",
+  ]);
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
   ).toBeVisible();

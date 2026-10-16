@@ -133,6 +133,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
         timeZone: "UTC",
       });
     if (path === "/v1/proof/feed") return ok([]);
+    if (path === "/v1/nudges") return ok([]);
     if (path === "/v1/consequences") return ok(state);
     const action = /^\/v1\/consequences\/(\w+)$/.exec(path)?.[1];
     if (action) {
@@ -247,7 +248,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText(["Maya2/3 · owes 2"]);
+  ).toHaveText(["Maya2/3 · owes 2Nudge"]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
   ).toContainText("1/5");
