@@ -42,7 +42,13 @@ export function persistentMap<T>(name: string): Map<string, T> {
   return map;
 }
 
+const clearers = new Set<() => void>();
+
+// In-memory caches register here so sign-out drops them too.
+export const onClearPersisted = (clear: () => void) => clearers.add(clear);
+
 // Sign-out and revoked access drop every member's cached data.
 export function clearPersisted() {
   for (const map of maps) map.clear();
+  for (const clear of clearers) clear();
 }

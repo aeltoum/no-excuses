@@ -43,6 +43,16 @@ Every browser pass must:
 
 Start each browser validator pass from a fresh tab or a documented reset state.
 
+### Speed
+
+Hosted APIs can be slow, so every added or changed UI is timed with at least 1000ms injected API latency (`apps/web/tests/timing.ts`):
+
+- direct feedback for a member action: at most 100ms after the input;
+- a sheet or drawer: open to first actionable content in at most 100ms;
+- network-dependent content: a placeholder shows at once and holds its space.
+
+Assert these budgets in the changed flow's browser test. Workers and validators report the measured numbers for changed UI.
+
 ## 1. Orchestrator: frame
 
 Read the governing issue or specification and the repository instructions. Define a checkable acceptance list, the validation adapter and environment, and the repository checks that must stay green. For browser work, include the entry URL and relevant viewports. For a bug, require a pre-change reproduction through the selected adapter when the environment permits it.

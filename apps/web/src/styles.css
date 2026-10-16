@@ -2612,7 +2612,11 @@ body:has(.home-log-button) .result.event-notice {
 }
 .reactor-add {
   width: 100%;
-  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.reactor-placeholder {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 .reactor-error {
   display: grid;

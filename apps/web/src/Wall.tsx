@@ -4,6 +4,7 @@ import { useConfirm } from "./Confirm";
 import { persistentMap } from "./persist";
 import {
   actOnProof,
+  cachedReactors,
   loadProofFeed,
   loadReactors,
   type ProofAction,
@@ -381,6 +382,7 @@ export function ProofFeed({
             loadReactors={() =>
               loadReactors(apiBaseUrl, token, item.workoutCheckinId)
             }
+            cachedReactors={() => cachedReactors(item.workoutCheckinId)}
           />
         )}
         {item.reviewStatus === "questioned" && (

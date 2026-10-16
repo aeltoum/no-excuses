@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
@@ -177,6 +178,62 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+
+  // On a slow API the drawer and your own controls show at once; names follow below them.
+  failNextReactors = false;
+  failNextReaction = false;
+  const slow = [
+    await delayRoute(page, "**/v1/proof/*/reactions", 1500),
+    await delayRoute(page, "**/v1/proof/*/react", 1500),
+  ];
+  const slowDrawer = page.getByRole("dialog", { name: "Reactions" });
+  const slowFire = page
+    .getByRole("group", { name: "Reactions" })
+    .first()
+    .getByRole("button", { name: "🔥, 2" });
+  const slowReact = slowDrawer.getByRole("button", { name: "React with 🔥" });
+  const slowRemove = slowDrawer.getByRole("button", { name: "Remove your 🔥" });
+  const timings: Record<string, number> = {};
+  timings.open = await msUntilVisible(page, () => slowFire.click(), slowReact);
+  await expect(slowDrawer.getByRole("tab", { name: "🔥, 2" })).toBeVisible();
+  await expect(slowDrawer.getByRole("status")).toHaveText("Loading names…");
+  const reactBox = await slowReact.boundingBox();
+  await expect(slowDrawer.locator(".reactor-name")).toHaveText([
+    "Jordan",
+    "Sam",
+  ]);
+  expect(await slowReact.boundingBox()).toEqual(reactBox);
+  timings.react = await msUntilVisible(
+    page,
+    () => slowReact.click(),
+    slowRemove,
+  );
+  timings.remove = await msUntilVisible(
+    page,
+    () => slowRemove.click(),
+    slowReact,
+  );
+  await page.keyboard.press("Escape");
+  await expect(slowDrawer).toHaveCount(0);
+  // Reopening shows the cached names at once.
+  timings.reopen = await msUntilVisible(
+    page,
+    () => slowFire.click(),
+    slowDrawer.getByText("Jordan"),
+  );
+  await page.keyboard.press("Escape");
+  await expect(slowDrawer).toHaveCount(0);
+  for (const undo of slow) await undo();
+  testInfo.annotations.push({
+    type: "timings",
+    description: JSON.stringify(timings),
+  });
+  console.log("Reactions timings (ms):", JSON.stringify(timings));
+  for (const ms of Object.values(timings)) expect(ms).toBeLessThanOrEqual(100);
+  await expect.poll(() => calls.length).toBe(2);
+  calls.length = 0;
+  failNextReactors = true;
+  failNextReaction = true;
 
   // Chips open a drawer of who reacted; on your own proof it is view-only.
   const reactions = page.getByRole("group", { name: "Reactions" });
@@ -437,4 +494,82 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
     path: testInfo.outputPath("reactions-nudges.png"),
   });
   expect(errors.filter((text) => !text.includes("status of 500"))).toEqual([]);
+});
+
+test("Signing out drops the cached reactor names", async ({ page }) => {
+  let reactorsAnswer = true;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("http://127.0.0.1:54321/auth/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
+    if (path.endsWith("/verify"))
+      return route.fulfill({ status: 200, json: session });
+    if (path.endsWith("/user"))
+      return route.fulfill({ status: 200, json: session.user });
+    if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
+    return route.fulfill({ status: 401, json: { message: "no session" } });
+  });
+  await page.route("http://127.0.0.1:8787/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const ok = (data: unknown) =>
+      route.fulfill({ status: 200, json: { contractVersion: 1, data } });
+    if (path.endsWith("/current"))
+      return ok({ membership: { groupId, membershipId } });
+    if (path === "/v1/proof/feed")
+      return ok([
+        item({
+          reviewStatus: "verified",
+          canReview: false,
+          reactions: [{ emoji: "🔥", count: 2 }],
+        }),
+      ]);
+    if (path.endsWith("/reactions")) {
+      // The next member's request never answers, so only a stale cache could fill the list.
+      if (!reactorsAnswer) return;
+      return ok([
+        { emoji: "🔥", name: "Jordan", mine: false },
+        { emoji: "🔥", name: "Sam", mine: false },
+      ]);
+    }
+    if (path.endsWith("/current-week-progress"))
+      return ok(
+        [membershipId, friendMembershipId].map((id, index) => ({
+          membershipId: id,
+          displayName: ["Akrum", "Maya"][index],
+          lockedTarget: 3,
+          completedWorkoutCount: 1,
+          activityTypes: [],
+        })),
+      );
+    if (path === "/v1/nudges") return ok([]);
+    return route.fulfill({ status: 404, json: {} });
+  });
+  const signIn = async (email: string) => {
+    await page.getByLabel("Email address").fill(email);
+    await page.getByRole("button", { name: "Send code" }).click();
+    for (const [index, digit] of [..."123456"].entries())
+      await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
+    await page.getByRole("button", { name: "Verify code" }).click();
+    await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  };
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: "I already have an account" }).click();
+  await signIn("member@example.test");
+  const fire = page
+    .getByRole("group", { name: "Reactions" })
+    .getByRole("button", { name: "🔥, 2" });
+  const drawer = page.getByRole("dialog", { name: "Reactions" });
+  await fire.click();
+  await expect(drawer.locator(".reactor-name")).toHaveText(["Jordan", "Sam"]);
+  await page.keyboard.press("Escape");
+  // Sign out in place, without a reload that would reset memory anyway.
+  await page.getByRole("link", { name: "Account", exact: true }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  reactorsAnswer = false;
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await page.getByRole("button", { name: "Use another email" }).click();
+  await signIn("other@example.test");
+  await fire.click();
+  await expect(drawer.getByRole("status")).toHaveText("Loading names…");
+  await expect(drawer.locator(".reactor-name")).toHaveCount(0);
 });
