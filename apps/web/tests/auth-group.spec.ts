@@ -554,10 +554,8 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Invitation code")).toHaveCount(0);
   await page.getByLabel("Crew name").fill("6AM Crew");
-  await Promise.all([
-    page.getByRole("button", { name: "Saving…" }).waitFor(),
-    page.getByRole("button", { name: "Continue" }).click(),
-  ]);
+  // Naming a new crew is local; step 3 opens without a wait.
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Step 3 of 3 · Your target")).toBeVisible();
   await expect(
     page.getByText(
@@ -567,7 +565,9 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   await page.getByRole("button", { name: "Decrease weekly target" }).click();
   await expect(page.getByText("1 workout", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Start 6AM Crew" }).click();
-  await expect(page.getByRole("status")).toHaveText("Group created.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Group created." }),
+  ).toHaveText("Group created.");
 });
 
 test("invited OTP preserves its code into no-Group onboarding", async ({
@@ -1111,6 +1111,30 @@ test("Group conflict retains draft and retries same idempotency key", async ({
         status: 200,
         json: { contractVersion: 1, data: { accepted: true } },
       });
+    // Create sets the membership from its own response, then the new crew loads.
+    if (path.endsWith("/members"))
+      return route.fulfill({
+        status: 200,
+        json: {
+          contractVersion: 1,
+          data: {
+            groupName: "Morning crew",
+            members: [
+              {
+                membershipId,
+                displayName: "Akrum",
+                weeklyTarget: 3,
+                creator: true,
+              },
+            ],
+          },
+        },
+      });
+    if (path.endsWith("/pending-invitations"))
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: [] },
+      });
     keys.push(request.headers()["idempotency-key"] ?? "");
     creates += 1;
     return creates === 1
@@ -1151,7 +1175,9 @@ test("Group conflict retains draft and retries same idempotency key", async ({
   await expect(page.getByText("3 workouts")).toBeVisible();
   findings.get(page)?.console.splice(0);
   await page.getByRole("button", { name: "Start Morning crew" }).click();
-  await expect(page.getByRole("status")).toHaveText("Group created.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Group created." }),
+  ).toHaveText("Group created.");
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
 });

@@ -15,7 +15,8 @@ This repository is in project-setup phase. Product scope and technology stack re
 
 ## UI conventions
 
-- Default to optimistic UI for member actions: show the result at once, send the request, and on failure roll back only that change and show the error notice. Use a pending state instead only when the action is irreversible or its outcome depends on the server (for example, payments, account deletion, or decisions others must see confirmed).
+- Default to optimistic UI for member actions: show the result at once, send the request, and on failure roll back only that change and show the error notice. Votes and decisions are optimistic too; the server still settles the final tally.
+- Keep a pending state, on the acting control only, for auth, server-generated results (codes, invites, previews), irreversible or destructive actions, account deletion, random draws, and OS permission prompts.
 - Meet the speed budgets in `docs/agents/implementation-loop.md` (Speed) for any added or changed UI.
 
 ## Communication

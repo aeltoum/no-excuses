@@ -158,20 +158,26 @@ export function ProofFeed({
     ) => {
       const id = item.workoutCheckinId;
       // Optimistic: show the outcome at once; a failure restores the post.
-      const instant = action === "review" || action === "vote";
+      // Removing photos cannot be undone, so it waits for the server.
+      const instant =
+        action === "review" ||
+        action === "vote" ||
+        (action === "moderate" && choice === "restore");
       const optimistic: ProofItem = !instant
         ? item
-        : action === "vote"
-          ? {
-              ...item,
-              myVote: choice as ProofItem["myVote"],
-              acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
-              rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
-            }
-          : {
-              ...item,
-              reviewStatus: choice === "verify" ? "verified" : "questioned",
-            };
+        : action === "moderate"
+          ? { ...item, hidden: false }
+          : action === "vote"
+            ? {
+                ...item,
+                myVote: choice as ProofItem["myVote"],
+                acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
+                rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
+              }
+            : {
+                ...item,
+                reviewStatus: choice === "verify" ? "verified" : "questioned",
+              };
       const swap = (next: ProofItem) =>
         setItems((current) =>
           current.map((entry) =>
