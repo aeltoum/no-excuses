@@ -51,16 +51,28 @@ export function keepPhotoUrls(previous: ProofItem[], next: ProofItem[]) {
   });
 }
 
-const cachedFeed = (cacheKey: string) =>
-  feedCache.get(cacheKey)?.map((item) => ({
+// With the service worker in control, an expired URL still finds the photo
+// in its cache; without it, an expired URL would only show a broken image.
+const cachedFeed = (cacheKey: string) => {
+  const keep = (url: string | null) =>
+    usable(url) || navigator.serviceWorker?.controller ? url : null;
+  return feedCache.get(cacheKey)?.map((item) => ({
     ...item,
-    activityPhotoUrl: usable(item.activityPhotoUrl)
-      ? item.activityPhotoUrl
-      : null,
-    presencePhotoUrl: usable(item.presencePhotoUrl)
-      ? item.presencePhotoUrl
-      : null,
+    activityPhotoUrl: keep(item.activityPhotoUrl),
+    presencePhotoUrl: keep(item.presencePhotoUrl),
   }));
+};
+
+// A photo the cache missed under an expired URL stays hidden until the feed
+// brings a fresh one.
+const photoEvents = {
+  onLoad: (event: { currentTarget: HTMLImageElement }) => {
+    event.currentTarget.style.visibility = "";
+  },
+  onError: (event: { currentTarget: HTMLImageElement }) => {
+    event.currentTarget.style.visibility = "hidden";
+  },
+};
 
 // Feeds cached before custom reactions held a preset-keyed object.
 const reactionList = (item: ProofItem) =>
@@ -318,6 +330,8 @@ export function ProofFeed({
               alt={`${item.mine ? "Your" : `${item.authorName}'s`} workout activity`}
               loading="lazy"
               decoding="async"
+              crossOrigin="anonymous"
+              {...photoEvents}
             />
           )}
           {item.presencePhotoUrl && (
@@ -327,6 +341,8 @@ export function ProofFeed({
               alt={`${who} at the workout`}
               loading="lazy"
               decoding="async"
+              crossOrigin="anonymous"
+              {...photoEvents}
             />
           )}
           <span className="proof-tag">
