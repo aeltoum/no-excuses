@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { maxClipSeconds, ProofClip } from "./ProofClip";
 import { persistentMap } from "./persist";
 import { Result, useNotice } from "./Result";
 
@@ -22,6 +23,7 @@ export type ConsequenceHome = {
     expiresAt: string;
     approvals: number;
     approvalsNeeded: number;
+    clipUrl?: string | null;
     pauseRequest: {
       approvals: number;
       rejections: number;
@@ -33,6 +35,7 @@ export type ConsequenceHome = {
     memberName: string;
     title: string;
     instructions: string;
+    clipUrl?: string | null;
     myResponse: string | null;
   }[];
   pauseReviews: {
@@ -145,6 +148,22 @@ function DebtMeter({ owed }: { owed: number }) {
   );
 }
 
+// Loads only on tap, so a list of clips costs nothing until someone plays one.
+function ClipPlayer({ url, label }: { url?: string | null; label: string }) {
+  if (!url) return null;
+  return (
+    // biome-ignore lint/a11y/useMediaCaption: member-recorded proof has no captions
+    <video
+      className="clip-player"
+      src={url}
+      controls
+      playsInline
+      preload="none"
+      aria-label={label}
+    />
+  );
+}
+
 // Owed Consequence cards on Home: pick, complete, and approve friends' claims.
 export function Consequences({
   apiBaseUrl,
@@ -170,6 +189,7 @@ export function Consequences({
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const busy = (key: string) => pending.has(key);
   const [picking, setPicking] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
 
@@ -306,27 +326,21 @@ export function Consequences({
                 Due in {hoursLeft(attempt.expiresAt)}. Miss it and you owe
                 another.
               </p>
+              <p className="clip-heads-up">
+                Proof must be a video recorded in the app right now. Uploads
+                from your camera roll aren’t accepted. Record a quick clip (up
+                to {maxClipSeconds}s) showing the code, then doing the card.
+              </p>
               <div className="proof-actions">
                 <button
                   type="button"
-                  disabled={busy(`claim:${attempt.attemptId}`)}
-                  onClick={async () => {
-                    if (
-                      await ask({
-                        title: "Mark it done?",
-                        body: `Confirm you completed ${attempt.title}. Two friends must approve it.`,
-                        confirm: "I did it",
-                      })
-                    )
-                      void act(
-                        "claim",
-                        attempt.attemptId,
-                        "",
-                        "Marked done. Waiting for friends to approve.",
-                      );
+                  onClick={() => {
+                    // Earlier toasts would sit over the recorder.
+                    setNotice(null);
+                    setRecording(true);
                   }}
                 >
-                  I did it
+                  Record proof
                 </button>
                 {!attempt.pauseRequest && (
                   <button
@@ -418,6 +432,7 @@ export function Consequences({
                 Waiting for friends: {attempt.approvals} of{" "}
                 {attempt.approvalsNeeded} approvals.
               </p>
+              <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
             </>
           )}
         </div>
@@ -431,6 +446,10 @@ export function Consequences({
                 <strong>{review.title}</strong>
               </p>
               <p className="owed-deadline">{review.instructions}</p>
+              <ClipPlayer
+                url={review.clipUrl}
+                label={`${review.memberName}’s proof clip`}
+              />
               <div className="proof-actions">
                 {(
                   [
@@ -539,6 +558,25 @@ export function Consequences({
             </li>
           ))}
         </ul>
+      )}
+      {recording && attempt?.status === "active" && (
+        <ProofClip
+          apiBaseUrl={apiBaseUrl}
+          token={token}
+          attemptId={attempt.attemptId}
+          title={attempt.title}
+          notice={<Result notice={notice} />}
+          onError={fail}
+          onClose={() => setRecording(false)}
+          onSubmit={(clipPath) =>
+            act(
+              "claim",
+              attempt.attemptId,
+              clipPath,
+              "Proof sent. Waiting for friends to approve.",
+            )
+          }
+        />
       )}
       {offer && picking && (
         <AugmentPicker

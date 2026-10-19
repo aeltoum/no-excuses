@@ -185,12 +185,16 @@ A Group-visible count of Consequence completions a member owes after Missed-targ
 _Avoid_: Punishment debt, simultaneous card stack
 
 **Consequence completion**:
-A Consequence card completed through a timely structured completion claim approved by two other Group members, or by every other member when fewer than two are available. The claim contains only the fixed Card identity, completion time, and the member's explicit attestation; it has no media or free text. Approval acknowledges a trusted peer's claim rather than certifying independently observed performance. It removes exactly one item from the member's Consequence backlog and starts the next Card offer when any remain.
+A Consequence card completed through a timely structured completion claim approved by two other Group members, or by every other member when fewer than two are available. The claim contains the fixed Card identity, completion time, the member's explicit attestation, and one Proof clip; it has no free text. Approval acknowledges a trusted peer's claim rather than certifying independently observed performance. It removes exactly one item from the member's Consequence backlog and starts the next Card offer when any remain.
 _Avoid_: Self-reported consequence
 
 **Consequence completion claim**:
-A Group-visible structured claim submitted within an active Consequence card's 48-hour deadline. It identifies the fixed Card and completion time, requires an explicit completion attestation, permits no media or free text, and pauses Card expiration during a 48-hour peer review. Reviewers may Approve, Reject, or choose Cannot assess; review closes when two other Group members approve or reject, every other member does so when fewer than two are available, or time expires. A rejected or timed-out claim is Not completed and returns the original owed completion to a fresh Card offer without adding another backlog item.
-_Avoid_: Proof video, independent performance verification
+A Group-visible structured claim submitted within an active Consequence card's 48-hour deadline. It identifies the fixed Card and completion time, requires an explicit completion attestation and one Proof clip, permits no free text, and pauses Card expiration during a 48-hour peer review. Reviewers may Approve, Reject, or choose Cannot assess; review closes when two other Group members approve or reject, every other member does so when fewer than two are available, or time expires. A rejected or timed-out claim is Not completed and returns the original owed completion to a fresh Card offer without adding another backlog item.
+_Avoid_: Independent performance verification
+
+**Proof clip**:
+A video of up to 30 seconds recorded live in the app for a Consequence completion claim; camera-roll uploads are not accepted. Before recording, the server issues a one-time challenge for the member's own active card: a three-digit code and a simple action that the member shows at the start of the clip. The upload must begin within 2 minutes of issue and the claim must follow within 10 minutes; a new challenge replaces any open one. Every current Group member may play the clip, which is kept until the author leaves the Group or their Account ends; uploads never attached to a claim are deleted after one day.
+_Avoid_: Proof video from the camera roll
 
 **Safety pause**:
 A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
