@@ -1,4 +1,4 @@
-import { ApiError, requestTimeoutMs } from "./api-client";
+import { ApiError, requestTimeoutMs, wakeTimeoutMs } from "./api-client";
 import { onClearPersisted } from "./persist";
 
 export type ProofItem = {
@@ -45,8 +45,8 @@ async function call<T>(
   init: { method: "GET" | "POST"; body?: unknown },
 ): Promise<T> {
   let response: Response;
-  try {
-    response = await fetch(`${baseUrl}${path}`, {
+  const send = (timeoutMs: number) =>
+    fetch(`${baseUrl}${path}`, {
       method: init.method,
       headers: {
         authorization: `Bearer ${token}`,
@@ -55,8 +55,17 @@ async function call<T>(
           : { "content-type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      signal: AbortSignal.timeout(requestTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
+  try {
+    try {
+      response = await send(requestTimeoutMs);
+    } catch (error) {
+      // Reads retry once: after a cold app launch the first attempt often
+      // only wakes the API host, which would leave the feed empty until a refresh.
+      if (init.method !== "GET") throw error;
+      response = await send(wakeTimeoutMs);
+    }
   } catch {
     throw new ApiError("failure", "Connection failed. Try again.", true);
   }
