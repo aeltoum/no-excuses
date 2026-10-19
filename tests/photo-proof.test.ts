@@ -307,7 +307,7 @@ describe("Photo proof", { timeout: 30_000 }, () => {
     ).toEqual([{ count: 0 }]);
   });
 
-  it("expires Wall media 90 days after verification and abandoned uploads after a day", async () => {
+  it("keeps Verified Wall media and expires abandoned uploads after a day", async () => {
     const db = await database();
     const id = await submit(db, 0);
     await as(db, 1);
@@ -325,6 +325,6 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       ).rows[0]?.count;
     expect(await due("2026-03-06T10:59Z")).toBe(0);
     expect(await due("2026-03-06T11:00Z")).toBe(1);
-    expect(await due("2026-06-03T11:00Z")).toBe(3);
+    expect(await due("2027-03-05T11:00Z")).toBe(1);
   });
 });
