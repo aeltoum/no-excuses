@@ -219,6 +219,7 @@ const weeklyLoop = async (
         lockedTarget: 4,
         completedWorkoutCount: ownMet ? 4 : 2,
         outcome: ownMet ? "attained" : "missed",
+        targetStreak: ownMet ? 1 : 0,
       },
       {
         membershipId: friendMembershipId,
@@ -228,6 +229,7 @@ const weeklyLoop = async (
         lockedTarget: 3,
         completedWorkoutCount: index % 3 === 0 ? 2 : 3,
         outcome: index % 3 === 0 ? "missed" : "attained",
+        targetStreak: index % 3 === 0 ? 0 : 1,
       },
     ];
   })
@@ -288,6 +290,8 @@ const weeklyLoop = async (
             count === 2
               ? ["strength", "cardio"]
               : ["strength", "cardio", "strength"],
+          targetStreak: 2,
+          workoutStreak: 5,
         },
         {
           membershipId: friendMembershipId,
@@ -295,6 +299,8 @@ const weeklyLoop = async (
           lockedTarget: 2,
           completedWorkoutCount: 1,
           activityTypes: ["cardio"],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
       ]);
     if (path.endsWith("/finalized-weekly-history") && emptyHistory)
@@ -414,6 +420,12 @@ const weeklyLoop = async (
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(
+    page.getByText("2-week streak · 5 workouts since last miss"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("1-week streak · 3 workouts since last miss"),
+  ).toBeAttached();
   await page.goto("/");
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
@@ -657,7 +669,7 @@ const weeklyLoop = async (
   const rack = page.getByRole("list", { name: "Finalized weeks" });
   await expect(rack.getByRole("button")).toHaveCount(12);
   const latestPlate = rack.getByRole("button", {
-    name: "Sep 14 – 20: 4/4, Met",
+    name: "Sep 14 – 20: 4/4, Met, 1-week streak",
   });
   await expect(latestPlate).toBeVisible();
   await expect(rack.getByText("Jun 22 – 28")).toHaveCount(0);
@@ -666,7 +678,9 @@ const weeklyLoop = async (
   await expect(historySheet.getByRole("heading")).toBeFocused();
   await expect(historySheet.getByText("You met it: 4 of 4.")).toBeVisible();
   await expect(historySheet.getByText("Akrum")).toBeVisible();
-  await expect(historySheet.getByText("4/4 · Met")).toBeVisible();
+  await expect(
+    historySheet.getByText("4/4 · Met · 1-week streak"),
+  ).toBeVisible();
   await expect(historySheet.getByText("Maya")).toBeVisible();
   await expect(historySheet.getByText("2/3 · Missed")).toBeVisible();
   await page.keyboard.press("Escape");

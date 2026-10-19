@@ -17,6 +17,12 @@ import {
 } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
+
+const weekStreakText = (weeks: number) => `${weeks}-week streak`;
+
+const streakText = (item: CurrentWeekProgressItem) =>
+  `${weekStreakText(item.targetStreak)} · ${item.workoutStreak} workout${item.workoutStreak === 1 ? "" : "s"} since last miss`;
+
 import { ProofFeed } from "./Wall";
 
 type Api = ReturnType<typeof createApiClient>;
@@ -557,6 +563,7 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  <p className="home-streaks">{streakText(own)}</p>
                   <a
                     className="home-target-link"
                     href="/target"
@@ -634,6 +641,15 @@ export function Weekly({
                             ? ` · owes ${groupOwed[item.membershipId]}`
                             : ""}
                           {awaitingReview.has(item.membershipId) && " · review"}
+                        </span>
+                        <span className="friend-streaks">
+                          <span aria-hidden="true">
+                            {item.targetStreak} wk · {item.workoutStreak} in a
+                            row
+                          </span>
+                          <span className="visually-hidden">
+                            {streakText(item)}
+                          </span>
                         </span>
                         {item.completedWorkoutCount < item.lockedTarget && (
                           <button
@@ -1212,7 +1228,7 @@ export function Weekly({
                           <button
                             type="button"
                             className={`history-plate${met ? " met" : " missed"}`}
-                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met ? "Met" : "Missed"}`}
+                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met ? `Met, ${weekStreakText(item.targetStreak)}` : "Missed"}`}
                             onClick={(event) => {
                               historyOpenerRef.current = event.currentTarget;
                               setSelectedWeek(startsAt);
@@ -1231,6 +1247,11 @@ export function Weekly({
                             <strong className="history-outcome">
                               {met ? "Met" : "Missed"}
                             </strong>
+                            {met && (
+                              <span className="history-streak">
+                                {weekStreakText(item.targetStreak)}
+                              </span>
+                            )}
                           </span>
                         </li>
                       );
@@ -1282,7 +1303,9 @@ export function Weekly({
                               <span>
                                 {item.completedWorkoutCount}/{item.lockedTarget}{" "}
                                 ·{" "}
-                                {item.outcome === "attained" ? "Met" : "Missed"}
+                                {item.outcome === "attained"
+                                  ? `Met · ${weekStreakText(item.targetStreak)}`
+                                  : "Missed"}
                               </span>
                             </li>
                           ))}

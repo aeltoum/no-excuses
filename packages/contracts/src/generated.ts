@@ -732,6 +732,8 @@ export interface components {
             data: components["schemas"]["CurrentWeekProgressItem"][];
         };
         CurrentWeekProgressItem: {
+            targetStreak: number;
+            workoutStreak: number;
             /** Format: uuid */
             membershipId: string;
             displayName: string;
@@ -745,6 +747,7 @@ export interface components {
             data: components["schemas"]["FinalizedWeeklyHistoryItem"][];
         };
         FinalizedWeeklyHistoryItem: {
+            targetStreak: number;
             /** Format: uuid */
             membershipId: string;
             displayName: string;

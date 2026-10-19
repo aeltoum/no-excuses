@@ -886,8 +886,10 @@ components:
     CurrentWeekProgressItem:
       type: object
       additionalProperties: false
-      required: [membershipId, displayName, lockedTarget, completedWorkoutCount, activityTypes]
+      required: [membershipId, displayName, lockedTarget, completedWorkoutCount, activityTypes, targetStreak, workoutStreak]
       properties:
+        targetStreak: { type: integer, minimum: 0 }
+        workoutStreak: { type: integer, minimum: 0 }
         membershipId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 40 }
         lockedTarget: { type: integer, minimum: 1 }
@@ -909,8 +911,9 @@ components:
     FinalizedWeeklyHistoryItem:
       type: object
       additionalProperties: false
-      required: [membershipId, displayName, startsAt, endsAt, lockedTarget, completedWorkoutCount, outcome]
+      required: [membershipId, displayName, startsAt, endsAt, lockedTarget, completedWorkoutCount, outcome, targetStreak]
       properties:
+        targetStreak: { type: integer, minimum: 0 }
         membershipId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 40 }
         startsAt: { $ref: "#/components/schemas/UtcInstant" }

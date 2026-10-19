@@ -1104,6 +1104,18 @@ button:disabled {
   display: block;
   color: var(--chalk);
 }
+.history-streak {
+  display: block;
+}
+.home-streaks {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.friend-streaks {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
 .history-older {
   width: 100%;
   margin-top: 18px;

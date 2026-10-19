@@ -366,6 +366,8 @@ export const currentWeekProgressItemSchema = z
     lockedTarget: positiveIntegerSchema,
     completedWorkoutCount: z.number().int().nonnegative(),
     activityTypes: z.array(workoutActivityTypeSchema),
+    targetStreak: z.number().int().nonnegative(),
+    workoutStreak: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -378,6 +380,7 @@ export const finalizedWeeklyHistoryItemSchema = z
     lockedTarget: positiveIntegerSchema,
     completedWorkoutCount: z.number().int().nonnegative(),
     outcome: weeklyOutcomeSchema,
+    targetStreak: z.number().int().nonnegative(),
   })
   .strict();
 

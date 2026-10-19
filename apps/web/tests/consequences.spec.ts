@@ -113,6 +113,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
           lockedTarget: 3,
           completedWorkoutCount: 1,
           activityTypes: ["cardio"],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
         {
           membershipId: friendMembershipId,
@@ -120,6 +122,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
           lockedTarget: 3,
           completedWorkoutCount: 2,
           activityTypes: ["strength", "class"],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
       ]);
     if (path.endsWith("/finalized-weekly-history")) return ok([]);
@@ -248,7 +252,9 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText(["Maya2/3 · owes 2Nudge"]);
+  ).toHaveText([
+    "Maya2/3 · owes 21 wk · 3 in a row1-week streak · 3 workouts since last missNudge",
+  ]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
   ).toContainText("1/5");
