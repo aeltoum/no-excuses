@@ -164,6 +164,7 @@ export function App({
     }),
   ).current;
   const weeklyCache = useRef(persistentMap<WeeklySnapshot>("weekly")).current;
+  const nameCache = useRef(persistentMap<string>("name")).current;
   const groupCache = useRef(
     persistentMap<NonNullable<typeof groupRoster>>("group"),
   ).current;
@@ -184,6 +185,9 @@ export function App({
     setAccessRevision((current) => current + 1);
   }, []);
   const [session, setSession] = useState<Session | null>(null);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const userId = session?.user.id;
   const sessionUser = useRef<string | null>(null);
   sessionUser.current = session?.user.id ?? null;
   const signedInUser = useRef<string | null>(null);
@@ -495,33 +499,40 @@ export function App({
     if (
       access !== "signed-in" ||
       (path !== "/account" && (path !== "/group" || membership)) ||
-      !session
+      !userId
     )
       return;
+    if (displayNameScope.current === userId) return;
     let active = true;
-    const scope = session.user.id;
-    if (displayNameScope.current !== scope) {
-      displayNameScope.current = scope;
-      displayNameEdited.current = false;
-      setDisplayNameLoaded(false);
-      setDisplayName("");
-    }
+    let done = false;
+    displayNameScope.current = userId;
+    displayNameEdited.current = false;
+    // Show the last known name at once; the fetch below refreshes it.
+    const cached = nameCache.get(userId);
+    savedDisplayName.current = cached ?? "";
+    setDisplayName(cached ?? "");
+    setDisplayNameLoaded(cached !== undefined);
     void api
-      .displayName(session.access_token)
+      .displayName(sessionRef.current?.access_token ?? "")
       .then((response) => {
         if (!active) return;
         const next = response.data.displayName ?? "";
+        done = true;
+        nameCache.set(userId, next);
         savedDisplayName.current = next;
         if (!displayNameEdited.current) setDisplayName(next);
         setDisplayNameLoaded(true);
       })
       .catch((error) => {
         if (!active) return;
+        // Let the next visit retry.
+        done = true;
+        displayNameScope.current = "";
         if (error instanceof ApiError && error.kind === "unauthorized") {
           setSession(null);
           setMembership(null);
           recheckAccess();
-        } else {
+        } else if (cached === undefined) {
           setNotice({
             kind: "error",
             text: "Couldn’t load your name.",
@@ -530,9 +541,23 @@ export function App({
         }
       });
     return () => {
+      // Leaving mid-load: let the next visit fetch again.
+      if (!done && displayNameScope.current === userId)
+        displayNameScope.current = "";
       active = false;
     };
-  }, [access, api, membership, path, session, setNotice, recheckAccess]);
+    // Keyed on the user, not the session: a token refresh must not restart
+    // a slow load.
+  }, [
+    access,
+    api,
+    membership,
+    path,
+    userId,
+    nameCache,
+    setNotice,
+    recheckAccess,
+  ]);
   useEffect(() => {
     void groupRevision;
     if (
@@ -1093,6 +1118,11 @@ export function App({
                         );
                         commandDrafts.current.delete("onboarding-name");
                         savedDisplayName.current = saved.data.displayName ?? "";
+                        if (session)
+                          nameCache.set(
+                            session.user.id,
+                            savedDisplayName.current,
+                          );
                         displayNameEdited.current = false;
                         setDisplayName(savedDisplayName.current);
                         await api.consent(token());
@@ -1808,6 +1838,11 @@ export function App({
                       commandDrafts.current.delete("display-name");
                       savedDisplayName.current =
                         response.data.displayName ?? "";
+                      if (session)
+                        nameCache.set(
+                          session.user.id,
+                          savedDisplayName.current,
+                        );
                     },
                     () => {
                       // A later save owns the name; leave it alone.

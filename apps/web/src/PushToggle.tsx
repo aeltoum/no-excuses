@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { requestTimeoutMs, wakeTimeoutMs } from "./api-client";
 
 type State =
   | "checking"
@@ -15,6 +16,24 @@ const supported = () =>
   "PushManager" in window &&
   "Notification" in window;
 const ios = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+// The VAPID key rarely changes; keep it so the toggle works before the API wakes.
+const keyStorage = "no-excuses:push-key";
+const readKey = () => {
+  try {
+    return localStorage.getItem(keyStorage);
+  } catch {
+    return null;
+  }
+};
+const writeKey = (key: string | null) => {
+  try {
+    if (key) localStorage.setItem(keyStorage, key);
+    else localStorage.removeItem(keyStorage);
+  } catch {
+    // Storage unavailable: fetch the key again next time.
+  }
+};
 
 const base64Key = (value: string) => {
   const padded = (value + "=".repeat((4 - (value.length % 4)) % 4))
@@ -44,23 +63,42 @@ export function PushToggle({
         if (live) setState(ios() ? "install" : "unsupported");
         return;
       }
+      // On/off/blocked are device facts: show them without waiting on the API.
       try {
-        const response = await fetch(`${apiBaseUrl}/v1/push`, {
-          headers: { authorization: `Bearer ${tokenRef.current()}` },
-        });
-        const key = (
-          (await response.json()) as { data?: { publicKey?: string } }
-        ).data?.publicKey;
-        if (!live) return;
-        if (!key) return setState("unavailable");
-        setPublicKey(key);
-        if (Notification.permission === "denied") return setState("blocked");
-        const registration = await navigator.serviceWorker.getRegistration("/");
-        const subscription = await registration?.pushManager.getSubscription();
-        if (live) setState(subscription ? "on" : "off");
+        if (Notification.permission === "denied") {
+          if (live) setState("blocked");
+        } else {
+          const registration =
+            await navigator.serviceWorker.getRegistration("/");
+          const subscription =
+            await registration?.pushManager.getSubscription();
+          if (live) setState(subscription ? "on" : "off");
+        }
       } catch {
-        if (live) setState("unavailable");
+        if (live) setState("off");
       }
+      const cached = readKey();
+      if (cached && live) setPublicKey(cached);
+      // A sleeping API host can hang; time out and retry once while it wakes.
+      for (const timeout of [requestTimeoutMs, wakeTimeoutMs]) {
+        try {
+          const response = await fetch(`${apiBaseUrl}/v1/push`, {
+            headers: { authorization: `Bearer ${tokenRef.current()}` },
+            signal: AbortSignal.timeout(timeout),
+          });
+          const key = (
+            (await response.json()) as { data?: { publicKey?: string } }
+          ).data?.publicKey;
+          if (!live) return;
+          writeKey(key ?? null);
+          setPublicKey(key ?? null);
+          if (!key) setState((now) => (now === "on" ? now : "unavailable"));
+          return;
+        } catch {
+          if (!live) return;
+        }
+      }
+      if (!cached) setState((now) => (now === "off" ? "unavailable" : now));
     })();
     return () => {
       live = false;
@@ -80,8 +118,8 @@ export function PushToggle({
     });
 
   const toggle = async () => {
-    if (!publicKey) return;
     const turningOn = state === "off";
+    if (turningOn && !publicKey) return;
     setState("working");
     setError("");
     try {
@@ -97,7 +135,7 @@ export function PushToggle({
           existing ??
           (await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: base64Key(publicKey),
+            applicationServerKey: base64Key(publicKey as string),
           }));
         await send("POST", subscription);
         setState("on");
@@ -124,7 +162,7 @@ export function PushToggle({
     on: "On",
     working: "Updating…",
   };
-  const actionable = state === "on" || state === "off";
+  const actionable = state === "on" || (state === "off" && !!publicKey);
 
   return (
     <>
