@@ -284,6 +284,52 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     expect(after.offer?.cards).toHaveLength(3);
   });
 
+  it("reminds silent reviewers 12 hours out and approves a review with no rejections", async () => {
+    const db = await database();
+    await owe(db);
+    await owe(db, 0, "2026-03-09T00:01Z");
+    await advance(db, "2026-03-09T00:30Z");
+    const offer = (await home(db, 0)).offer;
+    await command(
+      db,
+      0,
+      "select",
+      offer?.offerId as string,
+      offer?.cards[0]?.cardId,
+    );
+    const attemptId = (await home(db, 0)).attempt?.attemptId as string;
+    await command(
+      db,
+      0,
+      "claim",
+      attemptId,
+      await recordClip(db, 0, attemptId),
+    );
+    const claimId = (await home(db, 1)).reviews[0]?.claimId as string;
+    await command(db, 1, "respond", claimId, "approve");
+    await db.exec(`insert into app_private.web_push_subscriptions
+      (endpoint, account_id, p256dh, auth, created_at) values
+      ('https://push.example.test/1', '${accounts[1]}', 'key', 'secret', '2026-03-01Z'),
+      ('https://push.example.test/2', '${accounts[2]}', 'key', 'secret', '2026-03-01Z')`);
+    const reminders = async (at: string) => {
+      await db.query("select app_private.enqueue_consequence_push($1)", [at]);
+      return (
+        await db.query<{ account_id: string }>(
+          "select account_id from app_private.web_push_outbox where dedupe_key like 'card-claim-reminder:%'",
+        )
+      ).rows.map((row) => row.account_id);
+    };
+    expect(await reminders("2026-03-10T12:59Z")).toEqual([]);
+    expect(await reminders("2026-03-10T13:00Z")).toEqual([accounts[2]]);
+    expect(await reminders("2026-03-10T14:00Z")).toEqual([accounts[2]]);
+
+    await advance(db, "2026-03-11T01:00Z");
+    const after = await home(db, 0, "2026-03-11T01:00Z");
+    expect(after.owed).toBe(1);
+    expect(after.attempt).toBeNull();
+    expect(after.offer?.cards).toHaveLength(3);
+  });
+
   it("pauses expiry for safety and reoffers when the member is ready", async () => {
     const db = await database();
     await owe(db);
