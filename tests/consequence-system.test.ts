@@ -362,6 +362,11 @@ describe("M5 Consequence system", () => {
       "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, $3, '2026-03-10T02:00Z')",
       [nextClaim, nextAttempt, await clip(db, nextAttempt, accounts[3])],
     );
+    // One rejection keeps a review that runs out from counting as approved.
+    await db.query(
+      "select app_private.respond_to_consequence_claim($1, $2, $3, 'reject', '2026-03-11Z')",
+      [randomUUID(), nextClaim, memberships[1]],
+    );
     expect(
       (
         await db.query(

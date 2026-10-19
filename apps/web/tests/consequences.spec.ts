@@ -207,6 +207,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
             clipUrl:
               "http://127.0.0.1:54321/storage/v1/object/sign/consequence-clips/mine.webm?token=m",
           },
+          // A card owed meanwhile waits behind the one in review.
+          owed: 2,
           logBlocked: false,
         };
       if (action === "respond")
@@ -484,6 +486,11 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ]);
   await expect(
     page.getByText("Waiting for friends: 0 of 2 approvals."),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "1 more card is queued. The next is dealt once this one is done.",
+    ),
   ).toBeVisible();
   await expect(page.getByLabel("Your proof clip")).toHaveAttribute(
     "preload",

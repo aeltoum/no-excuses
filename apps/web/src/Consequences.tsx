@@ -430,8 +430,16 @@ export function Consequences({
               <h2>{attempt.title}</h2>
               <p className="owed-deadline">
                 Waiting for friends: {attempt.approvals} of{" "}
-                {attempt.approvalsNeeded} approvals.
+                {attempt.approvalsNeeded} approvals. With no rejections it
+                counts as done when the review ends.
               </p>
+              {home.owed > 1 && (
+                <p className="owed-deadline">
+                  {home.owed - 1} more{" "}
+                  {home.owed === 2 ? "card is" : "cards are"} queued. The next
+                  is dealt once this one is done.
+                </p>
+              )}
               <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
             </>
           )}
