@@ -52,6 +52,12 @@ class CrashScreen extends Component<
   }
 }
 
+// The service worker caches proof photos so a reopened app shows them at once.
+if ("serviceWorker" in navigator)
+  void navigator.serviceWorker
+    .register("/sw.js", { scope: "/" })
+    .catch(() => {});
+
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Missing application root");
 const root = createRoot(rootElement);

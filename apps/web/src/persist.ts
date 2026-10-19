@@ -51,4 +51,10 @@ export const onClearPersisted = (clear: () => void) => clearers.add(clear);
 export function clearPersisted() {
   for (const map of maps) map.clear();
   for (const clear of clearers) clear();
+  // Proof photos cached by the service worker belong to this member too.
+  try {
+    void caches.delete("proof-photos").catch(() => {});
+  } catch {
+    // Cache Storage unavailable: nothing was cached.
+  }
 }
