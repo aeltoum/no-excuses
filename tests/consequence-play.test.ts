@@ -480,7 +480,7 @@ describe("Consequence video proof", { timeout: 30_000 }, () => {
     ).toEqual([{ clip_path: path }]);
   });
 
-  it("keeps attached clips and cleans up abandoned uploads after a day", async () => {
+  it("keeps attached clips until the author leaves and cleans up abandoned uploads after a day", async () => {
     const db = await database();
     const attemptId = await activeAttempt(db);
     const abandoned = await recordClip(db, 0, attemptId);
@@ -497,7 +497,7 @@ describe("Consequence video proof", { timeout: 30_000 }, () => {
     expect(await due("2026-03-10T01:00Z")).toEqual([abandoned]);
     await db.query(
       "select app_private.mark_consequence_clips_deleted($1, '2026-03-10T01:00Z')",
-      [[abandoned, kept]],
+      [[abandoned]],
     );
     expect(await due("2027-03-10T00:00Z")).toEqual([]);
     expect(
@@ -508,6 +508,27 @@ describe("Consequence video proof", { timeout: 30_000 }, () => {
         )
       ).rows,
     ).toEqual([{ deleted_at: null }]);
+    await db.query(
+      `update app_private.memberships m set ended_at = '2027-03-10T00:00Z', end_reason = 'left'
+       from app_private.consequence_attempts t
+       join app_private.consequence_obligations o on o.obligation_id = t.obligation_id
+       where t.attempt_id = $1 and m.membership_id = o.membership_id`,
+      [attemptId],
+    );
+    expect(await due("2027-03-10T00:01Z")).toEqual([kept]);
+    await db.query(
+      "select app_private.mark_consequence_clips_deleted($1, '2027-03-10T00:01Z')",
+      [[kept]],
+    );
+    expect(await due("2027-03-10T00:02Z")).toEqual([]);
+    expect(
+      (
+        await db.query(
+          "select clip_path from app_private.consequence_claims where attempt_id = $1",
+          [attemptId],
+        )
+      ).rows,
+    ).toEqual([{ clip_path: null }]);
   });
 
   it("requires the uploaded clip object when storage is present", async () => {

@@ -193,7 +193,7 @@ A Group-visible structured claim submitted within an active Consequence card's 4
 _Avoid_: Independent performance verification
 
 **Proof clip**:
-A video of up to 30 seconds recorded live in the app for a Consequence completion claim; camera-roll uploads are not accepted. Before recording, the server issues a one-time challenge for the member's own active card: a three-digit code and a simple action that the member shows at the start of the clip. The upload must begin within 2 minutes of issue and the claim must follow within 10 minutes; a new challenge replaces any open one. Every current Group member may play the clip, which is retained indefinitely; uploads never attached to a claim are deleted after one day.
+A video of up to 30 seconds recorded live in the app for a Consequence completion claim; camera-roll uploads are not accepted. Before recording, the server issues a one-time challenge for the member's own active card: a three-digit code and a simple action that the member shows at the start of the clip. The upload must begin within 2 minutes of issue and the claim must follow within 10 minutes; a new challenge replaces any open one. Every current Group member may play the clip, which is kept until the author leaves the Group or their Account ends; uploads never attached to a claim are deleted after one day.
 _Avoid_: Proof video from the camera roll
 
 **Safety pause**:

@@ -228,6 +228,15 @@ language sql stable security definer set search_path = '' as $$
   select c.clip_path from app_private.consequence_challenges c
   where c.clip_path is not null and c.used_at is null and c.deleted_at is null
     and requested_at >= c.upload_requested_at + interval '1 day'
+  union
+  -- Attached clips are kept until the author leaves the Group or their Account ends.
+  select c.clip_path from app_private.consequence_challenges c
+  join app_private.consequence_attempts t on t.attempt_id = c.attempt_id
+  join app_private.consequence_obligations o on o.obligation_id = t.obligation_id
+  join app_private.memberships m on m.membership_id = o.membership_id
+  join app_private.accounts a on a.account_id = m.account_id
+  where c.clip_path is not null and c.used_at is not null and c.deleted_at is null
+    and (m.ended_at is not null or a.status <> 'active')
   limit 200;
 $$;
 
@@ -238,8 +247,10 @@ language plpgsql security definer set search_path = '' as $$
 declare changed integer;
 begin
   update app_private.consequence_challenges set deleted_at = requested_at
-  where clip_path = any(requested_paths) and used_at is null and deleted_at is null;
+  where clip_path = any(requested_paths) and deleted_at is null;
   get diagnostics changed = row_count;
+  update app_private.consequence_claims set clip_path = null
+  where clip_path = any(requested_paths);
   return changed;
 end;
 $$;
