@@ -871,9 +871,9 @@ export function Weekly({
                         </p>
                       )}
                       <p className="log-lock-note">
-                        Tap “I did it” once it’s done. Logging unlocks the
-                        moment you submit, so you’re not stuck waiting on
-                        friends to approve.
+                        Tap “Record proof” and film a quick clip in the app.
+                        Logging unlocks the moment you send it, so you’re not
+                        stuck waiting on friends to approve.
                       </p>
                       <button
                         type="button"

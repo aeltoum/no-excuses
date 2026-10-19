@@ -1855,6 +1855,55 @@ button:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.clip-heads-up {
+  border-left: 3px solid var(--strength);
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+  padding-left: 0.625rem;
+}
+.clip-player,
+.clip-preview {
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 0.5rem;
+  display: block;
+  max-width: 100%;
+  width: 100%;
+}
+.clip-preview[hidden] {
+  display: none;
+}
+.proof-clip {
+  display: grid;
+  gap: 0.75rem;
+}
+.clip-rules,
+.clip-timer {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+.clip-challenge {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  min-height: 3rem;
+}
+.clip-code {
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+.clip-action {
+  font-weight: 600;
+}
+.clip-placeholder {
+  color: var(--muted);
+}
+.clip-stage {
+  position: relative;
+}
 .card-reviews {
   display: grid;
   margin: 0;

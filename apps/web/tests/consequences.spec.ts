@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
@@ -24,6 +25,10 @@ const offerId = "80000000-0000-4000-8000-000000000001";
 const attemptId = "80000000-0000-4000-8000-000000000002";
 const claimId = "80000000-0000-4000-8000-000000000003";
 const pauseRequestId = "80000000-0000-4000-8000-000000000004";
+const challengeId = "80000000-0000-4000-8000-000000000005";
+const clipPath = `20000000-0000-4000-8000-000000000001/${challengeId}.webm`;
+const friendClipUrl =
+  "http://127.0.0.1:54321/storage/v1/object/sign/consequence-clips/friend.webm?token=t";
 const cards = [
   [
     "90000000-0000-4000-8000-000000000001",
@@ -73,6 +78,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
         memberName: "Maya",
         title: "100 push-ups",
         instructions: "Complete 100 push-ups, any sets.",
+        clipUrl: friendClipUrl,
         myResponse: null,
       },
     ],
@@ -135,6 +141,24 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     if (path === "/v1/proof/feed") return ok([]);
     if (path === "/v1/nudges") return ok([]);
     if (path === "/v1/consequences") return ok(state);
+    if (path === "/v1/consequences/challenge") {
+      actions.push(`challenge:${request.postDataJSON().attemptId}`);
+      return ok({
+        challengeId,
+        code: "042",
+        action: "Hold up 3 fingers",
+        issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 120_000).toISOString(),
+      });
+    }
+    if (path === "/v1/consequences/clip-upload") {
+      const body = request.postDataJSON();
+      actions.push(`clip-upload:${body.challengeId}:${body.mimeType}`);
+      return ok({
+        path: clipPath,
+        uploadUrl: `http://127.0.0.1:54321/storage/v1/object/upload/sign/consequence-clips/${clipPath}?token=u`,
+      });
+    }
     const action = /^\/v1\/consequences\/(\w+)$/.exec(path)?.[1];
     if (action) {
       const body = request.postDataJSON();
@@ -180,6 +204,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
           attempt: {
             ...(state.attempt as object),
             status: "review",
+            clipUrl:
+              "http://127.0.0.1:54321/storage/v1/object/sign/consequence-clips/mine.webm?token=m",
           },
           logBlocked: false,
         };
@@ -197,6 +223,53 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     }
     return route.fulfill({ status: 404, json: {} });
   });
+  const uploads: string[] = [];
+  await page.route("http://127.0.0.1:54321/storage/v1/**", (route) => {
+    const request = route.request();
+    uploads.push(
+      `${request.method()}:${new URL(request.url()).pathname}:${request.headers()["content-type"]}`,
+    );
+    return route.fulfill({ status: 200, json: { Key: clipPath } });
+  });
+  // Live capture stand-ins: a canvas stream for the camera and a recorder that yields one chunk.
+  await page.addInitScript(() => {
+    const log: Record<string, unknown> = {};
+    (window as unknown as { capture: unknown }).capture = log;
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: {
+        getUserMedia: async (constraints: unknown) => {
+          log.constraints = constraints;
+          const canvas = document.createElement("canvas");
+          canvas.width = 64;
+          canvas.height = 36;
+          return canvas.captureStream();
+        },
+      },
+    });
+    class FakeRecorder {
+      state = "inactive";
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      static isTypeSupported(type: string) {
+        return type.startsWith("video/webm");
+      }
+      constructor(_stream: unknown, options: unknown) {
+        log.options = options;
+      }
+      start() {
+        this.state = "recording";
+      }
+      stop() {
+        if (this.state !== "recording") return;
+        this.state = "inactive";
+        this.ondataavailable?.({
+          data: new Blob(["clip"], { type: "video/webm" }),
+        });
+        this.onstop?.();
+      }
+    }
+    Object.defineProperty(window, "MediaRecorder", { value: FakeRecorder });
+  });
   await page.addInitScript(() => {
     const calls: unknown[] = [];
     (window as unknown as { buzzes: unknown[] }).buzzes = calls;
@@ -207,6 +280,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
       },
     });
   });
+  // A controllable page clock drives the recorder's 30-second auto-stop.
+  await page.clock.install();
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "I already have an account" }).click();
   await page.getByLabel("Email address").fill("member@example.test");
@@ -318,13 +393,102 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     page.getByRole("button", { name: "Request a pause" }),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "I did it" }).click();
-  const confirm = page.getByRole("dialog", { name: "Mark it done?" });
-  await expect(confirm).toContainText("Confirm you completed 5 km run.");
-  await confirm.getByRole("button", { name: "I did it" }).click();
+  // Proof is a live in-app clip: heads-up copy, no gallery picker.
+  await expect(
+    page.getByText(
+      "Proof must be a video recorded in the app right now. Uploads from your camera roll aren’t accepted. Record a quick clip (up to 30s) showing the code, then doing the card.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "I did it" })).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+
+  // Hosted APIs can be slow: the sheet, placeholder, and pending state show at once.
+  const undoApi = await delayRoute(page, "http://127.0.0.1:8787/v1/**", 1000);
+  const undoStorage = await delayRoute(
+    page,
+    "http://127.0.0.1:54321/storage/v1/**",
+    1000,
+  );
+  const timings: Record<string, number> = {};
+  const recorder = page.getByRole("dialog", { name: "Record proof" });
+  timings.sheetOpen = await msUntilVisible(
+    page,
+    () => page.getByRole("button", { name: "Record proof" }).click(),
+    recorder.getByRole("button", { name: "Close" }),
+  );
+  await expect(recorder.getByText("Getting your code…")).toBeVisible();
+  // No stale toast from earlier actions covers the recorder.
+  await expect(page.locator(".event-notice")).toHaveCount(0);
+  await expect(
+    recorder.getByRole("button", { name: "Getting ready…" }),
+  ).toBeDisabled();
+  await expect(recorder.locator('input[type="file"]')).toHaveCount(0);
+  await expect(recorder.getByText("042")).toBeVisible();
+  await expect(recorder.getByText("Hold up 3 fingers")).toBeVisible();
+  timings.recordingFeedback = await msUntilVisible(
+    page,
+    () => recorder.getByRole("button", { name: "Start recording" }).click(),
+    recorder.getByText(/Recording 0:00 · 0:30 left/),
+  );
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { capture: unknown }).capture,
+    ),
+  ).toEqual({
+    constraints: {
+      video: { width: 1280, height: 720, facingMode: "user" },
+      audio: true,
+    },
+    options: {
+      mimeType: "video/webm;codecs=vp9,opus",
+      videoBitsPerSecond: 1_500_000,
+      audioBitsPerSecond: 64_000,
+    },
+  });
+  await recorder.getByRole("button", { name: "Stop recording" }).click();
+  await expect(
+    recorder.getByRole("button", { name: "Record again" }),
+  ).toBeVisible();
+  // A second take stops itself at 30 seconds.
+  await recorder.getByRole("button", { name: "Record again" }).click();
+  await recorder.getByRole("button", { name: "Start recording" }).click();
+  await expect(recorder.getByText(/Recording 0:00/)).toBeVisible();
+  await page.clock.fastForward(29_000);
+  await expect(recorder.getByText(/Recording 0:29 · 0:01 left/)).toBeVisible();
+  await page.clock.fastForward(2_000);
+  await expect(recorder.getByText("Recorded 0:30")).toBeVisible();
+  await expect(
+    recorder.getByRole("button", { name: "Stop recording" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("clip-recorded.png") });
+  timings.sendPending = await msUntilVisible(
+    page,
+    () => recorder.getByRole("button", { name: "Send proof" }).click(),
+    recorder.getByRole("button", { name: "Sending…" }),
+  );
+  await expect(
+    recorder.getByRole("button", { name: "Sending…" }),
+  ).toBeDisabled();
+  await expect(recorder).toHaveCount(0, { timeout: 10_000 });
+  await undoApi();
+  await undoStorage();
+  console.log(`[timing] ${JSON.stringify(timings)}`);
+  testInfo.annotations.push({
+    type: "timing",
+    description: JSON.stringify(timings),
+  });
+  for (const [label, ms] of Object.entries(timings))
+    expect(ms, label).toBeLessThanOrEqual(100);
+  expect(uploads).toEqual([
+    `PUT:/storage/v1/object/upload/sign/consequence-clips/${clipPath}:video/webm`,
+  ]);
   await expect(
     page.getByText("Waiting for friends: 0 of 2 approvals."),
   ).toBeVisible();
+  await expect(page.getByLabel("Your proof clip")).toHaveAttribute(
+    "preload",
+    "none",
+  );
   // Proof is in: logging unlocks without waiting for approvals.
   await expect(logButton).toHaveAccessibleName("Log workout");
 
@@ -343,6 +507,16 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     .getByRole("list", { name: "Consequence cards to approve" })
     .getByRole("listitem");
   await expect(review).toContainText("Maya finished 100 push-ups");
+  const friendClip = review.getByLabel("Maya’s proof clip");
+  await expect(friendClip).toHaveAttribute("src", friendClipUrl);
+  await expect(friendClip).toHaveAttribute("preload", "none");
+  await expect(friendClip).toHaveAttribute("controls", "");
+  expect(
+    await friendClip.evaluate((video: HTMLVideoElement) => [
+      video.autoplay,
+      video.playsInline,
+    ]),
+  ).toEqual([false, true]);
   await review.getByRole("button", { name: "Approve" }).click();
   await expect(review.getByRole("button", { name: "Approve" })).toHaveAttribute(
     "aria-pressed",
@@ -352,11 +526,14 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     fullPage: true,
     path: testInfo.outputPath("card-home.png"),
   });
-  expect(actions).toEqual([
+  // Dev StrictMode mounts the recorder twice; only the newest challenge is used.
+  expect([...new Set(actions)]).toEqual([
     `redraw:${offerId}:`,
     `select:${offerId}:${cards[2]?.cardId}`,
     `request_pause:${attemptId}:`,
-    `claim:${attemptId}:`,
+    `challenge:${attemptId}`,
+    `clip-upload:${challengeId}:video/webm`,
+    `claim:${attemptId}:${clipPath}`,
     `vote_pause:${pauseRequestId}:approve`,
     `respond:${claimId}:approve`,
   ]);
