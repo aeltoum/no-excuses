@@ -1,4 +1,5 @@
 import { ApiError, requestTimeoutMs, wakeTimeoutMs } from "./api-client";
+import type { WorkoutDetails } from "./details";
 import { onClearPersisted } from "./persist";
 
 export type ProofItem = {
@@ -23,6 +24,7 @@ export type ProofItem = {
   canVote: boolean;
   // Feeds cached before post deletion lack it.
   canDelete?: boolean;
+  details?: WorkoutDetails | null;
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
   reactions: ReactionCount[];
@@ -110,6 +112,17 @@ export const deleteProof = (baseUrl: string, token: string, id: string) =>
     `/v1/proof/${id}/delete`,
     { method: "POST", body: {} },
   );
+
+export const setProofDetails = (
+  baseUrl: string,
+  token: string,
+  id: string,
+  details: WorkoutDetails,
+) =>
+  call<{ details: WorkoutDetails }>(baseUrl, token, `/v1/proof/${id}/details`, {
+    method: "POST",
+    body: { details },
+  });
 
 export const removeAllProof = (baseUrl: string, token: string) =>
   call<{ removed: number }>(baseUrl, token, "/v1/proof/remove-all", {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { detailLine } from "./details";
 import { persistentMap } from "./persist";
 import {
   actOnProof,
@@ -392,6 +393,9 @@ export function ProofFeed({
             </span>
           )}
         </div>
+        {item.details && (
+          <p className="proof-details">{detailLine(item.details)}</p>
+        )}
         {(needsReview(item) || needsVote(item)) && (
           // Referee light box: the photo sits on a base holding white and red lamps.
           <fieldset

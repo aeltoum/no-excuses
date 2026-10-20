@@ -13,6 +13,14 @@ import {
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
+import {
+  type DetailsDraft,
+  DetailsFields,
+  detailLine,
+  draftDetails,
+  emptyDraft,
+  type WorkoutDetails,
+} from "./details";
 import { Exceptions } from "./Exceptions";
 import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
@@ -23,6 +31,7 @@ import {
   loadNudged,
   nudgeMember,
   type ProofItem,
+  setProofDetails,
   uploadProofPhoto,
 } from "./proof";
 import { Result, useNotice } from "./Result";
@@ -61,6 +70,7 @@ type Outgoing = {
   intensity: "low" | "moderate" | "high";
   activity: ProofPhoto;
   presence: ProofPhoto;
+  details: WorkoutDetails | null;
   paths: { activity?: string; presence?: string };
   status: "sending" | "failed" | "sent";
   error?: string;
@@ -135,11 +145,16 @@ function sendOutgoing(
         entry.key,
       ),
     )
-    .then((response) => {
+    .then(async (response) => {
       if (response.data.workoutCheckinId !== entry.id)
         throw new ApiError(
           "failure",
           "Check-in response did not match this workout.",
+        );
+      // Details are extra: the workout counts even if they fail to save.
+      if (entry.details)
+        await setProofDetails(apiBaseUrl, token, entry.id, entry.details).catch(
+          () => undefined,
         );
       patchOutgoing(entry.id, {
         status: "sent",
@@ -226,6 +241,7 @@ export function Weekly({
     presence?: ProofPhoto;
   }>({});
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(emptyDraft);
   const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
     (entry) => entry.membershipId === membership?.membershipId,
   );
@@ -1009,6 +1025,7 @@ export function Weekly({
                           intensity,
                           activity: photos.activity,
                           presence: photos.presence,
+                          details: draftDetails(detailsDraft, activityType),
                           paths: {},
                           status: "sending",
                         };
@@ -1020,6 +1037,7 @@ export function Weekly({
                         setDuration("");
                         setOtherDuration(false);
                         setPhotos({});
+                        setDetailsDraft(emptyDraft());
                         sendOutgoing(entry, api, apiBaseUrl, token, () =>
                           revokeRef.current(),
                         );
@@ -1111,6 +1129,11 @@ export function Weekly({
                           )}
                         </div>
                       </fieldset>
+                      <DetailsFields
+                        activity={activityType}
+                        draft={detailsDraft}
+                        onChange={setDetailsDraft}
+                      />
                       <fieldset>
                         <legend>Proof photos</legend>
                         <div className="proof-capture">
@@ -1232,6 +1255,11 @@ export function Weekly({
                           {entry.activityType.slice(1)} · {entry.minutes} min
                         </span>
                       </div>
+                      {entry.details && (
+                        <p className="proof-details">
+                          {detailLine(entry.details)}
+                        </p>
+                      )}
                       {entry.status === "failed" && (
                         <>
                           <p className="result error" role="alert">

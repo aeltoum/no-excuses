@@ -273,6 +273,7 @@ describe("True-MVP workout check-ins", () => {
       "hidden_at",
       "removed_at",
       "media_deleted_at",
+      "details",
     ]);
   });
 

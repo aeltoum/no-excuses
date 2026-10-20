@@ -816,6 +816,7 @@ const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
 const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
+const proofDetails = /^\/v1\/proof\/([0-9a-f-]{36})\/details$/;
 const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
 // One standard emoji, including skin tones, flags, and joined sequences.
 const singleEmoji =
@@ -875,6 +876,13 @@ async function proof(request: Request, path: string): Promise<Response> {
           )
         ).rows.map((row) => [row.workout_checkin_id as string, row]),
       );
+      const details = new Map(
+        (
+          await query(actor, "select * from app_private.proof_details($1)", [
+            now,
+          ])
+        ).rows.map((row) => [row.workout_checkin_id as string, row.details]),
+      );
       const paths = rows.flatMap((row) => [
         row.activity_photo_path as string,
         row.presence_photo_path as string,
@@ -915,6 +923,7 @@ async function proof(request: Request, path: string): Promise<Response> {
             canReview: row.can_review,
             canVote: row.can_vote,
             canDelete: row.can_delete,
+            details: details.get(row.workout_checkin_id) ?? null,
             activityPhotoUrl:
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
@@ -961,6 +970,26 @@ async function proof(request: Request, path: string): Promise<Response> {
       ]);
       if (on) setImmediate(() => void deliverPush());
       return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
+    }
+    const detailed = proofDetails.exec(path);
+    if (detailed && request.method === "POST") {
+      const value = body.details;
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        JSON.stringify(value).length > 4000
+      )
+        return reply(fail("invalid_request", 400));
+      const rows = (
+        await query(
+          actor,
+          "select app_private.set_checkin_details($1,$2::jsonb,$3) as data",
+          [detailed[1], JSON.stringify(value), now],
+        )
+      ).rows;
+      return reply(
+        ok({ workoutCheckinId: detailed[1], details: rows[0]?.data }),
+      );
     }
     const deleted = proofDelete.exec(path);
     if (deleted && request.method === "POST") {
