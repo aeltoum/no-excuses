@@ -4,7 +4,7 @@ import { type ReactionCount, type Reactor, reactionLimit } from "./proof";
 import { Sheet } from "./Sheet";
 
 // Quick picks drawn from the gym floor; the full picker below searches every emoji.
-const quickPicks = [
+export const quickPicks = [
   "💪",
   "🔥",
   "👏",
@@ -279,7 +279,7 @@ function ReactorsSheet({
 }
 
 // The full picker loads on first open and reads emoji data served from our own origin.
-function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   const holder = useRef<HTMLDivElement>(null);
   const pickRef = useRef(onPick);
   pickRef.current = onPick;

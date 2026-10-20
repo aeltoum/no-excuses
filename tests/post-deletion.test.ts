@@ -108,4 +108,49 @@ describe("Post deletion", { timeout: 30_000 }, () => {
     );
     expect(feed.rows).toHaveLength(0);
   });
+
+  it("takes down a verified post's photos after its week ends, and the week stands", async () => {
+    const db = await database([1, 1, 1]);
+    const verified = await submitProof(db, 0);
+    const rejected = await submitProof(db, 0, "2026-03-05T11:00Z");
+    await db.query(
+      "update app_private.workout_checkins set review_status = 'rejected' where workout_checkin_id = $1",
+      [rejected],
+    );
+    await as(db, 1);
+    await db.query(
+      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T12:00Z')",
+      [verified],
+    );
+    await db.query(
+      "select app_private.finalize_ended_member_weeks('2026-03-09T01:00Z')",
+    );
+    const remove = async (member: number, id: string) => {
+      await as(db, member);
+      return rejects(
+        db.query(
+          "select app_private.remove_own_photos($1, '2026-03-10T09:00Z')",
+          [id],
+        ),
+      );
+    };
+    // Only the author, and only once a friend has verified it.
+    expect(await remove(1, verified)).toBe("42501");
+    expect(await remove(0, rejected)).toBe("42501");
+    expect(await remove(0, verified)).toBeNull();
+
+    const after = await db.query<{
+      review_status: string;
+      removed: boolean;
+    }>(
+      "select review_status, removed_at is not null as removed from app_private.workout_checkins where workout_checkin_id = $1",
+      [verified],
+    );
+    expect(after.rows).toEqual([{ review_status: "verified", removed: true }]);
+    const week = await db.query<{ status: string }>(
+      "select mw.status::text from app_private.member_weeks mw join app_private.workout_checkins c using (member_week_id) where c.workout_checkin_id = $1",
+      [verified],
+    );
+    expect(week.rows).toEqual([{ status: "attained" }]);
+  });
 });
