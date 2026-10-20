@@ -1643,6 +1643,36 @@ const operatorRoutes = (request: Request, path: string) =>
     return fail("not_found", 404);
   });
 
+const sessionAction = /^\/v1\/sessions\/([0-9a-f-]{36})\/(start|end|link)$/;
+const sessionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = sessionAction.exec(path);
+    if (!match || method !== "POST" || !uuid(match[1]))
+      return fail("not_found", 404);
+    const [, id, action] = match;
+    if (action === "start")
+      return ok(
+        await data("select app_private.start_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (action === "end")
+      return ok(
+        await data("select app_private.end_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (!uuid(body.workoutCheckinId)) return invalid();
+    return ok({
+      linked: await data(
+        "select app_private.link_session_checkin($1,$2,$3) as data",
+        [id, body.workoutCheckinId, now],
+      ),
+    });
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1654,6 +1684,7 @@ const extraRoutes: Array<
   ["/v1/exceptions/", exceptionRoutes],
   ["/v1/missed/", missedRoutes],
   ["/v1/safety/", safetyRoutes],
+  ["/v1/sessions/", sessionRoutes],
 ];
 function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/enrollment" && request.method === "POST")

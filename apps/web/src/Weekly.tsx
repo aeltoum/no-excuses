@@ -27,6 +27,7 @@ import { InstallPrompt } from "./InstallPrompt";
 import { MissedWeeks } from "./MissedWeeks";
 import { onClearPersisted } from "./persist";
 import {
+  call,
   compressPhoto,
   loadNudged,
   nudgeMember,
@@ -36,6 +37,7 @@ import {
 } from "./proof";
 import { Result, useNotice } from "./Result";
 import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
+import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
 
@@ -72,6 +74,7 @@ type Outgoing = {
   activity: ProofPhoto;
   presence: ProofPhoto;
   details: WorkoutDetails | null;
+  sessionId?: string;
   paths: { activity?: string; presence?: string };
   status: "sending" | "failed" | "sent";
   error?: string;
@@ -152,7 +155,12 @@ function sendOutgoing(
           "failure",
           "Check-in response did not match this workout.",
         );
-      // Details are extra: the workout counts even if they fail to save.
+      // The session link and details are extras: the workout counts either way.
+      if (entry.sessionId)
+        await call(apiBaseUrl, token, `/v1/sessions/${entry.sessionId}/link`, {
+          method: "POST",
+          body: { workoutCheckinId: entry.id },
+        }).catch(() => undefined);
       if (entry.details)
         await setProofDetails(apiBaseUrl, token, entry.id, entry.details).catch(
           () => undefined,
@@ -247,6 +255,8 @@ export function Weekly({
   }>({});
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(emptyDraft);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const shots = useCandidates();
   const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
     (entry) => entry.membershipId === membership?.membershipId,
   );
@@ -309,7 +319,12 @@ export function Weekly({
       try {
         const blob = await compressPhoto(file);
         setPhotos((current) => {
-          if (current[kind]) URL.revokeObjectURL(current[kind].url);
+          // Session photos stay listed, so their previews stay alive.
+          if (
+            current[kind] &&
+            !shots.some((shot) => shot.id === current[kind]?.id)
+          )
+            URL.revokeObjectURL(current[kind].url);
           return {
             ...current,
             [kind]: {
@@ -795,6 +810,20 @@ export function Weekly({
                   >
                     Change target
                   </a>
+                  <SessionCard
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                    extras={extras}
+                    apply={applyExtras}
+                    onNotice={setNotice}
+                    onFinish={(id, minutes) => {
+                      setSessionId(id);
+                      setDuration(String(minutes));
+                      setOtherDuration(![20, 30, 45, 60, 90].includes(minutes));
+                      if (logBlock) setLockOpen(true);
+                      else setSheetOpen(true);
+                    }}
+                  />
                   <ul className="activity-legend" aria-label="Activity colours">
                     {(
                       ["strength", "cardio", "class", "sport", "mixed"] as const
@@ -1042,6 +1071,7 @@ export function Weekly({
                           activity: photos.activity,
                           presence: photos.presence,
                           details: draftDetails(detailsDraft, activityType),
+                          sessionId: sessionId ?? undefined,
                           paths: {},
                           status: "sending",
                         };
@@ -1054,6 +1084,11 @@ export function Weekly({
                         setOtherDuration(false);
                         setPhotos({});
                         setDetailsDraft(emptyDraft());
+                        setSessionId(null);
+                        clearCandidates([
+                          photos.activity.id,
+                          photos.presence.id,
+                        ]);
                         sendOutgoing(entry, api, apiBaseUrl, token, () =>
                           revokeRef.current(),
                         );
@@ -1169,39 +1204,67 @@ export function Weekly({
                               ],
                             ] as const
                           ).map(([kind, title, facing, hint]) => (
-                            <label className="proof-capture-slot" key={kind}>
-                              {photos[kind] ? (
-                                <img
-                                  src={photos[kind].url}
-                                  alt={
-                                    kind === "activity"
-                                      ? "Activity preview"
-                                      : "Your presence preview"
+                            <div className="proof-capture-cell" key={kind}>
+                              <label className="proof-capture-slot">
+                                {photos[kind] ? (
+                                  <img
+                                    src={photos[kind].url}
+                                    alt={
+                                      kind === "activity"
+                                        ? "Activity preview"
+                                        : "Your presence preview"
+                                    }
+                                  />
+                                ) : (
+                                  <span
+                                    className="proof-capture-plus"
+                                    aria-hidden="true"
+                                  >
+                                    +
+                                  </span>
+                                )}
+                                <strong>
+                                  {photos[kind]
+                                    ? `Retake ${title.toLowerCase()}`
+                                    : title}
+                                </strong>
+                                <small>{hint}</small>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture={facing}
+                                  onChange={(event) =>
+                                    void choosePhoto(kind)(event)
                                   }
                                 />
-                              ) : (
-                                <span
-                                  className="proof-capture-plus"
-                                  aria-hidden="true"
+                              </label>
+                              {shots.length > 0 && (
+                                <fieldset
+                                  className="session-pick"
+                                  aria-label={`Use a session photo as ${title.toLowerCase()}`}
                                 >
-                                  +
-                                </span>
+                                  {shots.map((shot, index) => (
+                                    <button
+                                      type="button"
+                                      key={shot.id}
+                                      aria-pressed={
+                                        photos[kind]?.id === shot.id
+                                      }
+                                      aria-label={`Session photo ${index + 1}`}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        setPhotos((current) => ({
+                                          ...current,
+                                          [kind]: shot,
+                                        }));
+                                      }}
+                                    >
+                                      <img src={shot.url} alt="" />
+                                    </button>
+                                  ))}
+                                </fieldset>
                               )}
-                              <strong>
-                                {photos[kind]
-                                  ? `Retake ${title.toLowerCase()}`
-                                  : title}
-                              </strong>
-                              <small>{hint}</small>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture={facing}
-                                onChange={(event) =>
-                                  void choosePhoto(kind)(event)
-                                }
-                              />
-                            </label>
+                            </div>
                           ))}
                         </div>
                         {photoError && (

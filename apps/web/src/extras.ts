@@ -87,6 +87,7 @@ export type HomeExtras = {
   unlocks: CardUnlock[];
   unreadNotifications: number;
   safety: { conductAccepted: boolean; blocked: string[]; operator?: boolean };
+  session: { id: string; startedAt: string } | null;
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
@@ -95,6 +96,7 @@ export const emptyExtras: HomeExtras = {
   unlocks: [],
   unreadNotifications: 0,
   safety: { conductAccepted: false, blocked: [] },
+  session: null,
 };
 
 const cache = persistentMap<HomeExtras>("extras");

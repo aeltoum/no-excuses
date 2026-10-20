@@ -275,6 +275,7 @@ describe("True-MVP workout check-ins", () => {
       "media_deleted_at",
       "details",
       "caption",
+      "workout_session_id",
     ]);
   });
 

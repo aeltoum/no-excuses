@@ -37,6 +37,7 @@ export const homeExtras = (overrides: Record<string, unknown> = {}) => ({
   unlocks: [],
   unreadNotifications: 0,
   safety: { conductAccepted: false, blocked: [] },
+  session: null,
   ...overrides,
 });
 
