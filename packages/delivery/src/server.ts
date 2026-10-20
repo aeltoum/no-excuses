@@ -198,6 +198,21 @@ async function deleteExpiredProofMedia() {
   ]);
 }
 
+// Consequence clips stay for good; only uploads never attached to a claim go.
+const clipBucket = "consequence-clips";
+async function deleteAbandonedClips() {
+  const due = await pool.query(
+    "select path from app_private.consequence_clips_due(now())",
+  );
+  const paths = due.rows.map((row) => row.path as string);
+  if (paths.length === 0) return;
+  await storage(`/object/${clipBucket}`, "DELETE", { prefixes: paths });
+  await pool.query(
+    "select app_private.mark_consequence_clips_deleted($1, now())",
+    [paths],
+  );
+}
+
 let delivering = false;
 async function deliverPush() {
   if (!pushEnabled || delivering) return;
@@ -264,6 +279,11 @@ async function maintenance() {
       await deleteExpiredProofMedia();
     } catch {
       console.error("Proof media deletion pending retry");
+    }
+    try {
+      await deleteAbandonedClips();
+    } catch {
+      console.error("Consequence clip cleanup pending retry");
     }
     await deliverPush();
   } catch (error) {
@@ -793,7 +813,10 @@ async function push(request: Request): Promise<Response> {
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
-const reactionKinds = ["strong", "fire", "cheer"];
+const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
+// One standard emoji, including skin tones, flags, and joined sequences.
+const singleEmoji =
+  /^(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*(?:\u200D\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*)*)$/u;
 async function proof(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });
@@ -892,25 +915,48 @@ async function proof(request: Request, path: string): Promise<Response> {
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
               urls.get(row.presence_photo_path as string) ?? null,
-            reactions: reactions.get(row.workout_checkin_id)?.counts ?? {},
-            myReaction:
-              reactions.get(row.workout_checkin_id)?.my_reaction ?? null,
+            reactions: reactions.get(row.workout_checkin_id)?.counts ?? [],
+            myReactions:
+              reactions.get(row.workout_checkin_id)?.my_reactions ?? [],
+          })),
+        ),
+      );
+    }
+    const reactors = proofReactors.exec(path);
+    if (reactors && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.proof_reactors($1,$2)", [
+          reactors[1],
+          now,
+        ])
+      ).rows;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            emoji: row.reaction,
+            name: row.display_name,
+            mine: row.mine,
           })),
         ),
       );
     }
     const reacted = proofReaction.exec(path);
     if (reacted && request.method === "POST") {
-      const reaction = body.reaction ?? null;
-      if (reaction !== null && !reactionKinds.includes(String(reaction)))
+      const { emoji, on } = body;
+      if (
+        typeof emoji !== "string" ||
+        !singleEmoji.test(emoji) ||
+        typeof on !== "boolean"
+      )
         return reply(fail("invalid_request", 400));
-      await query(actor, "select app_private.react_to_proof($1,$2,$3)", [
+      await query(actor, "select app_private.react_to_proof($1,$2,$3,$4)", [
         reacted[1],
-        reaction,
+        emoji,
+        on,
         now,
       ]);
-      setImmediate(() => void deliverPush());
-      return reply(ok({ workoutCheckinId: reacted[1], reaction }));
+      if (on) setImmediate(() => void deliverPush());
+      return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
     }
     const match = proofAction.exec(path);
     if (match && request.method === "POST") {
@@ -991,6 +1037,38 @@ const anyUuid = (value: unknown): value is string =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const consequenceAction =
   /^\/v1\/consequences\/(redraw|select|claim|request_pause|vote_pause|resume|respond)$/;
+const clipExtensions: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+type ClipHome = {
+  attempt?: { clipPath?: string | null; clipUrl?: string | null } | null;
+  reviews?: { clipPath?: string | null; clipUrl?: string | null }[];
+};
+// Swaps each clip path on the home state for a day-long signed URL the Group can play.
+async function withClipUrls(home: unknown) {
+  const state = home as ClipHome | undefined;
+  if (!state) return home;
+  const items = [state.attempt, ...(state.reviews ?? [])].filter(
+    (item): item is NonNullable<typeof item> => Boolean(item),
+  );
+  const paths = items.flatMap((item) => (item.clipPath ? [item.clipPath] : []));
+  const urls = new Map<string, string>();
+  if (paths.length > 0) {
+    const signed = (await storage(`/object/sign/${clipBucket}`, "POST", {
+      expiresIn: 86_400,
+      paths,
+    })) as Array<{ path?: string; signedURL?: string }>;
+    for (const item of signed)
+      if (item.path && item.signedURL)
+        urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+  }
+  for (const item of items) {
+    item.clipUrl = item.clipPath ? (urls.get(item.clipPath) ?? null) : null;
+    delete item.clipPath;
+  }
+  return state;
+}
 async function consequences(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });
@@ -1009,20 +1087,66 @@ async function consequences(request: Request, path: string): Promise<Response> {
           now,
         ])
       ).rows;
-      return reply(ok(rows[0]?.home));
+      return reply(ok(await withClipUrls(rows[0]?.home)));
     }
-    const action = consequenceAction.exec(path)?.[1];
-    if (!action || request.method !== "POST")
-      return reply(fail("not_found", 404));
-    let body: { target?: unknown; choice?: unknown };
+    if (request.method !== "POST") return reply(fail("not_found", 404));
+    let body: {
+      target?: unknown;
+      choice?: unknown;
+      attemptId?: unknown;
+      challengeId?: unknown;
+      mimeType?: unknown;
+    };
     try {
       body = (await request.json()) as typeof body;
     } catch {
       return reply(fail("invalid_request", 400));
     }
+    if (path === "/v1/consequences/challenge") {
+      if (!anyUuid(body?.attemptId)) return reply(fail("invalid_request", 400));
+      const rows = (
+        await query(
+          actor,
+          "select app_private.issue_consequence_challenge($1,$2) as challenge",
+          [body.attemptId, now],
+        )
+      ).rows;
+      return reply(ok(rows[0]?.challenge));
+    }
+    if (path === "/v1/consequences/clip-upload") {
+      const extension = clipExtensions[String(body?.mimeType)];
+      if (!uuid(body?.challengeId) || !extension)
+        return reply(fail("invalid_request", 400));
+      const created = await query(
+        actor,
+        "select app_private.create_consequence_clip_upload($1,$2,$3) as path",
+        [body.challengeId, extension, now],
+      );
+      const objectPath = created.rows[0]?.path as string;
+      const signed = (await storage(
+        `/object/upload/sign/${clipBucket}/${objectPath}`,
+        "POST",
+        {},
+      )) as { url?: string };
+      if (!signed.url) throw new Error("Storage sign failed");
+      return reply(
+        ok({
+          path: objectPath,
+          uploadUrl: `${authUrl}/storage/v1${signed.url}`,
+        }),
+      );
+    }
+    const action = consequenceAction.exec(path)?.[1];
+    if (!action) return reply(fail("not_found", 404));
     if (!anyUuid(body?.target)) return reply(fail("invalid_request", 400));
     const choice = typeof body.choice === "string" ? body.choice : "";
     if (action === "select" && !anyUuid(choice))
+      return reply(fail("invalid_request", 400));
+    // A claim names the clip uploaded for the caller's open challenge.
+    if (
+      action === "claim" &&
+      !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(mp4|webm)$/.test(choice)
+    )
       return reply(fail("invalid_request", 400));
     const rows = (
       await query(
@@ -1032,7 +1156,7 @@ async function consequences(request: Request, path: string): Promise<Response> {
       )
     ).rows;
     setImmediate(() => void deliverPush());
-    return reply(ok(rows[0]?.home));
+    return reply(ok(await withClipUrls(rows[0]?.home)));
   } catch (error) {
     return reply(dbError(error));
   }

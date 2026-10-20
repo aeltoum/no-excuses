@@ -866,6 +866,7 @@ button:disabled {
   width: min(100%, 560px);
   max-height: min(90dvh, 760px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
   border: 1px solid var(--rule);
   border-bottom: 0;
@@ -1866,6 +1867,55 @@ button:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.clip-heads-up {
+  border-left: 3px solid var(--strength);
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+  padding-left: 0.625rem;
+}
+.clip-player,
+.clip-preview {
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 0.5rem;
+  display: block;
+  max-width: 100%;
+  width: 100%;
+}
+.clip-preview[hidden] {
+  display: none;
+}
+.proof-clip {
+  display: grid;
+  gap: 0.75rem;
+}
+.clip-rules,
+.clip-timer {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+.clip-challenge {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  min-height: 3rem;
+}
+.clip-code {
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+.clip-action {
+  font-weight: 600;
+}
+.clip-placeholder {
+  color: var(--muted);
+}
+.clip-stage {
+  position: relative;
+}
 .card-reviews {
   display: grid;
   margin: 0;
@@ -2375,8 +2425,17 @@ button:disabled {
 body:has(.home-log-button) .result.event-notice {
   bottom: calc(148px + env(safe-area-inset-bottom));
 }
-.sheet .result.event-notice {
-  bottom: calc(16px + env(safe-area-inset-bottom));
+/* Inside a sheet the notice joins the sheet's flow, clear of its header and actions.
+   The extra class outranks the Home offset above, which would push it up the sheet. */
+.sheet-layer .sheet .result.event-notice {
+  position: sticky;
+  bottom: 0;
+  left: auto;
+  width: auto;
+  margin-top: 16px;
+  transform: none;
+  box-shadow: none;
+  animation: none;
 }
 @keyframes notice-rise {
   from {
@@ -2481,17 +2540,21 @@ body:has(.home-log-button) .result.event-notice {
   border-radius: 8px;
 }
 
-/* Reactions under each proof post: quiet chips; the viewer's own pick fills yellow. */
+/* Reactions under each proof post: quiet chips; the viewer's own picks fill yellow.
+   The add chip opens a tray of gym-floor picks plus a field for any emoji. */
 .proof-reactions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0;
   padding: 0;
   border: 0;
 }
-.proof-reaction {
+.proof-reactions .proof-reaction {
   display: inline-flex;
+  gap: 6px;
   align-items: center;
+  justify-content: center;
   width: auto;
   min-width: 44px;
   min-height: 36px;
@@ -2504,9 +2567,154 @@ body:has(.home-log-button) .result.event-notice {
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
-.proof-reaction[aria-pressed="true"] {
+.proof-reaction-count {
+  font-weight: 600;
+}
+.proof-reactions .proof-reaction[aria-pressed="true"] {
   border-color: var(--class);
   background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+.proof-reactions .proof-reaction-add {
+  padding: 0 10px;
+  border-style: dashed;
+  border-color: var(--empty-slot);
+  background: transparent;
+  color: var(--muted);
+}
+.proof-reactions .proof-reaction-add[aria-expanded="true"] {
+  border-style: solid;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.reaction-quick {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+}
+.reaction-quick button {
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.reaction-quick button:hover {
+  background: var(--rubber);
+}
+.reaction-quick button[aria-pressed="true"] {
+  border-color: var(--class);
+  background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+/* Who reacted: emoji tabs like the chips, then names; your row wears the class yellow. */
+.reactor-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  padding-bottom: 4px;
+  overflow-x: auto;
+}
+.reactor-tabs [role="tab"] {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+.reactor-tabs [role="tab"][aria-selected="true"] {
+  border-color: var(--class);
+  background: color-mix(in srgb, var(--class) 18%, var(--surface));
+}
+.reactor-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reactor-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.reactor-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reactor-mine .reactor-name {
+  color: var(--class);
+  font-weight: 600;
+}
+.reactor-action {
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--empty-slot);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--ink);
+}
+.reactor-add {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.reactor-placeholder {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.reactor-error {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+/* The full picker wears the app's rubber and chalk; the yellow indicator matches picked chips. */
+.emoji-picker-holder {
+  min-height: 360px;
+}
+.emoji-picker-holder emoji-picker {
+  width: 100%;
+  height: min(52dvh, 420px);
+  --background: var(--rubber);
+  --border-color: var(--rule);
+  --border-radius: 10px;
+  --button-active-background: var(--rule);
+  --button-hover-background: var(--surface);
+  --category-font-color: var(--muted);
+  --indicator-color: var(--class);
+  --input-border-color: var(--empty-slot);
+  --input-border-radius: 6px;
+  --input-font-color: var(--ink);
+  --input-font-size: 1rem;
+  --input-padding: 0.5rem 0.75rem;
+  --input-placeholder-color: var(--muted);
+  --num-columns: 8;
+  --emoji-size: 1.6rem;
+  --category-emoji-size: 1.2rem;
+  --category-emoji-padding: 0.4rem;
+  --outline-color: var(--safety);
+  font-family: Archivo, system-ui, sans-serif;
+}
+@media (max-width: 420px) {
+  .emoji-picker-holder emoji-picker {
+    --num-columns: 7;
+  }
 }
 .friend-nudge {
   width: 100%;
@@ -2514,4 +2722,7 @@ body:has(.home-log-button) .result.event-notice {
   margin: 0;
   padding: 0 8px;
   font-size: 0.8rem;
+}
+.proof-outbox {
+  margin-top: 18px;
 }

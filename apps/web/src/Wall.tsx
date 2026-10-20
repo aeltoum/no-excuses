@@ -4,13 +4,14 @@ import { useConfirm } from "./Confirm";
 import { persistentMap } from "./persist";
 import {
   actOnProof,
+  cachedReactors,
   loadProofFeed,
+  loadReactors,
   type ProofAction,
   type ProofItem,
-  type Reaction,
-  reactionKinds,
   reactToProof,
 } from "./proof";
+import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
@@ -50,22 +51,32 @@ export function keepPhotoUrls(previous: ProofItem[], next: ProofItem[]) {
   });
 }
 
-const cachedFeed = (cacheKey: string) =>
-  feedCache.get(cacheKey)?.map((item) => ({
+// With the service worker in control, an expired URL still finds the photo
+// in its cache; without it, an expired URL would only show a broken image.
+const cachedFeed = (cacheKey: string) => {
+  const keep = (url: string | null) =>
+    usable(url) || navigator.serviceWorker?.controller ? url : null;
+  return feedCache.get(cacheKey)?.map((item) => ({
     ...item,
-    activityPhotoUrl: usable(item.activityPhotoUrl)
-      ? item.activityPhotoUrl
-      : null,
-    presencePhotoUrl: usable(item.presencePhotoUrl)
-      ? item.presencePhotoUrl
-      : null,
+    activityPhotoUrl: keep(item.activityPhotoUrl),
+    presencePhotoUrl: keep(item.presencePhotoUrl),
   }));
-
-const reactionEmoji: Record<Reaction, string> = {
-  strong: "💪",
-  fire: "🔥",
-  cheer: "👏",
 };
+
+// A photo the cache missed under an expired URL stays hidden until the feed
+// brings a fresh one.
+const photoEvents = {
+  onLoad: (event: { currentTarget: HTMLImageElement }) => {
+    event.currentTarget.style.visibility = "";
+  },
+  onError: (event: { currentTarget: HTMLImageElement }) => {
+    event.currentTarget.style.visibility = "hidden";
+  },
+};
+
+// Feeds cached before custom reactions held a preset-keyed object.
+const reactionList = (item: ProofItem) =>
+  Array.isArray(item.reactions) ? item.reactions : [];
 
 const label = (value: string) => value[0]?.toUpperCase() + value.slice(1);
 const remaining = (until: string | null) => {
@@ -159,20 +170,26 @@ export function ProofFeed({
     ) => {
       const id = item.workoutCheckinId;
       // Optimistic: show the outcome at once; a failure restores the post.
-      const instant = action === "review" || action === "vote";
+      // Removing photos cannot be undone, so it waits for the server.
+      const instant =
+        action === "review" ||
+        action === "vote" ||
+        (action === "moderate" && choice === "restore");
       const optimistic: ProofItem = !instant
         ? item
-        : action === "vote"
-          ? {
-              ...item,
-              myVote: choice as ProofItem["myVote"],
-              acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
-              rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
-            }
-          : {
-              ...item,
-              reviewStatus: choice === "verify" ? "verified" : "questioned",
-            };
+        : action === "moderate"
+          ? { ...item, hidden: false }
+          : action === "vote"
+            ? {
+                ...item,
+                myVote: choice as ProofItem["myVote"],
+                acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
+                rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
+              }
+            : {
+                ...item,
+                reviewStatus: choice === "verify" ? "verified" : "questioned",
+              };
       const swap = (next: ProofItem) =>
         setItems((current) =>
           current.map((entry) =>
@@ -219,24 +236,44 @@ export function ProofFeed({
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
-  // Optimistic: the tap shows at once; a failure restores the previous reaction.
+  // Optimistic: the tap shows at once; a failure undoes just that emoji.
   const react = useCallback(
-    async (item: ProofItem, reaction: Reaction) => {
+    async (item: ProofItem, emoji: string, on: boolean) => {
       const id = item.workoutCheckinId;
-      const next = item.myReaction === reaction ? null : reaction;
-      const counts = { ...item.reactions };
-      if (item.myReaction)
-        counts[item.myReaction] = (counts[item.myReaction] ?? 1) - 1;
-      if (next) counts[next] = (counts[next] ?? 0) + 1;
-      const swap = (entry: ProofItem) =>
-        setItems((current) =>
-          current.map((post) => (post.workoutCheckinId === id ? entry : post)),
+      const apply = (post: ProofItem, add: boolean): ProofItem => {
+        const step = add ? 1 : -1;
+        const listed = reactionList(post).some(
+          (entry) => entry.emoji === emoji,
         );
-      swap({ ...item, reactions: counts, myReaction: next });
+        const reactions = (
+          listed
+            ? reactionList(post).map((entry) =>
+                entry.emoji === emoji
+                  ? { ...entry, count: entry.count + step }
+                  : entry,
+              )
+            : [...reactionList(post), { emoji, count: 1 }]
+        ).filter((entry) => entry.count > 0);
+        const mine = post.myReactions ?? [];
+        return {
+          ...post,
+          reactions,
+          myReactions: add
+            ? [...mine, emoji]
+            : mine.filter((entry) => entry !== emoji),
+        };
+      };
+      const update = (add: boolean) =>
+        setItems((current) =>
+          current.map((post) =>
+            post.workoutCheckinId === id ? apply(post, add) : post,
+          ),
+        );
+      update(on);
       try {
-        await reactToProof(apiBaseUrl, token, id, next);
+        await reactToProof(apiBaseUrl, token, id, emoji, on);
       } catch (error) {
-        swap(item);
+        update(!on);
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
         setNotice({
@@ -293,6 +330,8 @@ export function ProofFeed({
               alt={`${item.mine ? "Your" : `${item.authorName}'s`} workout activity`}
               loading="lazy"
               decoding="async"
+              crossOrigin="anonymous"
+              {...photoEvents}
             />
           )}
           {item.presencePhotoUrl && (
@@ -302,6 +341,8 @@ export function ProofFeed({
               alt={`${who} at the workout`}
               loading="lazy"
               decoding="async"
+              crossOrigin="anonymous"
+              {...photoEvents}
             />
           )}
           <span className="proof-tag">
@@ -354,36 +395,18 @@ export function ProofFeed({
             </button>
           </fieldset>
         )}
-        {!item.hidden &&
-          (!item.mine ||
-            Object.values(item.reactions ?? {}).some((n) => n > 0)) && (
-            <fieldset className="proof-reactions" aria-label="Reactions">
-              {reactionKinds.map((kind) => {
-                const count = item.reactions?.[kind] ?? 0;
-                return item.mine ? (
-                  count > 0 && (
-                    <span key={kind} className="proof-reaction">
-                      <span aria-hidden="true">{reactionEmoji[kind]}</span>{" "}
-                      {count}
-                      <span className="visually-hidden"> {kind}</span>
-                    </span>
-                  )
-                ) : (
-                  <button
-                    key={kind}
-                    type="button"
-                    className="proof-reaction"
-                    aria-pressed={item.myReaction === kind}
-                    aria-label={`${label(kind)}${count ? `, ${count}` : ""}`}
-                    onClick={() => void react(item, kind)}
-                  >
-                    <span aria-hidden="true">{reactionEmoji[kind]}</span>
-                    {count > 0 && <span aria-hidden="true"> {count}</span>}
-                  </button>
-                );
-              })}
-            </fieldset>
-          )}
+        {!item.hidden && (!item.mine || reactionList(item).length > 0) && (
+          <Reactions
+            reactions={reactionList(item)}
+            mine={item.myReactions ?? []}
+            readOnly={item.mine}
+            onToggle={(emoji, on) => void react(item, emoji, on)}
+            loadReactors={() =>
+              loadReactors(apiBaseUrl, token, item.workoutCheckinId)
+            }
+            cachedReactors={() => cachedReactors(item.workoutCheckinId)}
+          />
+        )}
         {item.reviewStatus === "questioned" && (
           <p className="proof-tally">
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}

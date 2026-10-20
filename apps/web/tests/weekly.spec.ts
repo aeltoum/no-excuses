@@ -537,27 +537,24 @@ const weeklyLoop = async (
     dialog.getByRole("button", { name: "Log workout" }),
   ).toBeEnabled();
   await dialog.getByRole("button", { name: "Log workout" }).click();
+  // The sheet closes at once; the workout uploads in the background.
+  await expect(dialog).toHaveCount(0);
   if (workoutFailures === 2) {
-    await expect(dialog.getByRole("alert")).toHaveText(
-      "Action failed. Try again. Your choices are kept; try again.",
+    const sending = page.getByRole("list", { name: "Your workouts sending" });
+    await expect(sending.getByRole("alert")).toHaveText(
+      "Action failed. Try again.",
     );
+    await expect(sending.getByText("Couldn’t upload")).toBeVisible();
+    // The count rolls back while the workout is unsent.
     await expect(
-      dialog.getByRole("button", { name: "Strength" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      dialog.getByRole("button", { name: "45 min" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      dialog.getByRole("img", { name: "Activity preview" }),
+      page.getByText("2 of 4 this week", { exact: true }),
     ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: "Moderate" }),
-    ).toHaveAttribute("aria-pressed", "true");
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("persistent-workout-failure.png"),
     });
-    await dialog.getByRole("button", { name: "Log workout" }).click();
+    // Retry re-sends the kept photos without picking them again.
+    await sending.getByRole("button", { name: "Retry" }).click();
   }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText(

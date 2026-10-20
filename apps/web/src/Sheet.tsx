@@ -51,7 +51,8 @@ export function Sheet({
       }
       const first = controls[0];
       const last = controls.at(-1);
-      if (!controls.includes(document.activeElement as HTMLElement)) {
+      // Widgets with their own shadow DOM (the emoji picker) keep focus inside the sheet.
+      if (!dialogRef.current.contains(document.activeElement)) {
         event.preventDefault();
         (event.shiftKey ? last : first)?.focus();
       } else if (event.shiftKey && document.activeElement === first) {
@@ -63,7 +64,12 @@ export function Sheet({
       }
     };
     document.addEventListener("keydown", onKeyDown);
+    // Lock the page behind the sheet; the sheet and picker keep their own scrolling.
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
     return () => {
+      root.style.overflow = overflow;
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
       openerRef.current?.focus();

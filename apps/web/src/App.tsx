@@ -89,6 +89,45 @@ function workoutCount(count: number) {
   return `${count} ${count === 1 ? "workout" : "workouts"}`;
 }
 
+// Sign-out in progress on this device. A marker in storage survives a reload,
+// so a reopened app finishes the sign-out instead of restoring the member.
+const signOutMarker = "no-excuses:signing-out";
+let signOutInFlight: Promise<unknown> | null = null;
+
+function endSession(auth: SupabaseClient) {
+  if (signOutInFlight) return signOutInFlight;
+  try {
+    localStorage.setItem(signOutMarker, "1");
+  } catch {
+    // Storage unavailable: the sign-out below still runs.
+  }
+  const run = (async () => {
+    await unsubscribePush();
+    try {
+      await auth.auth.signOut({ scope: "local" });
+    } catch {
+      // Access already ended on screen.
+    }
+  })().finally(() => {
+    try {
+      localStorage.removeItem(signOutMarker);
+    } catch {
+      // Nothing left to finish.
+    }
+    signOutInFlight = null;
+  });
+  signOutInFlight = run;
+  return run;
+}
+
+function pendingSignOut() {
+  try {
+    return localStorage.getItem(signOutMarker) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function App({
   auth,
   apiBaseUrl,
@@ -125,8 +164,12 @@ export function App({
     }),
   ).current;
   const weeklyCache = useRef(persistentMap<WeeklySnapshot>("weekly")).current;
+  const nameCache = useRef(persistentMap<string>("name")).current;
   const groupCache = useRef(
     persistentMap<NonNullable<typeof groupRoster>>("group"),
+  ).current;
+  const invitationCache = useRef(
+    persistentMap<typeof pendingInvitations>("invitations"),
   ).current;
   // Last verified member on this device: reopen straight into the app and
   // verify in the background instead of blocking on network checks.
@@ -142,6 +185,9 @@ export function App({
     setAccessRevision((current) => current + 1);
   }, []);
   const [session, setSession] = useState<Session | null>(null);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const userId = session?.user.id;
   const sessionUser = useRef<string | null>(null);
   sessionUser.current = session?.user.id ?? null;
   const signedInUser = useRef<string | null>(null);
@@ -160,7 +206,22 @@ export function App({
     groupId: string;
     membershipId: string;
   } | null>(hint?.membership ?? null);
-  const [busy, setBusy] = useState(false);
+  // Controls waiting on the server. Each action holds only its own key, so
+  // the rest of the screen stays usable and the same action cannot run twice.
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const running = useRef(new Set<string>());
+  const busy = (key: string) => pending.has(key);
+  const hold = (key: string) => {
+    if (running.current.has(key)) return false;
+    running.current.add(key);
+    setPending(new Set(running.current));
+    return true;
+  };
+  const release = (key: string) => {
+    running.current.delete(key);
+    setPending(new Set(running.current));
+  };
+  const savedDisplayName = useRef("");
   const [notice, setNotice] = useNotice();
 
   useEffect(() => {
@@ -314,7 +375,11 @@ export function App({
   useEffect(() => {
     let active = true;
     let revision = accessRevision;
-    const resolve = async (next: Session | null, expected: number) => {
+    // A sign-out cut short by a reload finishes before anyone is restored.
+    if (!signOutInFlight && pendingSignOut()) void endSession(auth);
+    const resolve = async (current: Session | null, expected: number) => {
+      // The previous member's session stays out while its sign-out runs.
+      const next = signOutInFlight ? null : current;
       if (!next) {
         if (active && revision === expected) {
           setSession(null);
@@ -368,6 +433,8 @@ export function App({
     };
     const listener = auth.auth.onAuthStateChange((event, next) => {
       if (event === "INITIAL_SESSION" && !next) return;
+      // A refresh landing during sign-out must not bring the old session back.
+      if (signOutInFlight && event !== "SIGNED_OUT") return;
       const expected = ++revision;
       if (next?.user.id !== (sessionUser.current ?? pendingUser.current)) {
         pendingUser.current = null;
@@ -432,32 +499,40 @@ export function App({
     if (
       access !== "signed-in" ||
       (path !== "/account" && (path !== "/group" || membership)) ||
-      !session
+      !userId
     )
       return;
+    if (displayNameScope.current === userId) return;
     let active = true;
-    const scope = session.user.id;
-    if (displayNameScope.current !== scope) {
-      displayNameScope.current = scope;
-      displayNameEdited.current = false;
-      setDisplayNameLoaded(false);
-      setDisplayName("");
-    }
+    let done = false;
+    displayNameScope.current = userId;
+    displayNameEdited.current = false;
+    // Show the last known name at once; the fetch below refreshes it.
+    const cached = nameCache.get(userId);
+    savedDisplayName.current = cached ?? "";
+    setDisplayName(cached ?? "");
+    setDisplayNameLoaded(cached !== undefined);
     void api
-      .displayName(session.access_token)
+      .displayName(sessionRef.current?.access_token ?? "")
       .then((response) => {
         if (!active) return;
         const next = response.data.displayName ?? "";
+        done = true;
+        nameCache.set(userId, next);
+        savedDisplayName.current = next;
         if (!displayNameEdited.current) setDisplayName(next);
         setDisplayNameLoaded(true);
       })
       .catch((error) => {
         if (!active) return;
+        // Let the next visit retry.
+        done = true;
+        displayNameScope.current = "";
         if (error instanceof ApiError && error.kind === "unauthorized") {
           setSession(null);
           setMembership(null);
           recheckAccess();
-        } else {
+        } else if (cached === undefined) {
           setNotice({
             kind: "error",
             text: "Couldn’t load your name.",
@@ -466,9 +541,23 @@ export function App({
         }
       });
     return () => {
+      // Leaving mid-load: let the next visit fetch again.
+      if (!done && displayNameScope.current === userId)
+        displayNameScope.current = "";
       active = false;
     };
-  }, [access, api, membership, path, session, setNotice, recheckAccess]);
+    // Keyed on the user, not the session: a token refresh must not restart
+    // a slow load.
+  }, [
+    access,
+    api,
+    membership,
+    path,
+    userId,
+    nameCache,
+    setNotice,
+    recheckAccess,
+  ]);
   useEffect(() => {
     void groupRevision;
     if (
@@ -485,6 +574,7 @@ export function App({
       groupScope.current = scope;
       groupRosterRef.current = stored;
       setGroupRoster(stored);
+      setPendingInvitations(invitationCache.get(scope) ?? []);
       setGroupLoad("ready");
     }
     const previousRoster = groupRosterRef.current;
@@ -517,10 +607,9 @@ export function App({
           }
         }
         setGroupStale(false);
-        if (path === "/account") {
-          setGroupLoad("ready");
-          return;
-        }
+        // The roster is enough to show the screen; invitations follow.
+        setGroupLoad("ready");
+        if (path === "/account") return;
         const creator = response.data.members.some(
           (member) =>
             member.membershipId === membership.membershipId && member.creator,
@@ -532,13 +621,13 @@ export function App({
             )
           : null;
         if (!active) return;
+        invitationCache.set(scope, pending?.data ?? []);
         setPendingInvitations((current) =>
           JSON.stringify(current) === JSON.stringify(pending?.data ?? [])
             ? current
             : (pending?.data ?? []),
         );
         setManageGroup((current) => current && creator);
-        setGroupLoad("ready");
       })
       .catch((error) => {
         if (!active) return;
@@ -548,7 +637,7 @@ export function App({
           recheckAccess();
           return;
         }
-        if (hasCache) {
+        if (hasCache || groupRosterRef.current) {
           setGroupStale(true);
         } else setGroupLoad("error");
       });
@@ -561,6 +650,7 @@ export function App({
     api,
     groupCache,
     groupRevision,
+    invitationCache,
     membership,
     path,
     session,
@@ -571,7 +661,23 @@ export function App({
     else if (signInDoor) emailInput.current?.focus();
   }, [codeSent, signInDoor]);
 
+  const fail = (error: unknown) => {
+    const message =
+      error instanceof ApiError && error.kind === "unauthorized"
+        ? "Action failed. Try again."
+        : error instanceof WebAuthError || error instanceof ApiError
+          ? error.message
+          : "Action failed. Try again.";
+    if (error instanceof ApiError && error.kind === "unauthorized") {
+      setSession(null);
+      setMembership(null);
+      recheckAccess();
+    }
+    setNotice({ kind: "error", text: message });
+  };
+  // Pending: the control named by `key` waits for the server's answer.
   const act = async (
+    key: string,
     work: () => Promise<string>,
     options: {
       clearCode?: boolean;
@@ -579,7 +685,7 @@ export function App({
       cutoff?: boolean;
     } = {},
   ) => {
-    setBusy(true);
+    if (!hold(key)) return;
     setNotice(null);
     try {
       const text = await work();
@@ -601,21 +707,36 @@ export function App({
       }
       setNotice({ kind: "success", text });
     } catch (error) {
-      const message =
-        error instanceof ApiError && error.kind === "unauthorized"
-          ? "Action failed. Try again."
-          : error instanceof WebAuthError || error instanceof ApiError
-            ? error.message
-            : "Action failed. Try again.";
-      if (error instanceof ApiError && error.kind === "unauthorized") {
-        setSession(null);
-        setMembership(null);
-        recheckAccess();
-      }
-      setNotice({ kind: "error", text: message });
+      fail(error);
     } finally {
-      setBusy(false);
+      release(key);
     }
+  };
+  // Optimistic: the change already shows; the server confirms in the
+  // background and a failure undoes only this change.
+  const optimistic = (
+    key: string,
+    text: string,
+    work: () => Promise<unknown>,
+    undo: () => void,
+  ) => {
+    if (!hold(key)) return;
+    setNotice({ kind: "success", text });
+    void work()
+      .catch((error) => {
+        undo();
+        fail(error);
+      })
+      .finally(() => release(key));
+  };
+  // Access ends on screen at once; Auth's own sign-out (which tells other
+  // tabs) finishes in the background.
+  const signOut = () => {
+    setSession(null);
+    setMembership(null);
+    setAccess("signed-out");
+    setNotice({ kind: "success", text: "Signed out." });
+    void endSession(auth);
   };
   const token = () => {
     if (!session)
@@ -626,12 +747,13 @@ export function App({
     String(form.get(name) ?? "").trim();
   const submit =
     (
+      key: string,
       fn: (form: FormData) => Promise<string>,
-      options?: Parameters<typeof act>[1],
+      options?: Parameters<typeof act>[2],
     ) =>
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      void act(() => fn(new FormData(event.currentTarget)), options);
+      void act(key, () => fn(new FormData(event.currentTarget)), options);
     };
   const statusCopy: Record<Exclude<Access, "signed-in">, [string, string]> = {
     checking: [
@@ -772,7 +894,7 @@ export function App({
             )}
             {signInDoor && !codeSent && (
               <form
-                onSubmit={submit(async () => {
+                onSubmit={submit("send-code", async () => {
                   if (signInDoor === "invited")
                     await api.enroll(
                       email.trim().toLowerCase(),
@@ -794,7 +916,7 @@ export function App({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={busy}
+                  disabled={busy("send-code")}
                 />
                 {signInDoor === "invited" && (
                   <>
@@ -807,19 +929,22 @@ export function App({
                       required
                       value={enrollmentToken}
                       onChange={(e) => setEnrollmentToken(e.target.value)}
-                      disabled={busy}
+                      disabled={busy("send-code")}
                     />
                   </>
                 )}
-                <button type="submit" disabled={busy}>
-                  {busy ? "Sending…" : "Send code"}
+                <button type="submit" disabled={busy("send-code")}>
+                  {busy("send-code") ? "Sending…" : "Send code"}
                 </button>
               </form>
             )}
             {codeSent && (
               <form
                 onSubmit={submit(
+                  "verify",
                   async () => {
+                    // A late sign-out must never remove the new session.
+                    await signOutInFlight;
                     await verifyOtp(auth, email, code);
                     if (signInDoor === "invited") {
                       setCrewChoice("join");
@@ -883,19 +1008,19 @@ export function App({
                         setNotice(null);
                         codeInputs.current[5]?.focus();
                       }}
-                      disabled={busy}
+                      disabled={busy("verify")}
                     />
                   ))}
                 </fieldset>
-                <button type="submit" disabled={busy}>
-                  {busy ? "Checking…" : "Verify code"}
+                <button type="submit" disabled={busy("verify")}>
+                  {busy("verify") ? "Checking…" : "Verify code"}
                 </button>
                 <div className="sign-in-secondary-actions">
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy("resend")}
                     onClick={() =>
-                      void act(async () => {
+                      void act("resend", async () => {
                         await requestOtp(auth, email);
                         return "If this account is eligible, a code was sent.";
                       })
@@ -905,7 +1030,7 @@ export function App({
                   </button>
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy("verify")}
                     onClick={() => {
                       setCodeSent(false);
                       setCode("");
@@ -952,7 +1077,7 @@ export function App({
                     className="back-button"
                     type="button"
                     aria-label="Back"
-                    disabled={busy}
+                    disabled={busy("preview")}
                     onClick={() => {
                       setNotice(null);
                       setInvitationError("");
@@ -982,19 +1107,24 @@ export function App({
                         )
                       )
                         return;
-                      void act(async () => {
-                        const draft = commandDraft(
-                          "onboarding-name",
-                          displayName.trim(),
-                        );
+                      // Consent is recorded before the member moves on.
+                      void act("onboarding-name", async () => {
+                        const name = displayName.trim();
+                        const draft = commandDraft("onboarding-name", name);
                         const saved = await api.setDisplayName(
                           token(),
-                          displayName.trim(),
+                          name,
                           draft.key,
                         );
                         commandDrafts.current.delete("onboarding-name");
+                        savedDisplayName.current = saved.data.displayName ?? "";
+                        if (session)
+                          nameCache.set(
+                            session.user.id,
+                            savedDisplayName.current,
+                          );
                         displayNameEdited.current = false;
-                        setDisplayName(saved.data.displayName ?? "");
+                        setDisplayName(savedDisplayName.current);
                         await api.consent(token());
                         setOnboardingStep(2);
                         return "About you saved.";
@@ -1012,7 +1142,9 @@ export function App({
                         }}
                         maxLength={40}
                         required
-                        disabled={busy || !displayNameLoaded}
+                        placeholder={
+                          displayNameLoaded ? undefined : "Loading your name…"
+                        }
                       />
                     </label>
                     <label className="check-label">
@@ -1027,7 +1159,7 @@ export function App({
                           })
                         }
                         required
-                        disabled={busy}
+                        disabled={busy("onboarding-name")}
                       />{" "}
                       I’m 18 or older
                     </label>
@@ -1043,7 +1175,7 @@ export function App({
                           })
                         }
                         required
-                        disabled={busy}
+                        disabled={busy("onboarding-name")}
                       />{" "}
                       I understand this is an early-access pilot
                     </label>
@@ -1059,20 +1191,19 @@ export function App({
                           })
                         }
                         required
-                        disabled={busy}
+                        disabled={busy("onboarding-name")}
                       />{" "}
                       I agree to the terms and how my data is used
                     </label>
                     <button
                       type="submit"
                       disabled={
-                        busy ||
-                        !displayNameLoaded ||
+                        busy("onboarding-name") ||
                         !displayName.trim() ||
                         !Object.values(onboardingConsents).every(Boolean)
                       }
                     >
-                      {busy ? "Saving…" : "Continue"}
+                      {busy("onboarding-name") ? "Saving…" : "Continue"}
                     </button>
                     <p className="hint">
                       Add your name and tick all three to continue.
@@ -1084,17 +1215,10 @@ export function App({
                     onSubmit={(event) => {
                       event.preventDefault();
                       if (crewChoice === "start") {
-                        if (crewName.trim()) {
-                          setBusy(true);
-                          window.setTimeout(() => {
-                            setOnboardingStep(3);
-                            setBusy(false);
-                          }, 150);
-                        }
+                        if (crewName.trim()) setOnboardingStep(3);
                         return;
                       }
-                      if (!invitationCode.trim()) return;
-                      setBusy(true);
+                      if (!invitationCode.trim() || !hold("preview")) return;
                       setInvitationError("");
                       setNotice(null);
                       void api
@@ -1108,7 +1232,7 @@ export function App({
                             "That code has expired. Ask your friend for a new one.",
                           ),
                         )
-                        .finally(() => setBusy(false));
+                        .finally(() => release("preview"));
                     }}
                   >
                     <h2 id="onboarding-title">Start a crew or join one?</h2>
@@ -1138,7 +1262,6 @@ export function App({
                           onChange={(event) => setCrewName(event.target.value)}
                           maxLength={80}
                           required
-                          disabled={busy}
                         />
                         <span className="hint">Only members see it.</span>
                       </label>
@@ -1153,7 +1276,7 @@ export function App({
                           }}
                           maxLength={256}
                           required
-                          disabled={busy}
+                          disabled={busy("preview")}
                           aria-invalid={Boolean(invitationError)}
                           aria-describedby={
                             invitationError ? "invitation-error" : undefined
@@ -1166,36 +1289,38 @@ export function App({
                         )}
                       </label>
                     )}
-                    <button type="submit" disabled={busy}>
-                      {busy ? "Saving…" : "Continue"}
+                    <button type="submit" disabled={busy("preview")}>
+                      {busy("preview") ? "Saving…" : "Continue"}
                     </button>
                   </form>
                 )}
                 {onboardingStep === 3 && crewChoice === "start" && (
                   <form
-                    onSubmit={submit(
-                      async () => {
-                        const draft = commandDraft(
-                          "create",
-                          `${crewName}:${recurringTarget}`,
-                        );
-                        await api.create(
-                          token(),
-                          {
-                            groupId: draft.entityId,
-                            membershipId: draft.key,
-                            name: crewName,
-                            timeZone:
-                              Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            weeklyTarget: recurringTarget,
-                          },
-                          draft.key,
-                        );
-                        commandDrafts.current.delete("create");
-                        return "Group created.";
-                      },
-                      { refreshMembership: true },
-                    )}
+                    onSubmit={submit("create", async () => {
+                      const draft = commandDraft(
+                        "create",
+                        `${crewName}:${recurringTarget}`,
+                      );
+                      const created = await api.create(
+                        token(),
+                        {
+                          groupId: draft.entityId,
+                          membershipId: draft.key,
+                          name: crewName,
+                          timeZone:
+                            Intl.DateTimeFormat().resolvedOptions().timeZone,
+                          weeklyTarget: recurringTarget,
+                        },
+                        draft.key,
+                      );
+                      commandDrafts.current.delete("create");
+                      // The new IDs are known; no membership refetch needed.
+                      setMembership({
+                        groupId: draft.entityId,
+                        membershipId: created.data.membershipId,
+                      });
+                      return "Group created.";
+                    })}
                   >
                     <h2 id="onboarding-title">Your weekly target</h2>
                     <div className="target-stepper">
@@ -1221,8 +1346,8 @@ export function App({
                       We suggest at least 2. You can change it for any future
                       week.
                     </p>
-                    <button type="submit" disabled={busy}>
-                      {busy ? "Saving…" : `Start ${crewName}`}
+                    <button type="submit" disabled={busy("create")}>
+                      {busy("create") ? "Saving…" : `Start ${crewName}`}
                     </button>
                   </form>
                 )}
@@ -1231,6 +1356,7 @@ export function App({
                   invitationPreview && (
                     <form
                       onSubmit={submit(
+                        "join",
                         async () => {
                           const draft = commandDraft(
                             "join",
@@ -1320,8 +1446,8 @@ export function App({
                           +
                         </button>
                       </div>
-                      <button type="submit" disabled={busy}>
-                        {busy
+                      <button type="submit" disabled={busy("join")}>
+                        {busy("join")
                           ? "Saving…"
                           : `Join ${invitationPreview.groupName}`}
                       </button>
@@ -1424,7 +1550,9 @@ export function App({
                                 <button
                                   className="row-action danger-text"
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy(
+                                    `remove:${member.membershipId}`,
+                                  )}
                                   onClick={() => {
                                     if (
                                       !window.confirm(
@@ -1432,21 +1560,24 @@ export function App({
                                       )
                                     )
                                       return;
-                                    void act(async () => {
-                                      const draft = commandDraft(
-                                        "remove",
-                                        member.membershipId,
-                                      );
-                                      await api.remove(
-                                        token(),
-                                        membership.groupId,
-                                        member.membershipId,
-                                        draft.key,
-                                      );
-                                      commandDrafts.current.delete("remove");
-                                      setGroupRevision((value) => value + 1);
-                                      return "Member removed.";
-                                    });
+                                    void act(
+                                      `remove:${member.membershipId}`,
+                                      async () => {
+                                        const draft = commandDraft(
+                                          "remove",
+                                          member.membershipId,
+                                        );
+                                        await api.remove(
+                                          token(),
+                                          membership.groupId,
+                                          member.membershipId,
+                                          draft.key,
+                                        );
+                                        commandDrafts.current.delete("remove");
+                                        setGroupRevision((value) => value + 1);
+                                        return "Member removed.";
+                                      },
+                                    );
                                   }}
                                 >
                                   Remove
@@ -1476,7 +1607,6 @@ export function App({
                                   <button
                                     className="row-action"
                                     type="button"
-                                    disabled={busy}
                                     onClick={() => {
                                       if (
                                         !window.confirm(
@@ -1484,20 +1614,49 @@ export function App({
                                         )
                                       )
                                         return;
-                                      void act(async () => {
-                                        const draft = commandDraft(
-                                          "revoke",
-                                          invitation.invitationId,
-                                        );
-                                        await api.revoke(
-                                          token(),
-                                          invitation.invitationId,
-                                          draft.key,
-                                        );
-                                        commandDrafts.current.delete("revoke");
-                                        setGroupRevision((value) => value + 1);
-                                        return "Invitation revoked.";
-                                      });
+                                      const id = invitation.invitationId;
+                                      const scope = groupScope.current;
+                                      setPendingInvitations((current) =>
+                                        current.filter(
+                                          (entry) => entry.invitationId !== id,
+                                        ),
+                                      );
+                                      optimistic(
+                                        `revoke:${id}`,
+                                        "Invitation revoked.",
+                                        async () => {
+                                          const draft = commandDraft(
+                                            `revoke:${id}`,
+                                            id,
+                                          );
+                                          await api.revoke(
+                                            token(),
+                                            id,
+                                            draft.key,
+                                          );
+                                          commandDrafts.current.delete(
+                                            `revoke:${id}`,
+                                          );
+                                          invitationCache.set(
+                                            scope,
+                                            (
+                                              invitationCache.get(scope) ?? []
+                                            ).filter(
+                                              (entry) =>
+                                                entry.invitationId !== id,
+                                            ),
+                                          );
+                                        },
+                                        () =>
+                                          setPendingInvitations((current) =>
+                                            current.some(
+                                              (entry) =>
+                                                entry.invitationId === id,
+                                            )
+                                              ? current
+                                              : [...current, invitation],
+                                          ),
+                                      );
                                     }}
                                   >
                                     Revoke
@@ -1551,7 +1710,7 @@ export function App({
                       ) : (
                         <form
                           className="invite-form"
-                          onSubmit={submit(async (form) => {
+                          onSubmit={submit("invite", async (form) => {
                             const inviteEmail = field(
                               form,
                               "inviteEmail",
@@ -1582,11 +1741,13 @@ export function App({
                               type="email"
                               maxLength={254}
                               required
-                              disabled={busy}
+                              disabled={busy("invite")}
                             />
                           </label>
-                          <button type="submit" disabled={busy}>
-                            {busy ? "Creating invite…" : "Invite a friend"}
+                          <button type="submit" disabled={busy("invite")}>
+                            {busy("invite")
+                              ? "Creating invite…"
+                              : "Invite a friend"}
                           </button>
                         </form>
                       )}
@@ -1594,24 +1755,23 @@ export function App({
                         <button
                           className="danger-outline leave-group"
                           type="button"
-                          disabled={busy}
+                          disabled={busy("leave")}
                           onClick={() => {
                             if (
                               !window.confirm(`Leave ${groupRoster.groupName}?`)
                             )
                               return;
-                            void act(
-                              async () => {
-                                const draft = commandDraft(
-                                  "leave",
-                                  membership.membershipId,
-                                );
-                                await api.leave(token(), draft.key);
-                                commandDrafts.current.delete("leave");
-                                return `You left ${groupRoster.groupName}.`;
-                              },
-                              { refreshMembership: true },
-                            );
+                            void act("leave", async () => {
+                              const draft = commandDraft(
+                                "leave",
+                                membership.membershipId,
+                              );
+                              await api.leave(token(), draft.key);
+                              commandDrafts.current.delete("leave");
+                              // Leaving ends the membership; nothing to refetch.
+                              setMembership(null);
+                              return `You left ${groupRoster.groupName}.`;
+                            });
                           }}
                         >
                           Leave {groupRoster.groupName}
@@ -1652,24 +1812,47 @@ export function App({
               </section>
               <form
                 className="account-name-row"
-                onSubmit={submit(async () => {
+                onSubmit={(event) => {
+                  event.preventDefault();
                   const name = displayName.trim();
-                  if (!name || name.length > 40)
-                    throw new WebAuthError(
-                      "invalid",
-                      "Name must be 1 to 40 characters.",
-                    );
-                  const draft = commandDraft("display-name", name);
-                  const response = await api.setDisplayName(
-                    token(),
-                    name,
-                    draft.key,
+                  if (!name || name.length > 40) {
+                    setNotice({
+                      kind: "error",
+                      text: "Name must be 1 to 40 characters.",
+                    });
+                    return;
+                  }
+                  const previous = savedDisplayName.current;
+                  savedDisplayName.current = name;
+                  setDisplayNameLoaded(true);
+                  optimistic(
+                    `display-name:${name}`,
+                    "Name saved.",
+                    async () => {
+                      const draft = commandDraft("display-name", name);
+                      const response = await api.setDisplayName(
+                        token(),
+                        name,
+                        draft.key,
+                      );
+                      commandDrafts.current.delete("display-name");
+                      savedDisplayName.current =
+                        response.data.displayName ?? "";
+                      if (session)
+                        nameCache.set(
+                          session.user.id,
+                          savedDisplayName.current,
+                        );
+                    },
+                    () => {
+                      // A later save owns the name; leave it alone.
+                      if (savedDisplayName.current !== name) return;
+                      savedDisplayName.current = previous;
+                      displayNameEdited.current = false;
+                      setDisplayName(previous);
+                    },
                   );
-                  commandDrafts.current.delete("display-name");
-                  displayNameEdited.current = false;
-                  setDisplayName(response.data.displayName ?? "");
-                  return "Name saved.";
-                })}
+                }}
               >
                 <label>
                   <span className="account-name-label">Name</span>
@@ -1687,23 +1870,13 @@ export function App({
                     minLength={1}
                     maxLength={40}
                     required
-                    disabled={
-                      busy ||
-                      !displayNameLoaded ||
-                      displayNameScope.current !== session?.user.id
+                    placeholder={
+                      displayNameLoaded ? undefined : "Loading your name…"
                     }
                   />
                 </label>
-                <button
-                  className="secondary-button"
-                  type="submit"
-                  disabled={
-                    busy ||
-                    !displayNameLoaded ||
-                    displayNameScope.current !== session?.user.id
-                  }
-                >
-                  {busy ? "Saving…" : "Save name"}
+                <button className="secondary-button" type="submit">
+                  Save name
                 </button>
               </form>
               {groupLoad === "error" &&
@@ -1780,12 +1953,9 @@ export function App({
               <button
                 className="secondary-button account-sign-out"
                 type="button"
-                onClick={() =>
-                  void act(async () => "Signed out.", { cutoff: true })
-                }
-                disabled={busy}
+                onClick={signOut}
               >
-                {busy ? "Signing out…" : "Sign out"}
+                Sign out
               </button>
               <button
                 className="account-delete"
@@ -1865,9 +2035,9 @@ export function App({
                     <button
                       type="button"
                       className="danger"
-                      disabled={busy}
+                      disabled={busy("deletion-code")}
                       onClick={() =>
-                        void act(async () => {
+                        void act("deletion-code", async () => {
                           const address = session?.user.email;
                           if (!address)
                             throw new WebAuthError(
@@ -1880,13 +2050,13 @@ export function App({
                         })
                       }
                     >
-                      {busy ? "Sending…" : "Email me a code"}
+                      {busy("deletion-code") ? "Sending…" : "Email me a code"}
                     </button>
                   </>
                 )}
                 {deletionStep === "code-sent" && (
                   <form
-                    onSubmit={submit(async () => {
+                    onSubmit={submit("deletion-check", async () => {
                       normalizeOtp(deletionCode);
                       setDeletionStep("ready");
                       return "Code ready. Final confirmation will verify identity before deletion.";
@@ -1908,7 +2078,7 @@ export function App({
                           maxLength={1}
                           required
                           value={deletionCode[index] ?? ""}
-                          disabled={busy}
+                          disabled={busy("deletion-check")}
                           onChange={(event) => {
                             const digit = event.target.value
                               .replace(/\D/g, "")
@@ -1930,14 +2100,19 @@ export function App({
                         />
                       ))}
                     </fieldset>
-                    <button type="submit" className="danger" disabled={busy}>
-                      {busy ? "Checking…" : "Continue"}
+                    <button
+                      type="submit"
+                      className="danger"
+                      disabled={busy("deletion-check")}
+                    >
+                      {busy("deletion-check") ? "Checking…" : "Continue"}
                     </button>
                   </form>
                 )}
                 {deletionStep === "ready" && (
                   <form
                     onSubmit={submit(
+                      "delete-account",
                       async (f) => {
                         if (field(f, "confirmation") !== "DELETE")
                           throw new WebAuthError(
@@ -1977,18 +2152,24 @@ export function App({
                         name="confirmation"
                         autoComplete="off"
                         required
-                        disabled={busy}
+                        disabled={busy("delete-account")}
                       />
                     </label>
-                    <button type="submit" className="danger" disabled={busy}>
-                      {busy ? "Deleting…" : "Delete my account"}
+                    <button
+                      type="submit"
+                      className="danger"
+                      disabled={busy("delete-account")}
+                    >
+                      {busy("delete-account")
+                        ? "Deleting…"
+                        : "Delete my account"}
                     </button>
                   </form>
                 )}
                 <button
                   className="keep-account"
                   type="button"
-                  disabled={busy}
+                  disabled={busy("delete-account")}
                   onClick={() => {
                     setDeletionStep("idle");
                     setDeletionCode("");

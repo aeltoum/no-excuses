@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { maxClipSeconds, ProofClip } from "./ProofClip";
+import { persistentMap } from "./persist";
 import { Result, useNotice } from "./Result";
 
 type Card = {
@@ -21,6 +23,7 @@ export type ConsequenceHome = {
     expiresAt: string;
     approvals: number;
     approvalsNeeded: number;
+    clipUrl?: string | null;
     pauseRequest: {
       approvals: number;
       rejections: number;
@@ -32,6 +35,7 @@ export type ConsequenceHome = {
     memberName: string;
     title: string;
     instructions: string;
+    clipUrl?: string | null;
     myResponse: string | null;
   }[];
   pauseReviews: {
@@ -91,6 +95,9 @@ async function request(
   };
 }
 
+// Last known cards per member and Group, shown at once on reopen.
+const homeCache = persistentMap<ConsequenceHome>("consequences");
+
 // The picker pops up on its own once per hand; afterwards it opens from Home.
 const seenKey = "no-excuses:seen-card-offer";
 const readSeen = () => {
@@ -141,6 +148,22 @@ function DebtMeter({ owed }: { owed: number }) {
   );
 }
 
+// Loads only on tap, so a list of clips costs nothing until someone plays one.
+function ClipPlayer({ url, label }: { url?: string | null; label: string }) {
+  if (!url) return null;
+  return (
+    // biome-ignore lint/a11y/useMediaCaption: member-recorded proof has no captions
+    <video
+      className="clip-player"
+      src={url}
+      controls
+      playsInline
+      preload="none"
+      aria-label={label}
+    />
+  );
+}
+
 // Owed Consequence cards on Home: pick, complete, and approve friends' claims.
 export function Consequences({
   apiBaseUrl,
@@ -149,17 +172,24 @@ export function Consequences({
   onGroupOwed,
   onAttention,
   onLogBlock,
+  cacheKey,
 }: {
   apiBaseUrl: string;
   token: string;
+  cacheKey: string;
   onRevoked: () => void;
   onGroupOwed: (owed: Record<string, number>) => void;
   onAttention: (count: number) => void;
   onLogBlock: (block: LogBlock) => void;
 }) {
-  const [home, setHome] = useState<ConsequenceHome | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [home, setHome] = useState<ConsequenceHome | null>(
+    () => homeCache.get(cacheKey) ?? null,
+  );
+  // Controls waiting on the server, by action and target.
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const busy = (key: string) => pending.has(key);
   const [picking, setPicking] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
 
@@ -183,6 +213,7 @@ export function Consequences({
     request(apiBaseUrl, token, "/v1/consequences")
       .then((next) => {
         if (!active) return;
+        homeCache.set(cacheKey, next);
         setHome(next);
         onGroupOwed(next.groupOwed);
         const offerId = next.offer?.offerId;
@@ -199,7 +230,7 @@ export function Consequences({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, onRevoked, onGroupOwed]);
+  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed]);
 
   useEffect(() => {
     if (!home) return;
@@ -211,13 +242,29 @@ export function Consequences({
     onLogBlock(home.logBlocked ? { title: home.attempt?.title ?? null } : null);
   }, [home, onAttention, onLogBlock]);
 
+  useEffect(() => {
+    if (home) onGroupOwed(home.groupOwed);
+  }, [home, onGroupOwed]);
+
+  // With `change`, the outcome shows at once and a failure undoes only that
+  // change; without it, only this control waits for the server.
   const act = async (
     action: Action,
     target: string,
     choice: string,
     done: string,
+    change?: {
+      apply: (current: ConsequenceHome) => ConsequenceHome;
+      undo: (current: ConsequenceHome) => ConsequenceHome;
+    },
   ) => {
-    setBusy(true);
+    const key = `${action}:${target}`;
+    if (pending.has(key)) return false;
+    setPending((current) => new Set(current).add(key));
+    if (change) {
+      setHome((current) => current && change.apply(current));
+      setNotice({ kind: "success", text: done });
+    }
     try {
       const next = await request(
         apiBaseUrl,
@@ -225,15 +272,20 @@ export function Consequences({
         `/v1/consequences/${action}`,
         { target, choice },
       );
+      homeCache.set(cacheKey, next);
       setHome(next);
-      onGroupOwed(next.groupOwed);
-      setNotice({ kind: "success", text: done });
+      if (!change) setNotice({ kind: "success", text: done });
       return true;
     } catch (error) {
+      if (change) setHome((current) => current && change.undo(current));
       fail(error);
       return false;
     } finally {
-      setBusy(false);
+      setPending((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -274,33 +326,27 @@ export function Consequences({
                 Due in {hoursLeft(attempt.expiresAt)}. Miss it and you owe
                 another.
               </p>
+              <p className="clip-heads-up">
+                Proof must be a video recorded in the app right now. Uploads
+                from your camera roll aren’t accepted. Record a quick clip (up
+                to {maxClipSeconds}s) showing the code, then doing the card.
+              </p>
               <div className="proof-actions">
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={async () => {
-                    if (
-                      await ask({
-                        title: "Mark it done?",
-                        body: `Confirm you completed ${attempt.title}. Two friends must approve it.`,
-                        confirm: "I did it",
-                      })
-                    )
-                      void act(
-                        "claim",
-                        attempt.attemptId,
-                        "",
-                        "Marked done. Waiting for friends to approve.",
-                      );
+                  onClick={() => {
+                    // Earlier toasts would sit over the recorder.
+                    setNotice(null);
+                    setRecording(true);
                   }}
                 >
-                  I did it
+                  Record proof
                 </button>
                 {!attempt.pauseRequest && (
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={busy}
+                    disabled={busy(`request_pause:${attempt.attemptId}`)}
                     onClick={async () => {
                       if (
                         await ask({
@@ -314,6 +360,26 @@ export function Consequences({
                           attempt.attemptId,
                           "",
                           "Pause requested. Waiting for friends to approve.",
+                          {
+                            apply: (current) => ({
+                              ...current,
+                              attempt: current.attempt && {
+                                ...current.attempt,
+                                pauseRequest: {
+                                  approvals: 0,
+                                  rejections: 0,
+                                  approvalsNeeded: 2,
+                                },
+                              },
+                            }),
+                            undo: (current) => ({
+                              ...current,
+                              attempt: current.attempt && {
+                                ...current.attempt,
+                                pauseRequest: null,
+                              },
+                            }),
+                          },
                         );
                     }}
                   >
@@ -339,13 +405,19 @@ export function Consequences({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy(`resume:${attempt.attemptId}`)}
                 onClick={() =>
                   void act(
                     "resume",
                     attempt.attemptId,
                     "",
                     "Ready. Pick a fresh card.",
+                    {
+                      // The fresh hand comes from the server.
+                      apply: (current) => ({ ...current, attempt: null }),
+                      undo: (current) =>
+                        current.attempt ? current : { ...current, attempt },
+                    },
                   )
                 }
               >
@@ -358,8 +430,17 @@ export function Consequences({
               <h2>{attempt.title}</h2>
               <p className="owed-deadline">
                 Waiting for friends: {attempt.approvals} of{" "}
-                {attempt.approvalsNeeded} approvals.
+                {attempt.approvalsNeeded} approvals. With no rejections it
+                counts as done when the review ends.
               </p>
+              {home.owed > 1 && (
+                <p className="owed-deadline">
+                  {home.owed - 1} more{" "}
+                  {home.owed === 2 ? "card is" : "cards are"} queued. The next
+                  is dealt once this one is done.
+                </p>
+              )}
+              <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
             </>
           )}
         </div>
@@ -373,6 +454,10 @@ export function Consequences({
                 <strong>{review.title}</strong>
               </p>
               <p className="owed-deadline">{review.instructions}</p>
+              <ClipPlayer
+                url={review.clipUrl}
+                label={`${review.memberName}’s proof clip`}
+              />
               <div className="proof-actions">
                 {(
                   [
@@ -388,13 +473,31 @@ export function Consequences({
                     className={
                       choice === "approve" ? undefined : "secondary-button"
                     }
-                    disabled={busy || review.myResponse !== null}
+                    disabled={review.myResponse !== null}
                     onClick={() =>
                       void act(
                         "respond",
                         review.claimId,
                         choice,
                         "Response saved.",
+                        {
+                          apply: (current) => ({
+                            ...current,
+                            reviews: current.reviews.map((entry) =>
+                              entry.claimId === review.claimId
+                                ? { ...entry, myResponse: choice }
+                                : entry,
+                            ),
+                          }),
+                          undo: (current) => ({
+                            ...current,
+                            reviews: current.reviews.map((entry) =>
+                              entry.claimId === review.claimId
+                                ? { ...entry, myResponse: null }
+                                : entry,
+                            ),
+                          }),
+                        },
                       )
                     }
                   >
@@ -428,13 +531,31 @@ export function Consequences({
                     className={
                       choice === "approve" ? undefined : "secondary-button"
                     }
-                    disabled={busy || review.myVote !== null}
+                    disabled={review.myVote !== null}
                     onClick={() =>
                       void act(
                         "vote_pause",
                         review.pauseRequestId,
                         choice,
                         "Vote saved.",
+                        {
+                          apply: (current) => ({
+                            ...current,
+                            pauseReviews: current.pauseReviews.map((entry) =>
+                              entry.pauseRequestId === review.pauseRequestId
+                                ? { ...entry, myVote: choice }
+                                : entry,
+                            ),
+                          }),
+                          undo: (current) => ({
+                            ...current,
+                            pauseReviews: current.pauseReviews.map((entry) =>
+                              entry.pauseRequestId === review.pauseRequestId
+                                ? { ...entry, myVote: null }
+                                : entry,
+                            ),
+                          }),
+                        },
                       )
                     }
                   >
@@ -446,11 +567,32 @@ export function Consequences({
           ))}
         </ul>
       )}
+      {recording && attempt?.status === "active" && (
+        <ProofClip
+          apiBaseUrl={apiBaseUrl}
+          token={token}
+          attemptId={attempt.attemptId}
+          title={attempt.title}
+          notice={<Result notice={notice} />}
+          onError={fail}
+          onClose={() => setRecording(false)}
+          onSubmit={(clipPath) =>
+            act(
+              "claim",
+              attempt.attemptId,
+              clipPath,
+              "Proof sent. Waiting for friends to approve.",
+            )
+          }
+        />
+      )}
       {offer && picking && (
         <AugmentPicker
           cards={offer.cards}
           canReroll={offer.canRedraw}
-          busy={busy}
+          busy={
+            busy(`redraw:${offer.offerId}`) || busy(`select:${offer.offerId}`)
+          }
           owed={home.owed}
           onClose={() => setPicking(false)}
           notice={<Result notice={notice} />}

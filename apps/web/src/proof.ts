@@ -1,4 +1,5 @@
-import { ApiError, requestTimeoutMs } from "./api-client";
+import { ApiError, requestTimeoutMs, wakeTimeoutMs } from "./api-client";
+import { onClearPersisted } from "./persist";
 
 export type ProofItem = {
   workoutCheckinId: string;
@@ -22,12 +23,13 @@ export type ProofItem = {
   canVote: boolean;
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
-  reactions: Partial<Record<Reaction, number>>;
-  myReaction: Reaction | null;
+  reactions: ReactionCount[];
+  myReactions: string[];
 };
 
-export const reactionKinds = ["strong", "fire", "cheer"] as const;
-export type Reaction = (typeof reactionKinds)[number];
+export type ReactionCount = { emoji: string; count: number };
+// Members may leave up to this many distinct emoji on one post.
+export const reactionLimit = 6;
 
 export type ProofAction =
   | "review"
@@ -43,8 +45,8 @@ async function call<T>(
   init: { method: "GET" | "POST"; body?: unknown },
 ): Promise<T> {
   let response: Response;
-  try {
-    response = await fetch(`${baseUrl}${path}`, {
+  const send = (timeoutMs: number) =>
+    fetch(`${baseUrl}${path}`, {
       method: init.method,
       headers: {
         authorization: `Bearer ${token}`,
@@ -53,8 +55,17 @@ async function call<T>(
           : { "content-type": "application/json" }),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      signal: AbortSignal.timeout(requestTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
+  try {
+    try {
+      response = await send(requestTimeoutMs);
+    } catch (error) {
+      // Reads retry once: after a cold app launch the first attempt often
+      // only wakes the API host, which would leave the feed empty until a refresh.
+      if (init.method !== "GET") throw error;
+      response = await send(wakeTimeoutMs);
+    }
   } catch {
     throw new ApiError("failure", "Connection failed. Try again.", true);
   }
@@ -94,12 +105,51 @@ export const reactToProof = (
   baseUrl: string,
   token: string,
   id: string,
-  reaction: Reaction | null,
+  emoji: string,
+  on: boolean,
 ) =>
-  call<{ reaction: Reaction | null }>(baseUrl, token, `/v1/proof/${id}/react`, {
-    method: "POST",
-    body: { reaction },
-  });
+  call<{ emoji: string; on: boolean }>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/react`,
+    { method: "POST", body: { emoji, on } },
+  );
+
+export type Reactor = { emoji: string; name: string; mine: boolean };
+
+// Names cached per proof for the session; one request per proof at a time.
+const reactorCache = new Map<string, Reactor[]>();
+const reactorRequests = new Map<string, Promise<Reactor[]>>();
+// Requests from before a sign-out neither fill the cache nor serve the next member.
+let reactorGeneration = 0;
+onClearPersisted(() => {
+  reactorGeneration++;
+  reactorCache.clear();
+  reactorRequests.clear();
+});
+
+export const cachedReactors = (id: string) => reactorCache.get(id);
+
+export function loadReactors(baseUrl: string, token: string, id: string) {
+  const pending = reactorRequests.get(id);
+  if (pending) return pending;
+  const generation = reactorGeneration;
+  const request = call<unknown>(baseUrl, token, `/v1/proof/${id}/reactions`, {
+    method: "GET",
+  })
+    .then((rows) => {
+      if (!Array.isArray(rows))
+        throw new ApiError("failure", "Couldn’t load reactions.", true);
+      if (generation === reactorGeneration)
+        reactorCache.set(id, rows as Reactor[]);
+      return rows as Reactor[];
+    })
+    .finally(() => {
+      if (reactorRequests.get(id) === request) reactorRequests.delete(id);
+    });
+  reactorRequests.set(id, request);
+  return request;
+}
 
 export const loadNudged = (baseUrl: string, token: string) =>
   call<string[]>(baseUrl, token, "/v1/nudges", { method: "GET" });

@@ -104,12 +104,13 @@ const react = async (
   db: PGlite,
   member: number,
   id: string,
-  reaction: string | null,
+  reaction: string,
+  on = true,
 ) => {
   await as(db, member);
   return db.query(
-    "select app_private.react_to_proof($1, $2, '2026-03-05T11:00Z')",
-    [id, reaction],
+    "select app_private.react_to_proof($1, $2, $3, '2026-03-05T11:00Z')",
+    [id, reaction, on],
   );
 };
 const nudge = async (
@@ -142,33 +143,113 @@ const social = (db: PGlite, at: string) =>
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("Reactions and nudges", { timeout: 30_000 }, () => {
-  it("keeps one changeable reaction per member on others' proof", async () => {
+  it("keeps any number of distinct emoji per member on others' proof", async () => {
     const db = await database();
     const id = await submit(db, 0);
-    await expect(react(db, 0, id, "fire")).rejects.toThrow(
+    await expect(react(db, 0, id, "🔥")).rejects.toThrow(
       "Reaction unavailable",
     );
     await expect(react(db, 1, id, "lol")).rejects.toThrow();
-    await react(db, 1, id, "fire");
-    await react(db, 1, id, "strong");
-    await react(db, 2, id, "strong");
+    await react(db, 1, id, "🔥");
+    await react(db, 1, id, "🦍");
+    await react(db, 1, id, "🔥");
+    await react(db, 2, id, "🔥");
     await as(db, 1);
     const summary = (
-      await db.query<{ counts: Record<string, number>; my_reaction: string }>(
+      await db.query<{ counts: unknown; my_reactions: string[] }>(
         "select * from app_private.proof_reaction_summary('2026-03-05T12:00Z')",
       )
     ).rows;
     expect(summary).toEqual([
-      expect.objectContaining({ counts: { strong: 2 }, my_reaction: "strong" }),
+      expect.objectContaining({
+        counts: [
+          { emoji: "🔥", count: 2 },
+          { emoji: "🦍", count: 1 },
+        ],
+        my_reactions: ["🔥", "🦍"],
+      }),
     ]);
-    await react(db, 1, id, null);
+    await react(db, 1, id, "🔥", false);
     await as(db, 1);
-    const cleared = (
-      await db.query<{ my_reaction: string | null }>(
-        "select my_reaction from app_private.proof_reaction_summary('2026-03-05T12:00Z')",
+    const removed = (
+      await db.query<{ my_reactions: string[] }>(
+        "select my_reactions from app_private.proof_reaction_summary('2026-03-05T12:00Z')",
       )
     ).rows;
-    expect(cleared[0]?.my_reaction).toBeNull();
+    expect(removed[0]?.my_reactions).toEqual(["🦍"]);
+    for (const emoji of ["😤", "🏋️", "👑", "⚡", "🫡"])
+      await react(db, 1, id, emoji);
+    await expect(react(db, 1, id, "🥇")).rejects.toThrow("Up to 6");
+  });
+
+  it("lists who reacted, in order, to the viewer's Group only", async () => {
+    const db = await database();
+    const id = await submit(db, 0);
+    await as(db, 2);
+    await db.query(
+      "select app_private.react_to_proof($1, '🔥', true, '2026-03-05T11:00Z')",
+      [id],
+    );
+    await as(db, 1);
+    await db.query(
+      "select app_private.react_to_proof($1, '🦍', true, '2026-03-05T11:01Z')",
+      [id],
+    );
+    await db.query(
+      "select app_private.react_to_proof($1, '🔥', true, '2026-03-05T11:02Z')",
+      [id],
+    );
+    const list = async () =>
+      (
+        await db.query<{ mine: boolean }>(
+          "select reaction, display_name, mine from app_private.proof_reactors($1, '2026-03-05T12:00Z')",
+          [id],
+        )
+      ).rows;
+    expect(await list()).toEqual([
+      { reaction: "🔥", display_name: "Casey", mine: false },
+      { reaction: "🦍", display_name: "Blair", mine: true },
+      { reaction: "🔥", display_name: "Blair", mine: true },
+    ]);
+    // The author sees the same list; nobody is "mine".
+    await as(db, 0);
+    expect((await list()).map((row) => row.mine)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    // Ended memberships drop out.
+    await db.query(
+      "update app_private.memberships set ended_at = '2026-03-05T11:30Z', end_reason = 'left' where membership_id = $1",
+      [memberships[2]],
+    );
+    expect(await list()).toEqual([
+      { reaction: "🦍", display_name: "Blair", mine: false },
+      { reaction: "🔥", display_name: "Blair", mine: false },
+    ]);
+    // Another Group cannot read it, nor can an unknown proof be listed.
+    const outsider = "30000000-0000-4000-8000-000000000009";
+    await db.exec(`
+      insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at, display_name) values
+        ('20000000-0000-4000-8000-000000000009', '${outsider}', 'z@example.test', '2026-03-01Z', 'Zed');
+      insert into app_private.groups (group_id, name, time_zone, status, activation_at) values
+        ('10000000-0000-4000-8000-000000000009', 'Others', 'UTC', 'active', '2026-03-02Z');
+      insert into app_private.memberships
+        (membership_id, account_id, group_id, joined_at, recurring_target) values
+        ('40000000-0000-4000-8000-000000000009', '20000000-0000-4000-8000-000000000009',
+         '10000000-0000-4000-8000-000000000009', '2026-03-01Z', 1);
+    `);
+    await db.query("select set_config('app.auth_user_id', $1, false)", [
+      outsider,
+    ]);
+    await expect(list()).rejects.toThrow("Reactions unavailable");
+    await as(db, 1);
+    await expect(
+      db.query(
+        "select * from app_private.proof_reactors($1, '2026-03-05T12:00Z')",
+        [randomUUID()],
+      ),
+    ).rejects.toThrow("Reactions unavailable");
   });
 
   it("nudges only members behind target, once per day", async () => {
@@ -191,15 +272,27 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     expect(today).toEqual([memberships[1]]);
   });
 
-  it("pushes the recipient at once, bundles within 15 minutes, caps at three a day", async () => {
+  it("nudges a member whose only report was rejected", async () => {
+    const db = await database();
+    const id = await submit(db, 2);
+    await db.query(
+      "update app_private.workout_checkins set review_status = 'rejected' where workout_checkin_id = $1",
+      [id],
+    );
+    await nudge(db, 0, 2);
+  });
+
+  it("pushes the recipient at once, bundles within 15 minutes, with no daily cap", async () => {
     const db = await database();
     await subscribe(db, 0);
     const id = await submit(db, 0);
-    await react(db, 1, id, "fire");
+    await react(db, 1, id, "🔥");
     await social(db, "2026-03-05T11:00Z");
     expect(await outbox(db, 0)).toEqual(["Blair reacted to your workout"]);
     expect(await outbox(db, 1)).toEqual([]);
-    await react(db, 2, id, "cheer");
+    // A second emoji from the same member does not push again.
+    await react(db, 1, id, "🦍");
+    await react(db, 2, id, "👏");
     await social(db, "2026-03-05T11:05Z");
     expect(await outbox(db, 0)).toHaveLength(1);
     await social(db, "2026-03-05T11:16Z");
@@ -213,10 +306,10 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     await social(db, "2026-03-05T11:20Z");
     expect(await outbox(db, 1)).toEqual(["Alex and Casey nudged you"]);
     const second = await submit(db, 0);
-    await react(db, 1, second, "strong");
+    await react(db, 1, second, "💪");
     await social(db, "2026-03-05T11:40Z");
-    await react(db, 2, second, "fire");
+    await react(db, 2, second, "🔥");
     await social(db, "2026-03-05T12:00Z");
-    expect(await outbox(db, 0)).toHaveLength(3);
+    expect(await outbox(db, 0)).toHaveLength(4);
   });
 });

@@ -42,6 +42,20 @@ async function database() {
   return db;
 }
 
+// An uploaded challenge clip, issued five minutes before the 02:00 claim.
+async function clip(db: PGlite, attemptId: string, accountId?: string) {
+  const challengeId = randomUUID();
+  const path = `${accountId}/${challengeId}.mp4`;
+  await db.query(
+    `insert into app_private.consequence_challenges (challenge_id, attempt_id, account_id,
+      code, action, issued_at, expires_at, clip_path, upload_requested_at)
+    values ($1, $2, $3, '042', 'Give a thumbs up', '2026-03-10T01:55Z', '2026-03-10T01:57Z',
+      $4, '2026-03-10T01:56Z')`,
+    [challengeId, attemptId, accountId, path],
+  );
+  return path;
+}
+
 async function addObligation(db: PGlite, membershipId = memberships[0]) {
   const obligationId = randomUUID();
   const sourceId = randomUUID();
@@ -296,8 +310,8 @@ describe("M5 Consequence system", () => {
       [attemptId, offerId, card],
     );
     await db.query(
-      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z')",
-      [claimId, attemptId],
+      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, $3, '2026-03-10T02:00Z')",
+      [claimId, attemptId, await clip(db, attemptId, accounts[0])],
     );
     expect(
       (
@@ -345,8 +359,13 @@ describe("M5 Consequence system", () => {
       [nextAttempt, nextOffer, nextCard],
     );
     await db.query(
-      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z')",
-      [nextClaim, nextAttempt],
+      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, $3, '2026-03-10T02:00Z')",
+      [nextClaim, nextAttempt, await clip(db, nextAttempt, accounts[3])],
+    );
+    // One rejection keeps a review that runs out from counting as approved.
+    await db.query(
+      "select app_private.respond_to_consequence_claim($1, $2, $3, 'reject', '2026-03-11Z')",
+      [randomUUID(), nextClaim, memberships[1]],
     );
     expect(
       (
@@ -403,8 +422,8 @@ describe("M5 Consequence system", () => {
       [attemptId, offerId, card],
     );
     await db.query(
-      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z')",
-      [claimId, attemptId],
+      "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, $3, '2026-03-10T02:00Z')",
+      [claimId, attemptId, await clip(db, attemptId, accounts[0])],
     );
     expect(
       (
@@ -416,7 +435,7 @@ describe("M5 Consequence system", () => {
     ).toEqual([{ finalize_consequence_claim: "approved" }]);
   });
 
-  it("contains no Consequence media, video, description, or free-text column", async () => {
+  it("keeps Consequence proof to the challenge clip, with no description or free-text column", async () => {
     const db = await database();
     const forbidden = await db.query(`select table_name, column_name
       from information_schema.columns where table_schema = 'app_private'
@@ -424,6 +443,12 @@ describe("M5 Consequence system", () => {
         and (column_name like '%video%' or column_name like '%media%'
           or column_name like '%description%' or column_name like '%text%')`);
     expect(forbidden.rows).toEqual([]);
+    await expect(
+      db.query(
+        "select app_private.submit_consequence_claim($1, $2, '2026-03-10T01:00Z', true, '2026-03-10T02:00Z')",
+        [randomUUID(), randomUUID()],
+      ),
+    ).rejects.toThrow("video proof required");
     await db.exec("set role authenticated");
     await expect(
       db.query(

@@ -139,4 +139,4 @@ grant execute on function app_private.current_week_progress(uuid, timestamptz),
   app_private.finalized_weekly_history(uuid)
   to authenticated, service_role;
 
-insert into app_private.schema_versions (version) values (24);
+insert into app_private.schema_versions (version) values (30);

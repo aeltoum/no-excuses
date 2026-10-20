@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import type { ProofItem } from "./proof";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { actOnProof, loadProofFeed, type ProofItem } from "./proof";
 import { keepPhotoUrls } from "./Wall";
 
 const signed = (path: string, exp: number, sig: string) => {
@@ -43,5 +43,30 @@ describe("proof feed photo URLs", () => {
     expect(
       keepPhotoUrls([item(old)], [item(null)])[0]?.activityPhotoUrl,
     ).toBeNull();
+  });
+});
+
+describe("loadProofFeed", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("retries once when the first read only wakes the API host", async () => {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"))
+      .mockResolvedValueOnce(Response.json({ data: [] }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(
+      loadProofFeed("https://api.example.test", "t"),
+    ).resolves.toEqual([]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry writes", async () => {
+    const fetcher = vi.fn().mockRejectedValue(new TypeError("offline"));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(
+      actOnProof("https://api.example.test", "t", "id", "review", "verify"),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

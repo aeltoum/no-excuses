@@ -46,8 +46,8 @@ const item = (overrides: Record<string, unknown>) => ({
   canVote: false,
   activityPhotoUrl: photo,
   presencePhotoUrl: photo,
-  reactions: {},
-  myReaction: null,
+  reactions: [],
+  myReactions: [],
   ...overrides,
 });
 

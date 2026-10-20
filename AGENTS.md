@@ -13,6 +13,12 @@ This repository is in project-setup phase. Product scope and technology stack re
 5. Keep secrets out of Git. Store local secrets in ignored files and commit sanitized examples only when needed.
 6. Verify relevant checks before handing off changes. If no checks exist, state that plainly.
 
+## UI conventions
+
+- Default to optimistic UI for member actions: show the result at once, send the request, and on failure roll back only that change and show the error notice. Votes and decisions are optimistic too; the server still settles the final tally.
+- Keep a pending state, on the acting control only, for auth, server-generated results (codes, invites, previews), irreversible or destructive actions, account deletion, random draws, and OS permission prompts.
+- Meet the speed budgets in `docs/agents/implementation-loop.md` (Speed) for any added or changed UI.
+
 ## Communication
 
 Apply the `caveman` skill at ultra intensity to every response in this repository. Keep all
