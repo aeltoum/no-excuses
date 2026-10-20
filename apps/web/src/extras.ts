@@ -28,22 +28,18 @@ export type ExceptionBallot = {
   closesAt: string;
   myResponse: "approve" | "deny" | "abstain" | null;
 };
-export type MissedResponse =
-  | "next_week"
-  | "got_you"
-  | "bounce_back"
-  | "rest_up"
-  | "no_excuses";
-export type MissedWeek = {
+export type RecapWeek = {
   memberWeekId: string;
   membershipId: string;
   name: string;
   mine: boolean;
+  met: boolean;
   completed: number;
   target: number;
+  activityTypes: Array<"strength" | "cardio" | "class" | "sport" | "mixed">;
   endsAt: string;
-  responses: Array<{ response: MissedResponse; count: number }>;
-  myResponse: MissedResponse | null;
+  reactions: Array<{ emoji: string; count: number }>;
+  myReaction: string | null;
 };
 export type CrownCategory = "load_progression" | "cardio_leap";
 export type SeasonState = {
@@ -82,7 +78,7 @@ export type HomeExtras = {
     excused: string[];
     pending: string[];
   };
-  missed: MissedWeek[];
+  recap: RecapWeek[];
   season: SeasonState | null;
   unlocks: CardUnlock[];
   unreadNotifications: number;
@@ -91,7 +87,7 @@ export type HomeExtras = {
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
-  missed: [],
+  recap: [],
   season: null,
   unlocks: [],
   unreadNotifications: 0,

@@ -826,6 +826,7 @@ const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
 const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
+const proofRemovePhotos = /^\/v1\/proof\/([0-9a-f-]{36})\/remove-photos$/;
 const proofDetails = /^\/v1\/proof\/([0-9a-f-]{36})\/details$/;
 const proofWrite = /^\/v1\/proof\/([0-9a-f-]{36})\/(caption|message)$/;
 const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
@@ -1075,6 +1076,15 @@ async function proof(request: Request, path: string): Promise<Response> {
           currentWeekCount: result.currentWeekCount,
         }),
       );
+    }
+    const removePhotos = proofRemovePhotos.exec(path);
+    if (removePhotos && request.method === "POST") {
+      // The workout keeps counting; the media sweep deletes the files.
+      await query(actor, "select app_private.remove_own_photos($1,$2)", [
+        removePhotos[1],
+        now,
+      ]);
+      return reply(ok({ workoutCheckinId: removePhotos[1] }));
     }
     if (path === "/v1/proof/remove-all" && request.method === "POST") {
       const rows = (
@@ -1448,24 +1458,20 @@ const exceptionRoutes = (request: Request, path: string) =>
     );
   });
 
-const missedResponses = [
-  "next_week",
-  "got_you",
-  "bounce_back",
-  "rest_up",
-  "no_excuses",
-];
-const missedAction = /^\/v1\/missed\/([0-9a-f-]{36})\/respond$/;
-const missedRoutes = (request: Request, path: string) =>
+const recapAction = /^\/v1\/recap\/([0-9a-f-]{36})\/react$/;
+const recapRoutes = (request: Request, path: string) =>
   memberRoute(request, async ({ body, method, now, data }) => {
-    const match = missedAction.exec(path);
+    const match = recapAction.exec(path);
     if (!match || method !== "POST") return fail("not_found", 404);
-    const response = body.response ?? null;
-    if (response !== null && !missedResponses.includes(String(response)))
+    const emoji = body.emoji ?? null;
+    if (
+      emoji !== null &&
+      !(typeof emoji === "string" && singleEmoji.test(emoji))
+    )
       return invalid();
     const value = await data(
-      "select app_private.respond_to_missed_week($1,$2,$3) as data",
-      [match[1], response, now],
+      "select app_private.react_to_recap($1,$2,$3) as data",
+      [match[1], emoji, now],
     );
     setImmediate(() => void deliverPush());
     return ok(value);
@@ -1682,7 +1688,7 @@ const extraRoutes: Array<
   ["/v1/group/", groupRoutes],
   ["/v1/home/", homeExtras],
   ["/v1/exceptions/", exceptionRoutes],
-  ["/v1/missed/", missedRoutes],
+  ["/v1/recap/", recapRoutes],
   ["/v1/safety/", safetyRoutes],
   ["/v1/sessions/", sessionRoutes],
 ];

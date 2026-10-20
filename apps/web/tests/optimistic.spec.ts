@@ -466,14 +466,14 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
   server.fail.add("respond");
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Approve", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByText("You approved Maya’s 100 push-ups."),
+  ).toBeVisible();
   await expect(page.getByRole("alert")).toHaveText(
     "Something went wrong. Try again.",
   );
   await expect(
     page.getByRole("button", { name: "Approve", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
+  ).toBeVisible();
   server.fail.delete("respond");
 
   await timed(
@@ -481,7 +481,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
     testInfo,
     "card respond",
     () => page.getByRole("button", { name: "Approve", exact: true }).click(),
-    page.getByRole("button", { name: "Approve", exact: true, pressed: true }),
+    page.getByText("You approved Maya’s 100 push-ups."),
   );
   // Another control stays usable while the response is in flight.
   await timed(
@@ -489,7 +489,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
     testInfo,
     "pause vote",
     () => page.getByRole("button", { name: "Approve pause" }).click(),
-    page.getByRole("button", { name: "Approve pause", pressed: true }),
+    page.getByText("You approved Jordan’s pause."),
   );
   await page.getByRole("button", { name: "Request a pause" }).click();
   await timed(

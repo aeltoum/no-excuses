@@ -113,3 +113,42 @@ test("Account removes every shared proof photo after confirming", async ({
   await expect(page.getByText("3 posts’ photos removed.")).toBeVisible();
   expect(calls.some((c) => c.path === "/v1/proof/remove-all")).toBe(true);
 });
+
+test("after its week, a verified post's photos come down and the count stays", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { calls, errors } = await signIn(page, ({ path }) => {
+    if (path === "/v1/proof/feed")
+      return [
+        post({
+          canDelete: false,
+          submittedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+        }),
+      ];
+    if (path.endsWith("/remove-photos"))
+      return { workoutCheckinId: "70000000-0000-4000-8000-000000000001" };
+  });
+  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete post" })).toHaveCount(
+    0,
+  );
+  await delayRoute(page, "**/v1/proof/*/remove-photos", 1000);
+  await page.getByRole("button", { name: "Remove photos" }).click();
+  const dialog = page.getByRole("dialog", { name: "Remove these photos?" });
+  await expect(dialog).toContainText("your week doesn’t change");
+  const pending = await msUntilVisible(
+    page,
+    () => dialog.getByRole("button", { name: "Remove photos" }).click(),
+    page.getByRole("button", { name: "Removing…" }),
+  );
+  expect(pending).toBeLessThanOrEqual(100);
+  await expect(
+    page.getByText(/Photos removed. The workout still counts./),
+  ).toBeVisible();
+  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  expect(calls.filter((c) => c.path.endsWith("/remove-photos"))).toHaveLength(
+    1,
+  );
+  expect(errors).toEqual([]);
+});

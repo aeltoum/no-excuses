@@ -30,7 +30,6 @@ import {
 import { Exceptions } from "./Exceptions";
 import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
-import { MissedWeeks } from "./MissedWeeks";
 import { onClearPersisted } from "./persist";
 import {
   call,
@@ -46,6 +45,7 @@ import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
 import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
+import { WeekRecap } from "./WeekRecap";
 
 // Snapshots cached before streaks shipped lack the fields; hide until refreshed.
 const hasStreaks = (item: { targetStreak?: number }) =>
@@ -869,6 +869,18 @@ export function Weekly({
                       activityTypes={own.activityTypes}
                     />
                   </a>
+                  <ul className="activity-legend" aria-label="Activity colours">
+                    {(
+                      ["strength", "cardio", "class", "sport", "mixed"] as const
+                    ).map((activity) => (
+                      <li key={activity}>
+                        <span
+                          className={`activity-swatch activity-${activity}`}
+                        />
+                        {activity[0].toUpperCase() + activity.slice(1)}
+                      </li>
+                    ))}
+                  </ul>
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
@@ -917,18 +929,6 @@ export function Weekly({
                       onRevoked={feedRevoked}
                     />
                   </div>
-                  <ul className="activity-legend" aria-label="Activity colours">
-                    {(
-                      ["strength", "cardio", "class", "sport", "mixed"] as const
-                    ).map((activity) => (
-                      <li key={activity}>
-                        <span
-                          className={`activity-swatch activity-${activity}`}
-                        />
-                        {activity[0].toUpperCase() + activity.slice(1)}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               ) : (
                 <div className="solo-week">
@@ -948,6 +948,17 @@ export function Weekly({
                 </div>
               )}
               {own && (
+                <WeekRecap
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onError={(text) => setNotice({ kind: "error", text })}
+                  onRevoked={feedRevoked}
+                />
+              )}
+              {own && (
                 <Consequences
                   apiBaseUrl={apiBaseUrl}
                   token={token}
@@ -956,17 +967,6 @@ export function Weekly({
                   onAttention={setCardAttention}
                   onLogBlock={setLogBlock}
                   cacheKey={cacheKey}
-                />
-              )}
-              {own && (
-                <MissedWeeks
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  extras={extras}
-                  apply={applyExtras}
-                  reload={reloadExtras}
-                  onError={(text) => setNotice({ kind: "error", text })}
-                  onRevoked={feedRevoked}
                 />
               )}
               {own && progress.length > 1 && (

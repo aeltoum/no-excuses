@@ -122,6 +122,14 @@ export const deleteProof = (baseUrl: string, token: string, id: string) =>
     { method: "POST", body: {} },
   );
 
+export const removeProofPhotos = (baseUrl: string, token: string, id: string) =>
+  call<{ workoutCheckinId: string }>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/remove-photos`,
+    { method: "POST", body: {} },
+  );
+
 export const setProofDetails = (
   baseUrl: string,
   token: string,

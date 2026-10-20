@@ -13,6 +13,7 @@ import {
   type ProofAction,
   type ProofItem,
   reactToProof,
+  removeProofPhotos,
 } from "./proof";
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
@@ -338,6 +339,38 @@ export function ProofFeed({
     [apiBaseUrl, token, cacheKey, onDeleted, onRevoked, setNotice],
   );
 
+  // Taking photos down cannot be undone either; the workout keeps counting.
+  const takeDown = useCallback(
+    async (item: ProofItem) => {
+      const id = item.workoutCheckinId;
+      setBusy(id);
+      try {
+        await removeProofPhotos(apiBaseUrl, token, id);
+        const keep = (list: ProofItem[]) =>
+          list.filter((entry) => entry.workoutCheckinId !== id);
+        setItems(keep);
+        feedCache.set(cacheKey, keep(feedCache.get(cacheKey) ?? []));
+        setNotice({
+          kind: "success",
+          text: "Photos removed. The workout still counts.",
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === "unauthorized")
+          onRevoked();
+        setNotice({
+          kind: "error",
+          text:
+            error instanceof ApiError
+              ? error.message
+              : "Couldn’t remove. Try again.",
+        });
+      } finally {
+        setBusy((current) => (current === id ? null : current));
+      }
+    },
+    [apiBaseUrl, token, cacheKey, onRevoked, setNotice],
+  );
+
   // A choice already made, here or on another device, needs no buttons.
   const needsReview = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canReview;
@@ -572,6 +605,26 @@ export function ProofFeed({
             }}
           >
             {disabled ? "Deleting…" : "Delete post"}
+          </button>
+        )}
+        {item.mine && !item.canDelete && item.reviewStatus === "verified" && (
+          <button
+            type="button"
+            className="proof-report"
+            disabled={disabled}
+            onClick={async () => {
+              if (
+                await ask({
+                  title: "Remove these photos?",
+                  body: "The photos are deleted for everyone. The workout stays verified, so your week doesn’t change.",
+                  confirm: "Remove photos",
+                  tone: "danger",
+                })
+              )
+                void takeDown(item);
+            }}
+          >
+            {disabled ? "Removing…" : "Remove photos"}
           </button>
         )}
       </li>

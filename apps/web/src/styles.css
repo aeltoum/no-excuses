@@ -2550,7 +2550,8 @@ body:has(.home-log-button) .result.event-notice {
   padding: 0;
   border: 0;
 }
-.proof-reactions .proof-reaction {
+.proof-reactions .proof-reaction,
+.recap-reactions .proof-reaction {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -2570,11 +2571,13 @@ body:has(.home-log-button) .result.event-notice {
 .proof-reaction-count {
   font-weight: 600;
 }
-.proof-reactions .proof-reaction[aria-pressed="true"] {
+.proof-reactions .proof-reaction[aria-pressed="true"],
+.recap-reactions .proof-reaction[aria-pressed="true"] {
   border-color: var(--class);
   background: color-mix(in srgb, var(--class) 18%, var(--surface));
 }
-.proof-reactions .proof-reaction-add {
+.proof-reactions .proof-reaction-add,
+.recap-reactions .proof-reaction-add {
   padding: 0 10px;
   border-style: dashed;
   border-color: var(--empty-slot);
@@ -2895,54 +2898,6 @@ textarea:focus-visible {
   background: var(--ground);
   color: var(--ink);
   font-size: 0.875rem;
-}
-
-/* Missed-week responses */
-.missed-weeks {
-  display: grid;
-  gap: 8px;
-  margin-top: 16px;
-}
-.missed-week {
-  padding: 12px;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-}
-.missed-week p {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.missed-week strong {
-  color: var(--ink);
-}
-.missed-responses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.missed-responses button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  width: auto;
-  min-height: 36px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--ground);
-  color: var(--ink);
-  font-size: 0.8rem;
-}
-.missed-responses button[aria-pressed="true"] {
-  border-color: var(--chalk);
-  background: var(--chalk);
-  color: var(--rubber);
-}
-.missed-responses small {
-  font-weight: 700;
 }
 
 /* Workout details */
@@ -3423,10 +3378,6 @@ fieldset.session-pick {
 .home-actions .exception-status {
   flex-basis: 100%;
 }
-.missed-responses button {
-  min-width: 44px;
-  justify-content: center;
-}
 .post-report-photos {
   margin-left: auto;
 }
@@ -3436,4 +3387,221 @@ fieldset.session-pick {
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* App shell: no sideways panning and no stray text selection on a phone. */
+html,
+body {
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+img,
+video,
+svg {
+  max-width: 100%;
+}
+.notification-list li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.notification-list strong,
+.notification-list span {
+  overflow-wrap: anywhere;
+}
+
+/* Plate key sits under the bar it explains. */
+.own-progress .activity-legend {
+  justify-content: center;
+  margin: 6px 0 12px;
+}
+
+/* Week recap: the day after a week ends, a scoreboard everyone can react to. */
+.week-recap {
+  margin-top: 20px;
+  padding: 14px 16px 6px;
+  border-top: 4px solid var(--chalk);
+  border-radius: 4px 4px 12px 12px;
+  background: var(--surface);
+  animation: recap-in 420ms var(--ease-out) both;
+}
+@keyframes recap-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .week-recap {
+    animation: none;
+  }
+}
+.week-recap-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.week-recap-head h2 {
+  margin: 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.week-recap-head span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.week-recap ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.recap-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+}
+.recap-row + .recap-row {
+  border-top: 1px solid var(--rule);
+}
+.recap-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px auto;
+  align-items: center;
+  gap: 10px;
+}
+.recap-result strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recap-result .barbell-mini {
+  width: 84px;
+  height: auto;
+}
+.recap-outcome {
+  min-width: 5.5em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+.recap-missed .recap-outcome {
+  color: var(--muted);
+}
+.recap-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Card votes: watch, decide, then a one-line receipt. */
+.card-reviews li.verdict {
+  gap: 10px;
+  padding: 16px 0;
+}
+.verdict-who {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.verdict-who strong {
+  color: var(--ink);
+}
+.verdict-title {
+  margin: 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.verdict-rules {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.verdict .clip-player {
+  aspect-ratio: 4 / 5;
+  max-height: 46svh;
+  object-fit: contain;
+}
+.verdict-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.verdict-choices button {
+  min-height: 52px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.verdict-choices .verdict-approve {
+  border-color: var(--chalk);
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.verdict-choices .verdict-reject {
+  border-color: var(--error);
+  background: transparent;
+  color: var(--ink);
+}
+.verdict-choices .verdict-cannot_assess {
+  grid-column: 1 / -1;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: underline;
+}
+.card-reviews li.verdict-receipt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.verdict-receipt strong {
+  color: var(--ink);
+}
+.verdict-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-weight: 800;
+}
+.verdict-mark.verdict-approve {
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.verdict-mark.verdict-reject {
+  background: var(--error);
+  color: #fff;
+}
+.recap-reactions .proof-reaction {
+  background: var(--ground);
 }
