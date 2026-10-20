@@ -10,6 +10,7 @@ import {
 } from "./auth";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import { NotificationBell, NotificationSettings } from "./Notifications";
+import { OperatorConsole } from "./OperatorConsole";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
 import { removeAllProof } from "./proof";
@@ -25,7 +26,8 @@ type Route =
   | "/home"
   | "/target"
   | "/history"
-  | "/account";
+  | "/account"
+  | "/operator";
 type Access =
   | "checking"
   | "signed-out"
@@ -297,6 +299,7 @@ export function App({
   // Items waiting on the member (proof reviews, votes, card picks and approvals).
   const [attention, setAttention] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [operator, setOperator] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const displayNameScope = useRef("");
@@ -816,6 +819,7 @@ export function App({
       "/target",
       "/history",
       "/account",
+      "/operator",
     ] as string[]
   ).includes(path)
     ? (path as Route)
@@ -1951,6 +1955,15 @@ export function App({
             )}
             <Result notice={notice} />
           </Page>
+        ) : route === "/operator" ? (
+          <Page title="Operator console" lead="Moderation cases and pauses.">
+            {session && (
+              <OperatorConsole
+                apiBaseUrl={apiBaseUrl}
+                token={session.access_token}
+              />
+            )}
+          </Page>
         ) : route === "/account" ? (
           <Page title="You" lead="Your account and crew settings.">
             <div className="account-page">
@@ -2121,6 +2134,16 @@ export function App({
                 <span>Install on your home screen</span>
                 <span>→</span>
               </button>
+              {operator && (
+                <a
+                  className="account-row"
+                  href="/operator"
+                  onClick={(event) => navigate(event, "/operator")}
+                >
+                  <span>Operator console</span>
+                  <span>→</span>
+                </a>
+              )}
               <button
                 className="account-row"
                 type="button"
@@ -2394,6 +2417,7 @@ export function App({
             onNavigate={navigate}
             onAttention={setAttention}
             onUnread={setUnread}
+            onOperator={setOperator}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}

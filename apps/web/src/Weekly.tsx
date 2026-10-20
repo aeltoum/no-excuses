@@ -186,6 +186,7 @@ export function Weekly({
   onNavigate,
   onAttention,
   onUnread,
+  onOperator,
   route,
   api,
   token,
@@ -197,6 +198,7 @@ export function Weekly({
   apiBaseUrl: string;
   onAttention: (count: number) => void;
   onUnread?: (count: number) => void;
+  onOperator?: (operator: boolean) => void;
   onNavigate: (
     event: React.MouseEvent<HTMLAnchorElement>,
     destination: string,
@@ -275,6 +277,9 @@ export function Weekly({
   useEffect(() => {
     onUnread?.(extras.unreadNotifications);
   }, [extras.unreadNotifications, onUnread]);
+  useEffect(() => {
+    onOperator?.(extras.safety.operator === true);
+  }, [extras.safety.operator, onOperator]);
   const excused = new Set(extras.exceptions.excused);
   const weekOffPending = new Set(extras.exceptions.pending);
   const feedItems = useCallback((items: ProofItem[]) => {

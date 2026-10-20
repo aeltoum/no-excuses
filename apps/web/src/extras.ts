@@ -86,7 +86,7 @@ export type HomeExtras = {
   season: SeasonState | null;
   unlocks: CardUnlock[];
   unreadNotifications: number;
-  safety: { conductAccepted: boolean; blocked: string[] };
+  safety: { conductAccepted: boolean; blocked: string[]; operator?: boolean };
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },

@@ -1550,6 +1550,99 @@ const safetyRoutes = (request: Request, path: string) =>
     return invalid();
   });
 
+type ConsoleCase = { photoPaths?: string[] | null; photoUrls?: string[] };
+// Reported photo pairs reach the operator as short-lived signed URLs.
+async function withCasePhotos(console: unknown) {
+  const cases = (console as { cases?: ConsoleCase[] })?.cases ?? [];
+  const paths = cases.flatMap((item) => item.photoPaths ?? []);
+  const urls = new Map<string, string>();
+  if (paths.length > 0) {
+    const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+      expiresIn: 900,
+      paths,
+    })) as Array<{ path?: string; signedURL?: string }>;
+    for (const item of signed)
+      if (item.path && item.signedURL)
+        urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+  }
+  for (const item of cases) {
+    item.photoUrls = (item.photoPaths ?? []).flatMap((path) => {
+      const url = urls.get(path);
+      return url ? [url] : [];
+    });
+    delete item.photoPaths;
+  }
+  return console;
+}
+const operatorRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/operator" && method === "GET")
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_console($1) as data", [now]),
+        ),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/operator/resolve") {
+      if (
+        !anyUuid(body.caseId) ||
+        !["dismiss", "remove", "suspend", "terminate"].includes(
+          String(body.action),
+        )
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_resolve_case($1,$2,$3) as data",
+            [body.caseId, body.action, now],
+          ),
+        ),
+      );
+    }
+    if (path === "/v1/operator/reinstate") {
+      if (!uuid(body.accountId)) return invalid();
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_reinstate($1,$2) as data", [
+            body.accountId,
+            now,
+          ]),
+        ),
+      );
+    }
+    if (path === "/v1/operator/hold") {
+      const open = body.open === true;
+      if (
+        typeof body.open !== "boolean" ||
+        (open &&
+          (!uuid(body.groupId) ||
+            (body.membershipId != null && !uuid(body.membershipId)) ||
+            typeof body.reason !== "string" ||
+            !body.reason.trim() ||
+            body.reason.length > 200)) ||
+        (!open && !anyUuid(body.holdId))
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_set_hold($1,$2,$3,$4,$5,$6) as data",
+            [
+              body.groupId ?? null,
+              body.membershipId ?? null,
+              body.reason ?? "",
+              open,
+              body.holdId ?? null,
+              now,
+            ],
+          ),
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1572,6 +1665,8 @@ function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
     return nudges(request);
   if (path === "/v1/consequences") return consequences(request, path);
+  if (path === "/v1/operator" || path.startsWith("/v1/operator/"))
+    return operatorRoutes(request, path);
   if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
     return notificationRoutes(request, path);
   for (const [prefix, handler] of extraRoutes)

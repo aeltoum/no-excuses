@@ -3222,3 +3222,59 @@ textarea:focus-visible {
   background: var(--ground);
   color: var(--ink);
 }
+
+/* Operator console */
+.operator-console {
+  display: grid;
+  gap: 24px;
+}
+.operator-console h2 {
+  margin: 0 0 8px;
+}
+.operator-cases,
+.operator-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.operator-cases li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.operator-cases li > span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.operator-photos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.operator-photos img {
+  width: 100%;
+  border-radius: 6px;
+}
+.operator-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.operator-actions button,
+.operator-list button {
+  width: auto;
+  padding-inline: 12px;
+}
+.operator-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.operator-hold-form {
+  display: grid;
+  gap: 8px;
+}
