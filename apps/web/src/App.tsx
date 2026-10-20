@@ -11,6 +11,7 @@ import {
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
+import { removeAllProof } from "./proof";
 import { Result, useNotice } from "./Result";
 import { Sheet } from "./Sheet";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
@@ -2076,6 +2077,35 @@ export function App({
                 onClick={() => setInstallHelpOpen(true)}
               >
                 <span>Install on your home screen</span>
+                <span>→</span>
+              </button>
+              <button
+                className="account-row"
+                type="button"
+                disabled={busy("remove-photos")}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Delete every proof photo you’ve shared? Your workout counts and finished weeks stay. This can’t be undone.",
+                    )
+                  )
+                    return;
+                  void act("remove-photos", async () => {
+                    const { removed } = await removeAllProof(
+                      apiBaseUrl,
+                      token(),
+                    );
+                    return removed === 1
+                      ? "1 post’s photos removed."
+                      : `${removed} posts’ photos removed.`;
+                  });
+                }}
+              >
+                <span>
+                  {busy("remove-photos")
+                    ? "Removing photos…"
+                    : "Remove my proof photos"}
+                </span>
                 <span>→</span>
               </button>
               <button

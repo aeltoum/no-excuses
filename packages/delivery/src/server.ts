@@ -813,6 +813,7 @@ async function push(request: Request): Promise<Response> {
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
+const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
 const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
 // One standard emoji, including skin tones, flags, and joined sequences.
 const singleEmoji =
@@ -911,6 +912,7 @@ async function proof(request: Request, path: string): Promise<Response> {
             eligibleVoters: row.eligible_voters,
             canReview: row.can_review,
             canVote: row.can_vote,
+            canDelete: row.can_delete,
             activityPhotoUrl:
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
@@ -957,6 +959,42 @@ async function proof(request: Request, path: string): Promise<Response> {
       ]);
       if (on) setImmediate(() => void deliverPush());
       return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
+    }
+    const deleted = proofDelete.exec(path);
+    if (deleted && request.method === "POST") {
+      const result = (
+        await query(
+          actor,
+          "select app_private.delete_own_checkin($1,$2) as data",
+          [deleted[1], now],
+        )
+      ).rows[0]?.data as { currentWeekCount: number; paths: string[] };
+      // Photos go now when storage answers; otherwise the unused-upload sweep takes them.
+      if (result.paths.length > 0)
+        void storage(`/object/${proofBucket}`, "DELETE", {
+          prefixes: result.paths,
+        })
+          .then(() =>
+            pool.query(
+              "select app_private.mark_proof_uploads_deleted($1, now())",
+              [result.paths],
+            ),
+          )
+          .catch(() => console.error("Deleted post photos pending sweep"));
+      return reply(
+        ok({
+          workoutCheckinId: deleted[1],
+          currentWeekCount: result.currentWeekCount,
+        }),
+      );
+    }
+    if (path === "/v1/proof/remove-all" && request.method === "POST") {
+      const rows = (
+        await query(actor, "select app_private.remove_all_my_proof($1) as n", [
+          now,
+        ])
+      ).rows;
+      return reply(ok({ removed: rows[0]?.n ?? 0 }));
     }
     const match = proofAction.exec(path);
     if (match && request.method === "POST") {

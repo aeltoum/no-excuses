@@ -5,6 +5,7 @@ import { persistentMap } from "./persist";
 import {
   actOnProof,
   cachedReactors,
+  deleteProof,
   loadProofFeed,
   loadReactors,
   type ProofAction,
@@ -110,6 +111,7 @@ export function ProofFeed({
   cacheKey,
   onRevoked,
   onItems,
+  onDeleted,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -117,6 +119,7 @@ export function ProofFeed({
   cacheKey: string;
   onRevoked: () => void;
   onItems: (items: ProofItem[]) => void;
+  onDeleted?: (currentWeekCount: number) => void;
 }) {
   const [items, setItems] = useState<ProofItem[]>(
     () => cachedFeed(cacheKey) ?? [],
@@ -288,6 +291,39 @@ export function ProofFeed({
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
+  // Deleting cannot be undone, so only its button waits on the server.
+  const remove = useCallback(
+    async (item: ProofItem) => {
+      const id = item.workoutCheckinId;
+      setBusy(id);
+      try {
+        const result = await deleteProof(apiBaseUrl, token, id);
+        const keep = (list: ProofItem[]) =>
+          list.filter((entry) => entry.workoutCheckinId !== id);
+        setItems(keep);
+        feedCache.set(cacheKey, keep(feedCache.get(cacheKey) ?? []));
+        onDeleted?.(result.currentWeekCount);
+        setNotice({
+          kind: "success",
+          text: "Post deleted. It no longer counts, so log a new one any time this week.",
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === "unauthorized")
+          onRevoked();
+        setNotice({
+          kind: "error",
+          text:
+            error instanceof ApiError
+              ? error.message
+              : "Couldn’t delete. Try again.",
+        });
+      } finally {
+        setBusy((current) => (current === id ? null : current));
+      }
+    },
+    [apiBaseUrl, token, cacheKey, onDeleted, onRevoked, setNotice],
+  );
+
   // A choice already made, here or on another device, needs no buttons.
   const needsReview = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canReview;
@@ -395,6 +431,23 @@ export function ProofFeed({
             </button>
           </fieldset>
         )}
+        {needsVote(item) && (
+          <button
+            type="button"
+            className="proof-report"
+            disabled={disabled}
+            onClick={() =>
+              void act(
+                item,
+                "vote",
+                "cannot_assess",
+                "Marked can’t tell. You won’t be reminded again.",
+              )
+            }
+          >
+            Can’t tell from these photos
+          </button>
+        )}
         {!item.hidden && (!item.mine || reactionList(item).length > 0) && (
           <Reactions
             reactions={reactionList(item)}
@@ -453,6 +506,26 @@ export function ProofFeed({
               Remove photos
             </button>
           </div>
+        )}
+        {item.mine && item.canDelete && (
+          <button
+            type="button"
+            className="proof-report"
+            disabled={disabled}
+            onClick={async () => {
+              if (
+                await ask({
+                  title: "Delete this post?",
+                  body: "It stops counting toward this week and its photos are deleted. You can log a new workout right after.",
+                  confirm: "Delete post",
+                  tone: "danger",
+                })
+              )
+                void remove(item);
+            }}
+          >
+            {disabled ? "Deleting…" : "Delete post"}
+          </button>
         )}
         {!item.mine && !item.hidden && (
           <button

@@ -1244,6 +1244,24 @@ export function Weekly({
                   cacheKey={cacheKey}
                   onRevoked={feedRevoked}
                   onItems={feedItems}
+                  onDeleted={(count) => {
+                    setProgress((items) =>
+                      items.map((item) =>
+                        item.membershipId === membership.membershipId
+                          ? {
+                              ...item,
+                              completedWorkoutCount: count,
+                              activityTypes: item.activityTypes.slice(0, count),
+                            }
+                          : item,
+                      ),
+                    );
+                    // The exact plates and streaks follow from the server.
+                    void api
+                      .progress(token, membership.groupId)
+                      .then((response) => setProgress(response.data))
+                      .catch(() => setRefreshWarning(true));
+                  }}
                 />
               )}
             </>

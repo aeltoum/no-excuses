@@ -21,6 +21,8 @@ export type ProofItem = {
   eligibleVoters: number;
   canReview: boolean;
   canVote: boolean;
+  // Feeds cached before post deletion lack it.
+  canDelete?: boolean;
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
   reactions: ReactionCount[];
@@ -99,6 +101,20 @@ export const actOnProof = (
   call<{ status: string }>(baseUrl, token, `/v1/proof/${id}/${action}`, {
     method: "POST",
     body: { choice },
+  });
+
+export const deleteProof = (baseUrl: string, token: string, id: string) =>
+  call<{ workoutCheckinId: string; currentWeekCount: number }>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/delete`,
+    { method: "POST", body: {} },
+  );
+
+export const removeAllProof = (baseUrl: string, token: string) =>
+  call<{ removed: number }>(baseUrl, token, "/v1/proof/remove-all", {
+    method: "POST",
+    body: {},
   });
 
 export const reactToProof = (
