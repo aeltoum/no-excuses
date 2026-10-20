@@ -26,7 +26,7 @@ export const workoutActivityTypeSchema = z.enum([
   "mixed",
 ]);
 export const perceivedIntensitySchema = z.enum(["low", "moderate", "high"]);
-export const weeklyOutcomeSchema = z.enum(["attained", "missed"]);
+export const weeklyOutcomeSchema = z.enum(["attained", "missed", "excepted"]);
 export const apiErrorCodeSchema = z.enum([
   "unauthorized",
   "invalid_request",

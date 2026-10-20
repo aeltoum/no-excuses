@@ -30,6 +30,11 @@ export const progressItem = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+export const homeExtras = (overrides: Record<string, unknown> = {}) => ({
+  exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
+  ...overrides,
+});
+
 export type ApiCall = {
   path: string;
   method: string;
@@ -85,6 +90,7 @@ const defaults = (call: ApiCall): unknown => {
   if (path === "/v1/consequences")
     return { owed: 0, offer: null, attempt: null, reviews: [], groupOwed: {} };
   if (path === "/v1/nudges") return [];
+  if (path === "/v1/home/extras") return homeExtras();
   return undefined;
 };
 

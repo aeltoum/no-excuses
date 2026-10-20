@@ -2791,3 +2791,108 @@ body:has(.home-log-button) .result.event-notice {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* Exceptions */
+.history-plate.excused {
+  border-style: dashed;
+  border-color: var(--muted);
+}
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+textarea:focus-visible {
+  outline: 3px solid var(--safety);
+  outline-offset: 3px;
+}
+.exception-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+.exception-status.exception-approved {
+  border-color: var(--chalk);
+}
+.exception-open {
+  display: block;
+  margin: 4px auto 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.exception-ballots ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.exception-ballot {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.exception-ballot span,
+.exception-ballot small {
+  color: var(--muted);
+}
+.exception-ballot q {
+  font-style: italic;
+}
+.exception-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+}
+.exception-choices button {
+  background: var(--ground);
+  color: var(--ink);
+}
+.exception-choices button[aria-pressed="true"],
+.exception-categories button[aria-pressed="true"] {
+  border-color: var(--chalk);
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.exception-form {
+  display: grid;
+  gap: 12px;
+}
+.exception-form .choice-chips {
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.exception-categories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.exception-categories legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.exception-categories button {
+  padding: 8px;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.875rem;
+}

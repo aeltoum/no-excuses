@@ -221,6 +221,7 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_push_notifications(now())");
     await pool.query("select app_private.enqueue_consequence_push(now())");
     await pool.query("select app_private.enqueue_social_push(now())");
+    await pool.query("select app_private.enqueue_exception_push(now())");
     const pending = await pool.query(
       "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
     );
@@ -1300,6 +1301,66 @@ const groupRoutes = (request: Request, path: string) =>
     return fail("not_found", 404);
   });
 
+const homeExtras = (request: Request, path: string) =>
+  memberRoute(request, async ({ method, now, data }) =>
+    path === "/v1/home/extras" && method === "GET"
+      ? ok(await data("select app_private.home_extras($1) as data", [now]))
+      : fail("not_found", 404),
+  );
+
+const exceptionCategories = [
+  "health_safety",
+  "family_caregiving",
+  "schedule_disruption",
+  "travel_access",
+  "planned_recovery",
+  "private",
+];
+const exceptionAction =
+  /^\/v1\/exceptions\/([0-9a-f-]{36})\/(respond|withdraw)$/;
+const exceptionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    const after = (value: unknown) => {
+      setImmediate(() => void deliverPush());
+      return ok(value);
+    };
+    if (path === "/v1/exceptions/request") {
+      const note = body.note ?? null;
+      if (
+        !uuid(body.id) ||
+        (body.week !== "current" && body.week !== "next") ||
+        !exceptionCategories.includes(String(body.category)) ||
+        (note !== null && (typeof note !== "string" || note.length > 280))
+      )
+        return invalid();
+      return after(
+        await data(
+          "select app_private.request_exception($1,$2,$3,$4,$5) as data",
+          [body.id, body.week, body.category, note, now],
+        ),
+      );
+    }
+    const match = exceptionAction.exec(path);
+    if (!match) return fail("not_found", 404);
+    if (match[2] === "withdraw")
+      return after(
+        await data("select app_private.withdraw_exception($1,$2) as data", [
+          match[1],
+          now,
+        ]),
+      );
+    if (!["approve", "deny", "abstain"].includes(String(body.response)))
+      return invalid();
+    return after(
+      await data("select app_private.respond_to_exception($1,$2,$3) as data", [
+        match[1],
+        body.response,
+        now,
+      ]),
+    );
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1307,6 +1368,8 @@ const extraRoutes: Array<
   ["/v1/proof/", proof],
   ["/v1/consequences/", consequences],
   ["/v1/group/", groupRoutes],
+  ["/v1/home/", homeExtras],
+  ["/v1/exceptions/", exceptionRoutes],
 ];
 function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/enrollment" && request.method === "POST")

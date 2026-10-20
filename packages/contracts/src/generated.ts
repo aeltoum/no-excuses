@@ -756,7 +756,7 @@ export interface components {
             lockedTarget: number;
             completedWorkoutCount: number;
             /** @enum {string} */
-            outcome: "attained" | "missed";
+            outcome: "attained" | "missed" | "excepted";
         };
         /** Format: date-time */
         UtcInstant: string;

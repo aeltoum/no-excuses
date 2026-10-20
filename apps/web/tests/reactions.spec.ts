@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { homeExtras } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -174,6 +175,11 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
       calls.push(`react:${emoji}:${on}`);
       return ok({ emoji, on });
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");
@@ -550,6 +556,11 @@ test("Signing out drops the cached reactor names", async ({ page }) => {
         })),
       );
     if (path === "/v1/nudges") return ok([]);
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   const signIn = async (email: string) => {

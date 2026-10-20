@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
+import { homeExtras } from "./member";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const friendMembershipId = "30000000-0000-4000-8000-000000000002";
@@ -105,6 +106,11 @@ test("one-member Group pauses workouts until a second member joins", async ({
         },
       });
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
 
@@ -409,6 +415,11 @@ const weeklyLoop = async (
         weeklyTarget: request.postDataJSON().weeklyTarget,
       });
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");

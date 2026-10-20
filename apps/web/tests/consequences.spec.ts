@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { homeExtras } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -227,6 +228,11 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
         };
       return ok(state);
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   const uploads: string[] = [];

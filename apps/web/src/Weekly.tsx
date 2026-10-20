@@ -13,6 +13,8 @@ import {
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
+import { Exceptions } from "./Exceptions";
+import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
 import { onClearPersisted } from "./persist";
 import {
@@ -234,11 +236,24 @@ export function Weekly({
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const [feedAttention, setFeedAttention] = useState(0);
   const [cardAttention, setCardAttention] = useState(0);
-  useEffect(() => {
-    if (route === "/home") onAttention(feedAttention + cardAttention);
-  }, [route, feedAttention, cardAttention, onAttention]);
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
+  const [extras, applyExtras, reloadExtras] = useHomeExtras(
+    apiBaseUrl,
+    token,
+    cacheKey,
+    route === "/home" && Boolean(membership),
+    feedRevoked,
+  );
+  const ballotAttention = extras.exceptions.toDecide.filter(
+    (ballot) => !ballot.myResponse,
+  ).length;
+  useEffect(() => {
+    if (route === "/home")
+      onAttention(feedAttention + cardAttention + ballotAttention);
+  }, [route, feedAttention, cardAttention, ballotAttention, onAttention]);
+  const excused = new Set(extras.exceptions.excused);
+  const weekOffPending = new Set(extras.exceptions.pending);
   const feedItems = useCallback((items: ProofItem[]) => {
     const waiting = items.filter(
       (item) => item.canReview || (item.canVote && !item.myVote),
@@ -778,6 +793,17 @@ export function Weekly({
                 </div>
               )}
               {own && (
+                <Exceptions
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onNotice={setNotice}
+                  onRevoked={feedRevoked}
+                />
+              )}
+              {own && (
                 <Consequences
                   apiBaseUrl={apiBaseUrl}
                   token={token}
@@ -818,6 +844,11 @@ export function Weekly({
                             ? ` · owes ${groupOwed[item.membershipId]}`
                             : ""}
                           {awaitingReview.has(item.membershipId) && " · review"}
+                          {excused.has(item.membershipId)
+                            ? " · excused"
+                            : weekOffPending.has(item.membershipId)
+                              ? " · week off?"
+                              : ""}
                         </span>
                         {hasStreaks(item) && (
                           <span className="friend-streaks">
@@ -830,23 +861,24 @@ export function Weekly({
                             </span>
                           </span>
                         )}
-                        {item.completedWorkoutCount < item.lockedTarget && (
-                          <button
-                            type="button"
-                            className="secondary-button friend-nudge"
-                            disabled={nudged.has(item.membershipId)}
-                            aria-label={
-                              nudged.has(item.membershipId)
-                                ? `Nudged ${item.displayName} today`
-                                : `Nudge ${item.displayName}`
-                            }
-                            onClick={() => void nudge(item.membershipId)}
-                          >
-                            {nudged.has(item.membershipId)
-                              ? "Nudged ✓"
-                              : "Nudge"}
-                          </button>
-                        )}
+                        {item.completedWorkoutCount < item.lockedTarget &&
+                          !excused.has(item.membershipId) && (
+                            <button
+                              type="button"
+                              className="secondary-button friend-nudge"
+                              disabled={nudged.has(item.membershipId)}
+                              aria-label={
+                                nudged.has(item.membershipId)
+                                  ? `Nudged ${item.displayName} today`
+                                  : `Nudge ${item.displayName}`
+                              }
+                              onClick={() => void nudge(item.membershipId)}
+                            >
+                              {nudged.has(item.membershipId)
+                                ? "Nudged ✓"
+                                : "Nudge"}
+                            </button>
+                          )}
                       </li>
                     ))}
                 </ul>
@@ -1409,13 +1441,19 @@ export function Weekly({
                       const item = ownHistory(startsAt);
                       if (!item) return null;
                       const met = item.outcome === "attained";
+                      const excusedWeek = item.outcome === "excepted";
+                      const outcomeLabel = met
+                        ? "Met"
+                        : excusedWeek
+                          ? "Excused"
+                          : "Missed";
                       const range = historyRange(item);
                       return (
                         <li key={startsAt}>
                           <button
                             type="button"
-                            className={`history-plate${met ? " met" : " missed"}`}
-                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met ? (hasStreaks(item) ? `Met, ${weekStreakText(item.targetStreak)}` : "Met") : "Missed"}`}
+                            className={`history-plate${met ? " met" : excusedWeek ? " excused" : " missed"}`}
+                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met && hasStreaks(item) ? `Met, ${weekStreakText(item.targetStreak)}` : outcomeLabel}`}
                             onClick={(event) => {
                               historyOpenerRef.current = event.currentTarget;
                               setSelectedWeek(startsAt);
@@ -1432,7 +1470,7 @@ export function Weekly({
                           <span className="history-caption">
                             {range}
                             <strong className="history-outcome">
-                              {met ? "Met" : "Missed"}
+                              {outcomeLabel}
                             </strong>
                             {met && hasStreaks(item) && (
                               <span className="history-streak">
@@ -1477,7 +1515,9 @@ export function Weekly({
                               You{" "}
                               {item.outcome === "attained"
                                 ? "met it"
-                                : "missed it"}
+                                : item.outcome === "excepted"
+                                  ? "were excused"
+                                  : "missed it"}
                               : {item.completedWorkoutCount} of{" "}
                               {item.lockedTarget}.
                             </p>
@@ -1490,11 +1530,13 @@ export function Weekly({
                               <span>
                                 {item.completedWorkoutCount}/{item.lockedTarget}{" "}
                                 ·{" "}
-                                {item.outcome !== "attained"
-                                  ? "Missed"
-                                  : hasStreaks(item)
-                                    ? `Met · ${weekStreakText(item.targetStreak)}`
-                                    : "Met"}
+                                {item.outcome === "excepted"
+                                  ? "Excused"
+                                  : item.outcome !== "attained"
+                                    ? "Missed"
+                                    : hasStreaks(item)
+                                      ? `Met · ${weekStreakText(item.targetStreak)}`
+                                      : "Met"}
                               </span>
                             </li>
                           ))}
