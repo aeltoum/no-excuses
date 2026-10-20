@@ -225,11 +225,17 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_missed_response_push(now())");
     await pool.query("select app_private.enqueue_crown_push(now())");
     await pool.query("select app_private.enqueue_unlock_push(now())");
+    await pool.query("select app_private.enqueue_digest(now())");
     const pending = await pool.query(
-      "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
+      "select * from app_private.pending_push(200)",
     );
     const sent = new Set<string>();
     for (const row of pending.rows) {
+      // Muted social items stay in the app's notification list only.
+      if (row.muted) {
+        sent.add(String(row.outbox_id));
+        continue;
+      }
       try {
         await webpush.sendNotification(
           {
@@ -1417,6 +1423,40 @@ const missedRoutes = (request: Request, path: string) =>
     return ok(value);
   });
 
+const notificationRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/notifications" && method === "GET")
+      return ok(
+        await data("select app_private.notification_center($1) as data", [now]),
+      );
+    if (path === "/v1/notifications/seen" && method === "POST")
+      return ok({
+        seen: await data(
+          "select app_private.mark_notifications_seen($1) as data",
+          [now],
+        ),
+      });
+    if (path === "/v1/notifications/prefs" && method === "POST") {
+      const flag = (value: unknown) =>
+        value === undefined || typeof value === "boolean";
+      const hour = body.digestHour;
+      if (
+        !flag(body.socialPush) ||
+        !flag(body.digest) ||
+        (hour !== undefined &&
+          (!Number.isInteger(hour) || Number(hour) < 0 || Number(hour) > 23))
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_notification_prefs($1,$2,$3::smallint) as data",
+          [body.socialPush ?? null, body.digest ?? null, hour ?? null],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1438,6 +1478,8 @@ function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
     return nudges(request);
   if (path === "/v1/consequences") return consequences(request, path);
+  if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
+    return notificationRoutes(request, path);
   for (const [prefix, handler] of extraRoutes)
     if (path.startsWith(prefix)) return handler(request, path);
   return route(request);

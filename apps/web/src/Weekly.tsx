@@ -185,6 +185,7 @@ export function Weekly({
   apiBaseUrl,
   onNavigate,
   onAttention,
+  onUnread,
   route,
   api,
   token,
@@ -195,6 +196,7 @@ export function Weekly({
 }: {
   apiBaseUrl: string;
   onAttention: (count: number) => void;
+  onUnread?: (count: number) => void;
   onNavigate: (
     event: React.MouseEvent<HTMLAnchorElement>,
     destination: string,
@@ -270,6 +272,9 @@ export function Weekly({
     if (route === "/home")
       onAttention(feedAttention + cardAttention + ballotAttention);
   }, [route, feedAttention, cardAttention, ballotAttention, onAttention]);
+  useEffect(() => {
+    onUnread?.(extras.unreadNotifications);
+  }, [extras.unreadNotifications, onUnread]);
   const excused = new Set(extras.exceptions.excused);
   const weekOffPending = new Set(extras.exceptions.pending);
   const feedItems = useCallback((items: ProofItem[]) => {

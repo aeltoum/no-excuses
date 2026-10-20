@@ -35,6 +35,7 @@ export const homeExtras = (overrides: Record<string, unknown> = {}) => ({
   missed: [],
   season: null,
   unlocks: [],
+  unreadNotifications: 0,
   ...overrides,
 });
 

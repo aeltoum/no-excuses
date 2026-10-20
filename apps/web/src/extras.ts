@@ -84,12 +84,14 @@ export type HomeExtras = {
   missed: MissedWeek[];
   season: SeasonState | null;
   unlocks: CardUnlock[];
+  unreadNotifications: number;
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
   missed: [],
   season: null,
   unlocks: [],
+  unreadNotifications: 0,
 };
 
 const cache = persistentMap<HomeExtras>("extras");

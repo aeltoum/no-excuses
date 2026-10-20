@@ -3091,3 +3091,62 @@ textarea:focus-visible {
 .unlock-list small {
   color: var(--muted);
 }
+
+/* Notifications */
+.masthead-bell {
+  position: relative;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+.masthead-bell .tab-badge {
+  top: 2px;
+  left: 24px;
+}
+.notification-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.notification-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.notification-list li.skeleton {
+  min-height: 48px;
+  margin-bottom: 8px;
+  border: 0;
+}
+.notification-list li.unread strong::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--error);
+  vertical-align: middle;
+}
+.notification-list span {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.notification-list time {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.notification-prefs {
+  display: grid;
+  gap: 16px;
+}

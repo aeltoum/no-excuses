@@ -9,6 +9,7 @@ import {
   WebAuthError,
 } from "./auth";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
+import { NotificationBell, NotificationSettings } from "./Notifications";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
 import { removeAllProof } from "./proof";
@@ -290,6 +291,7 @@ export function App({
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
   // Items waiting on the member (proof reviews, votes, card picks and approvals).
   const [attention, setAttention] = useState(0);
+  const [unread, setUnread] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const displayNameScope = useRef("");
@@ -852,6 +854,15 @@ export function App({
           <img src="/icons/icon.svg" alt="" width="32" height="32" />
           <span>No Excuses</span>
         </a>
+        {access === "signed-in" && membership && session && (
+          <NotificationBell
+            apiBaseUrl={apiBaseUrl}
+            token={session.access_token}
+            unread={unread}
+            onSeen={() => setUnread(0)}
+            onRevoked={recheckAccess}
+          />
+        )}
       </header>
       <main className="route-content" id="main-content" key={route ?? path}>
         {!route ? (
@@ -2071,6 +2082,13 @@ export function App({
                 </>
               )}
               <PushToggle apiBaseUrl={apiBaseUrl} accessToken={token} />
+              {membership && (
+                <NotificationSettings
+                  apiBaseUrl={apiBaseUrl}
+                  token={session?.access_token ?? ""}
+                  onNotice={setNotice}
+                />
+              )}
               <button
                 className="account-row"
                 type="button"
@@ -2351,6 +2369,7 @@ export function App({
             apiBaseUrl={apiBaseUrl}
             onNavigate={navigate}
             onAttention={setAttention}
+            onUnread={setUnread}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}
