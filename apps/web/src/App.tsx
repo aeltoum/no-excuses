@@ -8,6 +8,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
 import { Result, useNotice } from "./Result";
@@ -275,6 +276,7 @@ export function App({
     Array<{ invitationId: string; email: string; expiresAt: string }>
   >([]);
   const [manageGroup, setManageGroup] = useState(false);
+  const [crewNameDraft, setCrewNameDraft] = useState("");
   const [inviteReady, setInviteReady] = useState<{
     email: string;
     token: string;
@@ -729,6 +731,26 @@ export function App({
       })
       .finally(() => release(key));
   };
+  // Applies a local roster change to the screen, its ref, and the saved copy.
+  const patchRoster = (
+    change: (roster: NonNullable<typeof groupRoster>) => typeof groupRoster,
+  ) => {
+    const current = groupRosterRef.current;
+    if (!current) return;
+    const next = change(current);
+    groupRosterRef.current = next;
+    setGroupRoster(next);
+    if (next) groupCache.set(groupScope.current, next);
+  };
+  const setMemberAdmin = (membershipId: string, admin: boolean) =>
+    patchRoster((roster) => ({
+      ...roster,
+      members: roster.members.map((member) =>
+        member.membershipId === membershipId
+          ? { ...member, creator: admin }
+          : member,
+      ),
+    }));
   // Access ends on screen at once; Auth's own sign-out (which tells other
   // tabs) finishes in the background.
   const signOut = () => {
@@ -797,8 +819,15 @@ export function App({
           member.membershipId === membership.membershipId && member.creator,
       ),
   );
+  // The last admin hands the role on first, unless they are the last member.
   const canLeaveGroup = Boolean(
-    groupRoster && (!currentMemberIsAdmin || groupRoster.members.length === 1),
+    groupRoster &&
+      (!currentMemberIsAdmin ||
+        groupRoster.members.length === 1 ||
+        groupRoster.members.some(
+          (member) =>
+            member.creator && member.membershipId !== membership?.membershipId,
+        )),
   );
 
   if (launching) {
@@ -1517,17 +1546,62 @@ export function App({
                           <button
                             className="text-button"
                             type="button"
-                            onClick={() => setManageGroup(!manageGroup)}
+                            onClick={() => {
+                              setCrewNameDraft(groupRoster.groupName);
+                              setManageGroup(!manageGroup);
+                            }}
                           >
                             {manageGroup ? "Done" : "Manage"}
                           </button>
                         )}
                       </div>
                       {manageGroup && (
-                        <p className="hint">
-                          As the crew’s creator, you can remove members and
-                          revoke invites.
-                        </p>
+                        <form
+                          className="group-rename"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            const name = crewNameDraft.trim();
+                            const previous = groupRoster.groupName;
+                            if (!name || name === previous) return;
+                            const rename = (value: string) =>
+                              patchRoster((roster) => ({
+                                ...roster,
+                                groupName: value,
+                              }));
+                            rename(name);
+                            optimistic(
+                              "rename",
+                              "Crew renamed.",
+                              () => renameGroup(apiBaseUrl, token(), name),
+                              () => {
+                                rename(previous);
+                                setCrewNameDraft(previous);
+                              },
+                            );
+                          }}
+                        >
+                          <label>
+                            Crew name
+                            <input
+                              value={crewNameDraft}
+                              onChange={(event) =>
+                                setCrewNameDraft(event.target.value)
+                              }
+                              maxLength={80}
+                              required
+                            />
+                          </label>
+                          <button
+                            className="secondary-button"
+                            type="submit"
+                            disabled={
+                              !crewNameDraft.trim() ||
+                              crewNameDraft.trim() === groupRoster.groupName
+                            }
+                          >
+                            Rename
+                          </button>
+                        </form>
                       )}
                       <ul className="group-roster">
                         {groupRoster.members.map((member) => (
@@ -1542,9 +1616,50 @@ export function App({
                             </span>
                             <span className="group-member-copy">
                               <strong>{member.displayName}</strong>
-                              <span>{member.weeklyTarget} a week</span>
+                              <span>
+                                {member.weeklyTarget} a week
+                                {member.creator ? " · Admin" : ""}
+                              </span>
                             </span>
                             {manageGroup &&
+                              member.membershipId !==
+                                membership.membershipId && (
+                                <button
+                                  className="row-action"
+                                  type="button"
+                                  disabled={busy(
+                                    `admin:${member.membershipId}`,
+                                  )}
+                                  onClick={() => {
+                                    const admin = !member.creator;
+                                    setMemberAdmin(member.membershipId, admin);
+                                    optimistic(
+                                      `admin:${member.membershipId}`,
+                                      admin
+                                        ? `${member.displayName} is now an admin.`
+                                        : `${member.displayName} is no longer an admin.`,
+                                      () =>
+                                        setGroupAdmin(
+                                          apiBaseUrl,
+                                          token(),
+                                          member.membershipId,
+                                          admin,
+                                        ),
+                                      () =>
+                                        setMemberAdmin(
+                                          member.membershipId,
+                                          !admin,
+                                        ),
+                                    );
+                                  }}
+                                >
+                                  {member.creator
+                                    ? "Remove admin"
+                                    : "Make admin"}
+                                </button>
+                              )}
+                            {manageGroup &&
+                              !member.creator &&
                               member.membershipId !==
                                 membership.membershipId && (
                                 <button
@@ -1751,14 +1866,27 @@ export function App({
                           </button>
                         </form>
                       )}
+                      <GroupAdmin
+                        apiBaseUrl={apiBaseUrl}
+                        token={session?.access_token ?? ""}
+                        manage={manageGroup}
+                        revision={groupRevision}
+                        onNotice={setNotice}
+                        onRevoked={recheckAccess}
+                      />
                       {canLeaveGroup ? (
                         <button
                           className="danger-outline leave-group"
                           type="button"
                           disabled={busy("leave")}
                           onClick={() => {
+                            const closing = groupRoster.members.length === 1;
                             if (
-                              !window.confirm(`Leave ${groupRoster.groupName}?`)
+                              !window.confirm(
+                                closing
+                                  ? `Close ${groupRoster.groupName}? You are its last member, so it ends for good.`
+                                  : `Leave ${groupRoster.groupName}?`,
+                              )
                             )
                               return;
                             void act("leave", async () => {

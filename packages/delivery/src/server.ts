@@ -1162,6 +1162,129 @@ async function consequences(request: Request, path: string): Promise<Response> {
   }
 }
 
+type MemberCall = {
+  actor: Actor;
+  body: Record<string, unknown>;
+  method: string;
+  now: string;
+  // Runs one SQL statement as the member and returns its first row's `data` column.
+  data: (sql: string, values: unknown[]) => Promise<unknown>;
+};
+// Shared shell for the newer member routes: auth, JSON body, and database errors.
+async function memberRoute(
+  request: Request,
+  handle: (call: MemberCall) => Promise<ApiResponse>,
+): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  let body: Record<string, unknown> = {};
+  if (request.method === "POST") {
+    try {
+      const parsed = (await request.json()) ?? {};
+      if (typeof parsed !== "object" || Array.isArray(parsed))
+        return reply(fail("invalid_request", 400));
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+  }
+  const signed = actor;
+  try {
+    return reply(
+      await handle({
+        actor: signed,
+        body,
+        method: request.method,
+        now: new Date().toISOString(),
+        data: async (sql, values) =>
+          (await query(signed, sql, values)).rows[0]?.data,
+      }),
+    );
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+const invalid = () => fail("invalid_request", 400);
+
+const groupRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/group/settings" && method === "GET")
+      return ok(
+        await data("select app_private.group_settings($1) as data", [now]),
+      );
+    if (path === "/v1/group/activity" && method === "GET")
+      return ok(
+        await data("select app_private.group_activity($1) as data", [now]),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/group/rename") {
+      if (typeof body.name !== "string" || body.name.length > 200)
+        return invalid();
+      return ok(
+        await data("select app_private.rename_group($1,$2) as data", [
+          body.name,
+          now,
+        ]),
+      );
+    }
+    if (path === "/v1/group/admin") {
+      if (!uuid(body.membershipId) || typeof body.admin !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        admin: await data(
+          "select app_private.set_group_admin($1,$2,$3) as data",
+          [body.membershipId, body.admin, now],
+        ),
+      });
+    }
+    if (path === "/v1/group/settings") {
+      if (
+        typeof body.timeZone !== "string" ||
+        body.timeZone.length > 64 ||
+        !Number.isInteger(body.weekStarts)
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_group_settings($1,$2::smallint,$3) as data",
+          [body.timeZone, body.weekStarts, now],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+// Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
+const extraRoutes: Array<
+  [string, (request: Request, path: string) => Promise<Response>]
+> = [
+  ["/v1/proof/", proof],
+  ["/v1/consequences/", consequences],
+  ["/v1/group/", groupRoutes],
+];
+function dispatch(request: Request, path: string): Promise<Response> {
+  if (path === "/v1/enrollment" && request.method === "POST")
+    return enrollment(request);
+  if (path === "/v1/consent" && request.method === "POST")
+    return consent(request);
+  if (path === "/v1/push" && ["GET", "POST", "DELETE"].includes(request.method))
+    return push(request);
+  if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
+    return nudges(request);
+  if (path === "/v1/consequences") return consequences(request, path);
+  for (const [prefix, handler] of extraRoutes)
+    if (path.startsWith(prefix)) return handler(request, path);
+  return route(request);
+}
+
 const server = createServer(async (incoming, outgoing) => {
   const origin = incoming.headers.origin;
   if (origin && origin !== allowedOrigin) {
@@ -1197,22 +1320,7 @@ const server = createServer(async (incoming, outgoing) => {
         : Buffer.concat(chunks),
     });
     const path = new URL(request.url).pathname;
-    const response =
-      path === "/v1/enrollment" && request.method === "POST"
-        ? await enrollment(request)
-        : path === "/v1/consent" && request.method === "POST"
-          ? await consent(request)
-          : path === "/v1/push" &&
-              ["GET", "POST", "DELETE"].includes(request.method)
-            ? await push(request)
-            : path === "/v1/nudges" && ["GET", "POST"].includes(request.method)
-              ? await nudges(request)
-              : path.startsWith("/v1/proof/")
-                ? await proof(request, path)
-                : path === "/v1/consequences" ||
-                    path.startsWith("/v1/consequences/")
-                  ? await consequences(request, path)
-                  : await route(request);
+    const response = await dispatch(request, path);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",

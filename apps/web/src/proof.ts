@@ -38,7 +38,7 @@ export type ProofAction =
   | "report"
   | "moderate";
 
-async function call<T>(
+export async function call<T>(
   baseUrl: string,
   token: string,
   path: string,
