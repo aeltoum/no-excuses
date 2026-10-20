@@ -25,6 +25,8 @@ export type ProofItem = {
   // Feeds cached before post deletion lack it.
   canDelete?: boolean;
   details?: WorkoutDetails | null;
+  caption?: string | null;
+  messages?: ProofMessage[];
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
   reactions: ReactionCount[];
@@ -32,6 +34,13 @@ export type ProofItem = {
 };
 
 export type ReactionCount = { emoji: string; count: number };
+export type ProofMessage = {
+  id: string;
+  name: string;
+  mine: boolean;
+  body: string;
+  at: string;
+};
 // Members may leave up to this many distinct emoji on one post.
 export const reactionLimit = 6;
 
@@ -122,6 +131,40 @@ export const setProofDetails = (
   call<{ details: WorkoutDetails }>(baseUrl, token, `/v1/proof/${id}/details`, {
     method: "POST",
     body: { details },
+  });
+
+export const postMessage = (
+  baseUrl: string,
+  token: string,
+  checkinId: string,
+  id: string,
+  body: string,
+) =>
+  call(baseUrl, token, `/v1/proof/${checkinId}/message`, {
+    method: "POST",
+    body: { id, body },
+  });
+
+export const setCaption = (
+  baseUrl: string,
+  token: string,
+  checkinId: string,
+  caption: string,
+) =>
+  call<{ caption: string }>(baseUrl, token, `/v1/proof/${checkinId}/caption`, {
+    method: "POST",
+    body: { caption },
+  });
+
+export const reportMessage = (
+  baseUrl: string,
+  token: string,
+  messageId: string,
+  category: string,
+) =>
+  call(baseUrl, token, "/v1/safety/report-message", {
+    method: "POST",
+    body: { messageId, category },
   });
 
 export const removeAllProof = (baseUrl: string, token: string) =>

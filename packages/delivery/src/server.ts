@@ -226,6 +226,7 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_crown_push(now())");
     await pool.query("select app_private.enqueue_unlock_push(now())");
     await pool.query("select app_private.enqueue_digest(now())");
+    await pool.query("select app_private.enqueue_message_push(now())");
     const pending = await pool.query(
       "select * from app_private.pending_push(200)",
     );
@@ -826,6 +827,7 @@ const proofAction =
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
 const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
 const proofDetails = /^\/v1\/proof\/([0-9a-f-]{36})\/details$/;
+const proofWrite = /^\/v1\/proof\/([0-9a-f-]{36})\/(caption|message)$/;
 const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
 // One standard emoji, including skin tones, flags, and joined sequences.
 const singleEmoji =
@@ -873,9 +875,23 @@ async function proof(request: Request, path: string): Promise<Response> {
       );
     }
     if (path === "/v1/proof/feed" && request.method === "GET") {
+      const hidden = new Set(
+        (
+          await query(
+            actor,
+            "select app_private.block_hidden_posts($1) as id",
+            [now],
+          )
+        ).rows.map((row) => row.id as string),
+      );
       const rows = (
         await query(actor, "select * from app_private.proof_feed($1)", [now])
-      ).rows;
+      ).rows.filter((row) => !hidden.has(row.workout_checkin_id as string));
+      const text = new Map(
+        (
+          await query(actor, "select * from app_private.proof_text($1)", [now])
+        ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
       const reactions = new Map(
         (
           await query(
@@ -933,6 +949,8 @@ async function proof(request: Request, path: string): Promise<Response> {
             canVote: row.can_vote,
             canDelete: row.can_delete,
             details: details.get(row.workout_checkin_id) ?? null,
+            caption: text.get(row.workout_checkin_id)?.caption ?? null,
+            messages: text.get(row.workout_checkin_id)?.messages ?? [],
             activityPhotoUrl:
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
@@ -999,6 +1017,36 @@ async function proof(request: Request, path: string): Promise<Response> {
       return reply(
         ok({ workoutCheckinId: detailed[1], details: rows[0]?.data }),
       );
+    }
+    const written = proofWrite.exec(path);
+    if (written && request.method === "POST") {
+      const [, id, kind] = written;
+      if (kind === "caption") {
+        if (typeof body.caption !== "string" || body.caption.length > 300)
+          return reply(fail("invalid_request", 400));
+        const rows = (
+          await query(
+            actor,
+            "select app_private.set_checkin_caption($1,$2,$3) as caption",
+            [id, body.caption, now],
+          )
+        ).rows;
+        return reply(ok({ workoutCheckinId: id, caption: rows[0]?.caption }));
+      }
+      if (
+        !uuid(body.id) ||
+        typeof body.body !== "string" ||
+        body.body.length > 400
+      )
+        return reply(fail("invalid_request", 400));
+      await query(actor, "select app_private.post_proof_message($1,$2,$3,$4)", [
+        body.id,
+        id,
+        body.body,
+        now,
+      ]);
+      setImmediate(() => void deliverPush());
+      return reply(ok({ id: body.id, workoutCheckinId: id }));
     }
     const deleted = proofDelete.exec(path);
     if (deleted && request.method === "POST") {
@@ -1457,6 +1505,51 @@ const notificationRoutes = (request: Request, path: string) =>
     return fail("not_found", 404);
   });
 
+const reportCategories = [
+  "sexual_content",
+  "harassment",
+  "threats",
+  "private_information",
+  "dangerous",
+  "other",
+];
+const safetyRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/safety/conduct")
+      return ok({
+        version: await data("select app_private.accept_conduct() as data", []),
+      });
+    if (path === "/v1/safety/block") {
+      if (!uuid(body.membershipId) || typeof body.on !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        blocked: await data(
+          "select app_private.set_safety_block($1,$2,$3) as data",
+          [body.membershipId, body.on, now],
+        ),
+      });
+    }
+    const category = String(body.category ?? "");
+    if (!reportCategories.includes(category)) return invalid();
+    if (path === "/v1/safety/report-message" && uuid(body.messageId))
+      return ok({
+        reported: await data(
+          "select app_private.report_message($1,$2,$3) as data",
+          [body.messageId, category, now],
+        ),
+      });
+    if (path === "/v1/safety/report-member" && uuid(body.membershipId))
+      return ok({
+        reported: await data(
+          "select app_private.report_member($1,$2,$3) as data",
+          [body.membershipId, category, now],
+        ),
+      });
+    return invalid();
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1467,6 +1560,7 @@ const extraRoutes: Array<
   ["/v1/home/", homeExtras],
   ["/v1/exceptions/", exceptionRoutes],
   ["/v1/missed/", missedRoutes],
+  ["/v1/safety/", safetyRoutes],
 ];
 function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/enrollment" && request.method === "POST")

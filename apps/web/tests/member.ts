@@ -36,6 +36,7 @@ export const homeExtras = (overrides: Record<string, unknown> = {}) => ({
   season: null,
   unlocks: [],
   unreadNotifications: 0,
+  safety: { conductAccepted: false, blocked: [] },
   ...overrides,
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
 import { persistentMap } from "./persist";
 import { call } from "./proof";
+import { rememberSafety } from "./Safety";
 
 export type ExceptionCategory =
   | "health_safety"
@@ -85,6 +86,7 @@ export type HomeExtras = {
   season: SeasonState | null;
   unlocks: CardUnlock[];
   unreadNotifications: number;
+  safety: { conductAccepted: boolean; blocked: string[] };
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
@@ -92,6 +94,7 @@ export const emptyExtras: HomeExtras = {
   season: null,
   unlocks: [],
   unreadNotifications: 0,
+  safety: { conductAccepted: false, blocked: [] },
 };
 
 const cache = persistentMap<HomeExtras>("extras");
@@ -131,6 +134,7 @@ export function useHomeExtras(
       .then((next) => {
         if (!live) return;
         const merged = merge(next);
+        rememberSafety(merged.safety);
         cache.set(cacheKey, merged);
         setExtras(merged);
       })

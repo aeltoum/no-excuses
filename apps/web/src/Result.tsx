@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Notice = {
@@ -18,6 +18,12 @@ export function useNotice() {
 }
 
 export function Result({ notice }: { notice: Notice }) {
+  // Chosen after commit, so a sheet closing in the same update is no longer the target.
+  const [target, setTarget] = useState<Element | null>(null);
+  useLayoutEffect(() => {
+    void notice;
+    setTarget(document.querySelector('[role="dialog"]') ?? document.body);
+  }, [notice]);
   if (!notice) return null;
   const message = (
     <p
@@ -29,8 +35,7 @@ export function Result({ notice }: { notice: Notice }) {
   );
   return notice.persistent
     ? message
-    : createPortal(
-        message,
-        document.querySelector('[role="dialog"]') ?? document.body,
-      );
+    : target
+      ? createPortal(message, target)
+      : null;
 }

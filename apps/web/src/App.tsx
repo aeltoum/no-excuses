@@ -14,6 +14,7 @@ import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
 import { removeAllProof } from "./proof";
 import { Result, useNotice } from "./Result";
+import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
@@ -279,6 +280,10 @@ export function App({
   >([]);
   const [manageGroup, setManageGroup] = useState(false);
   const [crewNameDraft, setCrewNameDraft] = useState("");
+  const [safetyMember, setSafetyMember] = useState<{
+    membershipId: string;
+    displayName: string;
+  } | null>(null);
   const [inviteReady, setInviteReady] = useState<{
     email: string;
     token: string;
@@ -1633,6 +1638,18 @@ export function App({
                                 {member.creator ? " · Admin" : ""}
                               </span>
                             </span>
+                            {!manageGroup &&
+                              member.membershipId !==
+                                membership.membershipId && (
+                                <button
+                                  className="row-action row-more"
+                                  type="button"
+                                  aria-label={`More for ${member.displayName}`}
+                                  onClick={() => setSafetyMember(member)}
+                                >
+                                  ⋯
+                                </button>
+                              )}
                             {manageGroup &&
                               member.membershipId !==
                                 membership.membershipId && (
@@ -1878,6 +1895,13 @@ export function App({
                           </button>
                         </form>
                       )}
+                      <MemberSafety
+                        apiBaseUrl={apiBaseUrl}
+                        token={session?.access_token ?? ""}
+                        member={safetyMember}
+                        onClose={() => setSafetyMember(null)}
+                        onNotice={setNotice}
+                      />
                       <GroupAdmin
                         apiBaseUrl={apiBaseUrl}
                         token={session?.access_token ?? ""}

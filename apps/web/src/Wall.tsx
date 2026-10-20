@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
 import { detailLine } from "./details";
+import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
 import {
   actOnProof,
@@ -15,6 +16,7 @@ import {
 } from "./proof";
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
+import { useConduct } from "./Safety";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
 
@@ -135,6 +137,17 @@ export function ProofFeed({
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
+  const [conductSheet, ensureConduct] = useConduct(apiBaseUrl, token);
+  const confirmReport = useCallback(
+    () =>
+      ask({
+        title: "Report this message?",
+        body: "It’s hidden for everyone right away and the operator reviews it. The writer isn’t told who reported it.",
+        confirm: "Report message",
+        tone: "danger",
+      }),
+    [ask],
+  );
 
   useEffect(() => {
     void revision;
@@ -464,6 +477,16 @@ export function ProofFeed({
             cachedReactors={() => cachedReactors(item.workoutCheckinId)}
           />
         )}
+        {!item.hidden && (
+          <PostText
+            item={item}
+            apiBaseUrl={apiBaseUrl}
+            token={token}
+            ensureConduct={ensureConduct}
+            confirmReport={confirmReport}
+            onNotice={setNotice}
+          />
+        )}
         {item.reviewStatus === "questioned" && (
           <p className="proof-tally">
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}
@@ -564,6 +587,7 @@ export function ProofFeed({
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
       {confirmSheet}
+      {conductSheet}
       {state === "loading" ? (
         <p role="status" className="proof-feed-note">
           Loading proof…

@@ -3150,3 +3150,75 @@ textarea:focus-visible {
   display: grid;
   gap: 16px;
 }
+
+/* Member text and safety */
+.post-text {
+  margin-top: 8px;
+}
+.post-caption {
+  margin: 0 0 6px;
+}
+.post-messages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.post-messages li {
+  padding: 4px 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.post-report,
+.post-more {
+  min-height: 32px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.post-text-actions {
+  display: flex;
+  gap: 12px;
+}
+.post-text-actions .text-button {
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.post-compose {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  margin-top: 6px;
+}
+.post-compose button {
+  width: auto;
+  padding-inline: 12px;
+}
+.row-more {
+  font-size: 1.3rem;
+  text-decoration: none;
+  min-width: 44px;
+}
+.member-safety,
+.conduct-rules {
+  display: grid;
+  gap: 12px;
+}
+.conduct-rules ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.report-categories {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.report-categories legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.report-categories button {
+  background: var(--ground);
+  color: var(--ink);
+}
