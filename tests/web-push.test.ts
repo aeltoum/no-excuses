@@ -103,7 +103,13 @@ describe("Web Push notifications", () => {
     await db.query(
       "select app_private.enqueue_push_notifications('2026-03-08T13:00Z')",
     );
+    // Members without a device get it in the app's notification list too.
     expect(await outbox(db)).toEqual([
+      {
+        account_id: admin,
+        title: "Less than 24 hours left",
+        body: "You have 0 of 3 workouts. No excuses.",
+      },
       {
         account_id: peer,
         title: "Less than 24 hours left",

@@ -1,4 +1,5 @@
 import { ApiError, requestTimeoutMs, wakeTimeoutMs } from "./api-client";
+import type { WorkoutDetails } from "./details";
 import { onClearPersisted } from "./persist";
 
 export type ProofItem = {
@@ -21,6 +22,11 @@ export type ProofItem = {
   eligibleVoters: number;
   canReview: boolean;
   canVote: boolean;
+  // Feeds cached before post deletion lack it.
+  canDelete?: boolean;
+  details?: WorkoutDetails | null;
+  caption?: string | null;
+  messages?: ProofMessage[];
   activityPhotoUrl: string | null;
   presencePhotoUrl: string | null;
   reactions: ReactionCount[];
@@ -28,6 +34,13 @@ export type ProofItem = {
 };
 
 export type ReactionCount = { emoji: string; count: number };
+export type ProofMessage = {
+  id: string;
+  name: string;
+  mine: boolean;
+  body: string;
+  at: string;
+};
 // Members may leave up to this many distinct emoji on one post.
 export const reactionLimit = 6;
 
@@ -38,7 +51,7 @@ export type ProofAction =
   | "report"
   | "moderate";
 
-async function call<T>(
+export async function call<T>(
   baseUrl: string,
   token: string,
   path: string,
@@ -99,6 +112,65 @@ export const actOnProof = (
   call<{ status: string }>(baseUrl, token, `/v1/proof/${id}/${action}`, {
     method: "POST",
     body: { choice },
+  });
+
+export const deleteProof = (baseUrl: string, token: string, id: string) =>
+  call<{ workoutCheckinId: string; currentWeekCount: number }>(
+    baseUrl,
+    token,
+    `/v1/proof/${id}/delete`,
+    { method: "POST", body: {} },
+  );
+
+export const setProofDetails = (
+  baseUrl: string,
+  token: string,
+  id: string,
+  details: WorkoutDetails,
+) =>
+  call<{ details: WorkoutDetails }>(baseUrl, token, `/v1/proof/${id}/details`, {
+    method: "POST",
+    body: { details },
+  });
+
+export const postMessage = (
+  baseUrl: string,
+  token: string,
+  checkinId: string,
+  id: string,
+  body: string,
+) =>
+  call(baseUrl, token, `/v1/proof/${checkinId}/message`, {
+    method: "POST",
+    body: { id, body },
+  });
+
+export const setCaption = (
+  baseUrl: string,
+  token: string,
+  checkinId: string,
+  caption: string,
+) =>
+  call<{ caption: string }>(baseUrl, token, `/v1/proof/${checkinId}/caption`, {
+    method: "POST",
+    body: { caption },
+  });
+
+export const reportMessage = (
+  baseUrl: string,
+  token: string,
+  messageId: string,
+  category: string,
+) =>
+  call(baseUrl, token, "/v1/safety/report-message", {
+    method: "POST",
+    body: { messageId, category },
+  });
+
+export const removeAllProof = (baseUrl: string, token: string) =>
+  call<{ removed: number }>(baseUrl, token, "/v1/proof/remove-all", {
+    method: "POST",
+    body: {},
   });
 
 export const reactToProof = (

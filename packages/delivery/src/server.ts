@@ -221,11 +221,22 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_push_notifications(now())");
     await pool.query("select app_private.enqueue_consequence_push(now())");
     await pool.query("select app_private.enqueue_social_push(now())");
+    await pool.query("select app_private.enqueue_exception_push(now())");
+    await pool.query("select app_private.enqueue_missed_response_push(now())");
+    await pool.query("select app_private.enqueue_crown_push(now())");
+    await pool.query("select app_private.enqueue_unlock_push(now())");
+    await pool.query("select app_private.enqueue_digest(now())");
+    await pool.query("select app_private.enqueue_message_push(now())");
     const pending = await pool.query(
-      "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
+      "select * from app_private.pending_push(200)",
     );
     const sent = new Set<string>();
     for (const row of pending.rows) {
+      // Muted social items stay in the app's notification list only.
+      if (row.muted) {
+        sent.add(String(row.outbox_id));
+        continue;
+      }
       try {
         await webpush.sendNotification(
           {
@@ -265,6 +276,7 @@ async function maintenance() {
   try {
     await pool.query("select app_private.advance_true_mvp_weeks(now())");
     await pool.query("select app_private.advance_consequences(now())");
+    await pool.query("select app_private.advance_crowns(now())");
     const pending = await pool.query(
       "select auth_user_id from app_private.accounts where status='deleted' and auth_deleted_at is null limit 50",
     );
@@ -813,6 +825,9 @@ async function push(request: Request): Promise<Response> {
 const proofAction =
   /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
 const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
+const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
+const proofDetails = /^\/v1\/proof\/([0-9a-f-]{36})\/details$/;
+const proofWrite = /^\/v1\/proof\/([0-9a-f-]{36})\/(caption|message)$/;
 const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
 // One standard emoji, including skin tones, flags, and joined sequences.
 const singleEmoji =
@@ -860,9 +875,23 @@ async function proof(request: Request, path: string): Promise<Response> {
       );
     }
     if (path === "/v1/proof/feed" && request.method === "GET") {
+      const hidden = new Set(
+        (
+          await query(
+            actor,
+            "select app_private.block_hidden_posts($1) as id",
+            [now],
+          )
+        ).rows.map((row) => row.id as string),
+      );
       const rows = (
         await query(actor, "select * from app_private.proof_feed($1)", [now])
-      ).rows;
+      ).rows.filter((row) => !hidden.has(row.workout_checkin_id as string));
+      const text = new Map(
+        (
+          await query(actor, "select * from app_private.proof_text($1)", [now])
+        ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
       const reactions = new Map(
         (
           await query(
@@ -871,6 +900,13 @@ async function proof(request: Request, path: string): Promise<Response> {
             [now],
           )
         ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
+      const details = new Map(
+        (
+          await query(actor, "select * from app_private.proof_details($1)", [
+            now,
+          ])
+        ).rows.map((row) => [row.workout_checkin_id as string, row.details]),
       );
       const paths = rows.flatMap((row) => [
         row.activity_photo_path as string,
@@ -911,6 +947,10 @@ async function proof(request: Request, path: string): Promise<Response> {
             eligibleVoters: row.eligible_voters,
             canReview: row.can_review,
             canVote: row.can_vote,
+            canDelete: row.can_delete,
+            details: details.get(row.workout_checkin_id) ?? null,
+            caption: text.get(row.workout_checkin_id)?.caption ?? null,
+            messages: text.get(row.workout_checkin_id)?.messages ?? [],
             activityPhotoUrl:
               urls.get(row.activity_photo_path as string) ?? null,
             presencePhotoUrl:
@@ -957,6 +997,92 @@ async function proof(request: Request, path: string): Promise<Response> {
       ]);
       if (on) setImmediate(() => void deliverPush());
       return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
+    }
+    const detailed = proofDetails.exec(path);
+    if (detailed && request.method === "POST") {
+      const value = body.details;
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        JSON.stringify(value).length > 4000
+      )
+        return reply(fail("invalid_request", 400));
+      const rows = (
+        await query(
+          actor,
+          "select app_private.set_checkin_details($1,$2::jsonb,$3) as data",
+          [detailed[1], JSON.stringify(value), now],
+        )
+      ).rows;
+      return reply(
+        ok({ workoutCheckinId: detailed[1], details: rows[0]?.data }),
+      );
+    }
+    const written = proofWrite.exec(path);
+    if (written && request.method === "POST") {
+      const [, id, kind] = written;
+      if (kind === "caption") {
+        if (typeof body.caption !== "string" || body.caption.length > 300)
+          return reply(fail("invalid_request", 400));
+        const rows = (
+          await query(
+            actor,
+            "select app_private.set_checkin_caption($1,$2,$3) as caption",
+            [id, body.caption, now],
+          )
+        ).rows;
+        return reply(ok({ workoutCheckinId: id, caption: rows[0]?.caption }));
+      }
+      if (
+        !uuid(body.id) ||
+        typeof body.body !== "string" ||
+        body.body.length > 400
+      )
+        return reply(fail("invalid_request", 400));
+      await query(actor, "select app_private.post_proof_message($1,$2,$3,$4)", [
+        body.id,
+        id,
+        body.body,
+        now,
+      ]);
+      setImmediate(() => void deliverPush());
+      return reply(ok({ id: body.id, workoutCheckinId: id }));
+    }
+    const deleted = proofDelete.exec(path);
+    if (deleted && request.method === "POST") {
+      const result = (
+        await query(
+          actor,
+          "select app_private.delete_own_checkin($1,$2) as data",
+          [deleted[1], now],
+        )
+      ).rows[0]?.data as { currentWeekCount: number; paths: string[] };
+      // Photos go now when storage answers; otherwise the unused-upload sweep takes them.
+      if (result.paths.length > 0)
+        void storage(`/object/${proofBucket}`, "DELETE", {
+          prefixes: result.paths,
+        })
+          .then(() =>
+            pool.query(
+              "select app_private.mark_proof_uploads_deleted($1, now())",
+              [result.paths],
+            ),
+          )
+          .catch(() => console.error("Deleted post photos pending sweep"));
+      return reply(
+        ok({
+          workoutCheckinId: deleted[1],
+          currentWeekCount: result.currentWeekCount,
+        }),
+      );
+    }
+    if (path === "/v1/proof/remove-all" && request.method === "POST") {
+      const rows = (
+        await query(actor, "select app_private.remove_all_my_proof($1) as n", [
+          now,
+        ])
+      ).rows;
+      return reply(ok({ removed: rows[0]?.n ?? 0 }));
     }
     const match = proofAction.exec(path);
     if (match && request.method === "POST") {
@@ -1162,6 +1288,427 @@ async function consequences(request: Request, path: string): Promise<Response> {
   }
 }
 
+type MemberCall = {
+  actor: Actor;
+  body: Record<string, unknown>;
+  method: string;
+  now: string;
+  // Runs one SQL statement as the member and returns its first row's `data` column.
+  data: (sql: string, values: unknown[]) => Promise<unknown>;
+};
+// Shared shell for the newer member routes: auth, JSON body, and database errors.
+async function memberRoute(
+  request: Request,
+  handle: (call: MemberCall) => Promise<ApiResponse>,
+): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  let body: Record<string, unknown> = {};
+  if (request.method === "POST") {
+    try {
+      const parsed = (await request.json()) ?? {};
+      if (typeof parsed !== "object" || Array.isArray(parsed))
+        return reply(fail("invalid_request", 400));
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+  }
+  const signed = actor;
+  try {
+    return reply(
+      await handle({
+        actor: signed,
+        body,
+        method: request.method,
+        now: new Date().toISOString(),
+        data: async (sql, values) =>
+          (await query(signed, sql, values)).rows[0]?.data,
+      }),
+    );
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+const invalid = () => fail("invalid_request", 400);
+
+const groupRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/group/settings" && method === "GET")
+      return ok(
+        await data("select app_private.group_settings($1) as data", [now]),
+      );
+    if (path === "/v1/group/activity" && method === "GET")
+      return ok(
+        await data("select app_private.group_activity($1) as data", [now]),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/group/rename") {
+      if (typeof body.name !== "string" || body.name.length > 200)
+        return invalid();
+      return ok(
+        await data("select app_private.rename_group($1,$2) as data", [
+          body.name,
+          now,
+        ]),
+      );
+    }
+    if (path === "/v1/group/admin") {
+      if (!uuid(body.membershipId) || typeof body.admin !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        admin: await data(
+          "select app_private.set_group_admin($1,$2,$3) as data",
+          [body.membershipId, body.admin, now],
+        ),
+      });
+    }
+    if (path === "/v1/group/settings") {
+      if (
+        typeof body.timeZone !== "string" ||
+        body.timeZone.length > 64 ||
+        !Number.isInteger(body.weekStarts)
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_group_settings($1,$2::smallint,$3) as data",
+          [body.timeZone, body.weekStarts, now],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const homeExtras = (request: Request, path: string) =>
+  memberRoute(request, async ({ method, now, data }) =>
+    path === "/v1/home/extras" && method === "GET"
+      ? ok(await data("select app_private.home_extras($1) as data", [now]))
+      : fail("not_found", 404),
+  );
+
+const exceptionCategories = [
+  "health_safety",
+  "family_caregiving",
+  "schedule_disruption",
+  "travel_access",
+  "planned_recovery",
+  "private",
+];
+const exceptionAction =
+  /^\/v1\/exceptions\/([0-9a-f-]{36})\/(respond|withdraw)$/;
+const exceptionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    const after = (value: unknown) => {
+      setImmediate(() => void deliverPush());
+      return ok(value);
+    };
+    if (path === "/v1/exceptions/request") {
+      const note = body.note ?? null;
+      if (
+        !uuid(body.id) ||
+        (body.week !== "current" && body.week !== "next") ||
+        !exceptionCategories.includes(String(body.category)) ||
+        (note !== null && (typeof note !== "string" || note.length > 280))
+      )
+        return invalid();
+      return after(
+        await data(
+          "select app_private.request_exception($1,$2,$3,$4,$5) as data",
+          [body.id, body.week, body.category, note, now],
+        ),
+      );
+    }
+    const match = exceptionAction.exec(path);
+    if (!match) return fail("not_found", 404);
+    if (match[2] === "withdraw")
+      return after(
+        await data("select app_private.withdraw_exception($1,$2) as data", [
+          match[1],
+          now,
+        ]),
+      );
+    if (!["approve", "deny", "abstain"].includes(String(body.response)))
+      return invalid();
+    return after(
+      await data("select app_private.respond_to_exception($1,$2,$3) as data", [
+        match[1],
+        body.response,
+        now,
+      ]),
+    );
+  });
+
+const missedResponses = [
+  "next_week",
+  "got_you",
+  "bounce_back",
+  "rest_up",
+  "no_excuses",
+];
+const missedAction = /^\/v1\/missed\/([0-9a-f-]{36})\/respond$/;
+const missedRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = missedAction.exec(path);
+    if (!match || method !== "POST") return fail("not_found", 404);
+    const response = body.response ?? null;
+    if (response !== null && !missedResponses.includes(String(response)))
+      return invalid();
+    const value = await data(
+      "select app_private.respond_to_missed_week($1,$2,$3) as data",
+      [match[1], response, now],
+    );
+    setImmediate(() => void deliverPush());
+    return ok(value);
+  });
+
+const notificationRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/notifications" && method === "GET")
+      return ok(
+        await data("select app_private.notification_center($1) as data", [now]),
+      );
+    if (path === "/v1/notifications/seen" && method === "POST")
+      return ok({
+        seen: await data(
+          "select app_private.mark_notifications_seen($1) as data",
+          [now],
+        ),
+      });
+    if (path === "/v1/notifications/prefs" && method === "POST") {
+      const flag = (value: unknown) =>
+        value === undefined || typeof value === "boolean";
+      const hour = body.digestHour;
+      if (
+        !flag(body.socialPush) ||
+        !flag(body.digest) ||
+        (hour !== undefined &&
+          (!Number.isInteger(hour) || Number(hour) < 0 || Number(hour) > 23))
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_notification_prefs($1,$2,$3::smallint) as data",
+          [body.socialPush ?? null, body.digest ?? null, hour ?? null],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const reportCategories = [
+  "sexual_content",
+  "harassment",
+  "threats",
+  "private_information",
+  "dangerous",
+  "other",
+];
+const safetyRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/safety/conduct")
+      return ok({
+        version: await data("select app_private.accept_conduct() as data", []),
+      });
+    if (path === "/v1/safety/block") {
+      if (!uuid(body.membershipId) || typeof body.on !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        blocked: await data(
+          "select app_private.set_safety_block($1,$2,$3) as data",
+          [body.membershipId, body.on, now],
+        ),
+      });
+    }
+    const category = String(body.category ?? "");
+    if (!reportCategories.includes(category)) return invalid();
+    if (path === "/v1/safety/report-message" && uuid(body.messageId))
+      return ok({
+        reported: await data(
+          "select app_private.report_message($1,$2,$3) as data",
+          [body.messageId, category, now],
+        ),
+      });
+    if (path === "/v1/safety/report-member" && uuid(body.membershipId))
+      return ok({
+        reported: await data(
+          "select app_private.report_member($1,$2,$3) as data",
+          [body.membershipId, category, now],
+        ),
+      });
+    return invalid();
+  });
+
+type ConsoleCase = { photoPaths?: string[] | null; photoUrls?: string[] };
+// Reported photo pairs reach the operator as short-lived signed URLs.
+async function withCasePhotos(console: unknown) {
+  const cases = (console as { cases?: ConsoleCase[] })?.cases ?? [];
+  const paths = cases.flatMap((item) => item.photoPaths ?? []);
+  const urls = new Map<string, string>();
+  if (paths.length > 0) {
+    const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+      expiresIn: 900,
+      paths,
+    })) as Array<{ path?: string; signedURL?: string }>;
+    for (const item of signed)
+      if (item.path && item.signedURL)
+        urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+  }
+  for (const item of cases) {
+    item.photoUrls = (item.photoPaths ?? []).flatMap((path) => {
+      const url = urls.get(path);
+      return url ? [url] : [];
+    });
+    delete item.photoPaths;
+  }
+  return console;
+}
+const operatorRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/operator" && method === "GET")
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_console($1) as data", [now]),
+        ),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/operator/resolve") {
+      if (
+        !anyUuid(body.caseId) ||
+        !["dismiss", "remove", "suspend", "terminate"].includes(
+          String(body.action),
+        )
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_resolve_case($1,$2,$3) as data",
+            [body.caseId, body.action, now],
+          ),
+        ),
+      );
+    }
+    if (path === "/v1/operator/reinstate") {
+      if (!uuid(body.accountId)) return invalid();
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_reinstate($1,$2) as data", [
+            body.accountId,
+            now,
+          ]),
+        ),
+      );
+    }
+    if (path === "/v1/operator/hold") {
+      const open = body.open === true;
+      if (
+        typeof body.open !== "boolean" ||
+        (open &&
+          (!uuid(body.groupId) ||
+            (body.membershipId != null && !uuid(body.membershipId)) ||
+            typeof body.reason !== "string" ||
+            !body.reason.trim() ||
+            body.reason.length > 200)) ||
+        (!open && !anyUuid(body.holdId))
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_set_hold($1,$2,$3,$4,$5,$6) as data",
+            [
+              body.groupId ?? null,
+              body.membershipId ?? null,
+              body.reason ?? "",
+              open,
+              body.holdId ?? null,
+              now,
+            ],
+          ),
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const sessionAction = /^\/v1\/sessions\/([0-9a-f-]{36})\/(start|end|link)$/;
+const sessionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = sessionAction.exec(path);
+    if (!match || method !== "POST" || !uuid(match[1]))
+      return fail("not_found", 404);
+    const [, id, action] = match;
+    if (action === "start")
+      return ok(
+        await data("select app_private.start_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (action === "end")
+      return ok(
+        await data("select app_private.end_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (!uuid(body.workoutCheckinId)) return invalid();
+    return ok({
+      linked: await data(
+        "select app_private.link_session_checkin($1,$2,$3) as data",
+        [id, body.workoutCheckinId, now],
+      ),
+    });
+  });
+
+// Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
+const extraRoutes: Array<
+  [string, (request: Request, path: string) => Promise<Response>]
+> = [
+  ["/v1/proof/", proof],
+  ["/v1/consequences/", consequences],
+  ["/v1/group/", groupRoutes],
+  ["/v1/home/", homeExtras],
+  ["/v1/exceptions/", exceptionRoutes],
+  ["/v1/missed/", missedRoutes],
+  ["/v1/safety/", safetyRoutes],
+  ["/v1/sessions/", sessionRoutes],
+];
+function dispatch(request: Request, path: string): Promise<Response> {
+  if (path === "/v1/enrollment" && request.method === "POST")
+    return enrollment(request);
+  if (path === "/v1/consent" && request.method === "POST")
+    return consent(request);
+  if (path === "/v1/push" && ["GET", "POST", "DELETE"].includes(request.method))
+    return push(request);
+  if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
+    return nudges(request);
+  if (path === "/v1/consequences") return consequences(request, path);
+  if (path === "/v1/account/export" && request.method === "GET")
+    return memberRoute(request, async ({ now, data }) =>
+      ok(await data("select app_private.account_export($1) as data", [now])),
+    );
+  if (path === "/v1/operator" || path.startsWith("/v1/operator/"))
+    return operatorRoutes(request, path);
+  if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
+    return notificationRoutes(request, path);
+  for (const [prefix, handler] of extraRoutes)
+    if (path.startsWith(prefix)) return handler(request, path);
+  return route(request);
+}
+
 const server = createServer(async (incoming, outgoing) => {
   const origin = incoming.headers.origin;
   if (origin && origin !== allowedOrigin) {
@@ -1197,22 +1744,7 @@ const server = createServer(async (incoming, outgoing) => {
         : Buffer.concat(chunks),
     });
     const path = new URL(request.url).pathname;
-    const response =
-      path === "/v1/enrollment" && request.method === "POST"
-        ? await enrollment(request)
-        : path === "/v1/consent" && request.method === "POST"
-          ? await consent(request)
-          : path === "/v1/push" &&
-              ["GET", "POST", "DELETE"].includes(request.method)
-            ? await push(request)
-            : path === "/v1/nudges" && ["GET", "POST"].includes(request.method)
-              ? await nudges(request)
-              : path.startsWith("/v1/proof/")
-                ? await proof(request, path)
-                : path === "/v1/consequences" ||
-                    path.startsWith("/v1/consequences/")
-                  ? await consequences(request, path)
-                  : await route(request);
+    const response = await dispatch(request, path);
     outgoing
       .writeHead(response.status, {
         "content-type": "application/json",

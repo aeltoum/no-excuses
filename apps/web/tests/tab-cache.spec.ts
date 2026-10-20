@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { homeExtras } from "./member";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
@@ -90,6 +91,11 @@ test("member tabs retain data while background refresh resolves", async ({
     }
     if (path.endsWith("/pending-invitations")) return ok([]);
     if (path.endsWith("/display-name")) return ok({ displayName: "Akrum" });
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");
@@ -215,6 +221,11 @@ test("private tab cache ends at sign-out and new account sign-in", async ({
     if (path.endsWith("/pending-invitations")) return ok([]);
     if (path.endsWith("/display-name"))
       return ok({ displayName: second ? "Second" : "First" });
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   const signIn = async (email: string) => {

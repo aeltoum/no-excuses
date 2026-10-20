@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { detailLine } from "./details";
+import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
 import {
   actOnProof,
   cachedReactors,
+  deleteProof,
   loadProofFeed,
   loadReactors,
   type ProofAction,
@@ -13,6 +16,7 @@ import {
 } from "./proof";
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
+import { useConduct } from "./Safety";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
 
@@ -110,6 +114,7 @@ export function ProofFeed({
   cacheKey,
   onRevoked,
   onItems,
+  onDeleted,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -117,6 +122,7 @@ export function ProofFeed({
   cacheKey: string;
   onRevoked: () => void;
   onItems: (items: ProofItem[]) => void;
+  onDeleted?: (currentWeekCount: number) => void;
 }) {
   const [items, setItems] = useState<ProofItem[]>(
     () => cachedFeed(cacheKey) ?? [],
@@ -131,6 +137,17 @@ export function ProofFeed({
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
+  const [conductSheet, ensureConduct] = useConduct(apiBaseUrl, token);
+  const confirmReport = useCallback(
+    () =>
+      ask({
+        title: "Report this message?",
+        body: "It’s hidden for everyone right away and the operator reviews it. The writer isn’t told who reported it.",
+        confirm: "Report message",
+        tone: "danger",
+      }),
+    [ask],
+  );
 
   useEffect(() => {
     void revision;
@@ -288,6 +305,39 @@ export function ProofFeed({
     [apiBaseUrl, token, onRevoked, setNotice],
   );
 
+  // Deleting cannot be undone, so only its button waits on the server.
+  const remove = useCallback(
+    async (item: ProofItem) => {
+      const id = item.workoutCheckinId;
+      setBusy(id);
+      try {
+        const result = await deleteProof(apiBaseUrl, token, id);
+        const keep = (list: ProofItem[]) =>
+          list.filter((entry) => entry.workoutCheckinId !== id);
+        setItems(keep);
+        feedCache.set(cacheKey, keep(feedCache.get(cacheKey) ?? []));
+        onDeleted?.(result.currentWeekCount);
+        setNotice({
+          kind: "success",
+          text: "Post deleted. It no longer counts, so log a new one any time this week.",
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.kind === "unauthorized")
+          onRevoked();
+        setNotice({
+          kind: "error",
+          text:
+            error instanceof ApiError
+              ? error.message
+              : "Couldn’t delete. Try again.",
+        });
+      } finally {
+        setBusy((current) => (current === id ? null : current));
+      }
+    },
+    [apiBaseUrl, token, cacheKey, onDeleted, onRevoked, setNotice],
+  );
+
   // A choice already made, here or on another device, needs no buttons.
   const needsReview = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canReview;
@@ -356,6 +406,9 @@ export function ProofFeed({
             </span>
           )}
         </div>
+        {item.details && (
+          <p className="proof-details">{detailLine(item.details)}</p>
+        )}
         {(needsReview(item) || needsVote(item)) && (
           // Referee light box: the photo sits on a base holding white and red lamps.
           <fieldset
@@ -395,6 +448,23 @@ export function ProofFeed({
             </button>
           </fieldset>
         )}
+        {needsVote(item) && (
+          <button
+            type="button"
+            className="proof-report"
+            disabled={disabled}
+            onClick={() =>
+              void act(
+                item,
+                "vote",
+                "cannot_assess",
+                "Marked can’t tell. You won’t be reminded again.",
+              )
+            }
+          >
+            Can’t tell from these photos
+          </button>
+        )}
         {!item.hidden && (!item.mine || reactionList(item).length > 0) && (
           <Reactions
             reactions={reactionList(item)}
@@ -405,6 +475,36 @@ export function ProofFeed({
               loadReactors(apiBaseUrl, token, item.workoutCheckinId)
             }
             cachedReactors={() => cachedReactors(item.workoutCheckinId)}
+          />
+        )}
+        {!item.hidden && (
+          <PostText
+            item={item}
+            apiBaseUrl={apiBaseUrl}
+            token={token}
+            ensureConduct={ensureConduct}
+            confirmReport={confirmReport}
+            onNotice={setNotice}
+            onReportPhotos={
+              item.mine
+                ? undefined
+                : async () => {
+                    if (
+                      await ask({
+                        title: "Report these photos?",
+                        body: "They’ll be hidden from the Group until the Group admin reviews them.",
+                        confirm: "Report photos",
+                        tone: "danger",
+                      })
+                    )
+                      void act(
+                        item,
+                        "report",
+                        "",
+                        "Reported. The photos are hidden.",
+                      );
+                  }
+            }
           />
         )}
         {item.reviewStatus === "questioned" && (
@@ -454,7 +554,7 @@ export function ProofFeed({
             </button>
           </div>
         )}
-        {!item.mine && !item.hidden && (
+        {item.mine && item.canDelete && (
           <button
             type="button"
             className="proof-report"
@@ -462,21 +562,16 @@ export function ProofFeed({
             onClick={async () => {
               if (
                 await ask({
-                  title: "Report these photos?",
-                  body: "They’ll be hidden from the Group until the Group admin reviews them.",
-                  confirm: "Report photos",
+                  title: "Delete this post?",
+                  body: "It stops counting toward this week and its photos are deleted. You can log a new workout right after.",
+                  confirm: "Delete post",
                   tone: "danger",
                 })
               )
-                void act(
-                  item,
-                  "report",
-                  "",
-                  "Reported. The photos are hidden.",
-                );
+                void remove(item);
             }}
           >
-            Report photos
+            {disabled ? "Deleting…" : "Delete post"}
           </button>
         )}
       </li>
@@ -487,6 +582,7 @@ export function ProofFeed({
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
       {confirmSheet}
+      {conductSheet}
       {state === "loading" ? (
         <p role="status" className="proof-feed-note">
           Loading proof…

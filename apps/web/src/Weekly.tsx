@@ -13,16 +13,37 @@ import {
 import { ApiError, type createApiClient } from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
+import {
+  type DetailsDraft,
+  DetailsFields,
+  detailLine,
+  draftDetails,
+  emptyDraft,
+  type WorkoutDetails,
+} from "./details";
+import {
+  clearWorkouts,
+  forgetWorkout,
+  loadWorkouts,
+  saveWorkout,
+} from "./durable";
+import { Exceptions } from "./Exceptions";
+import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
+import { MissedWeeks } from "./MissedWeeks";
 import { onClearPersisted } from "./persist";
 import {
+  call,
   compressPhoto,
   loadNudged,
   nudgeMember,
   type ProofItem,
+  setProofDetails,
   uploadProofPhoto,
 } from "./proof";
 import { Result, useNotice } from "./Result";
+import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
+import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
 
@@ -48,7 +69,8 @@ type ProofPhoto = { id: string; blob: Blob; url: string };
 type Activity = "strength" | "cardio" | "class" | "sport" | "mixed";
 
 // A workout logged on this device that the server has not confirmed yet. Its
-// photos stay in memory for the session so Retry never asks for them again.
+// photos stay on the device (memory and IndexedDB) so Retry never asks for them
+// again, even after a reload.
 type Outgoing = {
   id: string;
   key: string;
@@ -58,6 +80,8 @@ type Outgoing = {
   intensity: "low" | "moderate" | "high";
   activity: ProofPhoto;
   presence: ProofPhoto;
+  details: WorkoutDetails | null;
+  sessionId?: string;
   paths: { activity?: string; presence?: string };
   status: "sending" | "failed" | "sent";
   error?: string;
@@ -67,10 +91,37 @@ type Outgoing = {
 };
 let outbox: Outgoing[] = [];
 const outboxListeners = new Set<() => void>();
+// Mirrors the queue to IndexedDB: unsent workouts are kept, sent or refused ones go.
+const persistOutbox = (previous: Outgoing[], next: Outgoing[]) => {
+  const live = new Set<string>();
+  for (const entry of next) {
+    if (entry.status === "sent" || entry.rejected) continue;
+    live.add(entry.id);
+    void saveWorkout({
+      id: entry.id,
+      key: entry.key,
+      membershipId: entry.membershipId,
+      activityType: entry.activityType,
+      minutes: entry.minutes,
+      intensity: entry.intensity,
+      activity: { id: entry.activity.id, blob: entry.activity.blob },
+      presence: { id: entry.presence.id, blob: entry.presence.blob },
+      details: entry.details,
+      sessionId: entry.sessionId,
+      paths: entry.paths,
+    });
+  }
+  for (const entry of previous)
+    if (!live.has(entry.id)) void forgetWorkout(entry.id);
+};
 const setOutbox = (next: Outgoing[]) => {
+  const previous = outbox;
   outbox = next;
+  persistOutbox(previous, next);
   for (const listener of outboxListeners) listener();
 };
+// Workouts saved by an earlier visit are picked up once per app start.
+let restored = false;
 const patchOutgoing = (id: string, patch: Partial<Outgoing>) =>
   setOutbox(
     outbox.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
@@ -90,6 +141,8 @@ const dropOutgoing = (id: string) => {
 };
 onClearPersisted(() => {
   for (const entry of outbox) dropOutgoing(entry.id);
+  void clearWorkouts();
+  restored = false;
 });
 
 // Uploads both photos and submits the check-in in the background. A retry
@@ -132,11 +185,21 @@ function sendOutgoing(
         entry.key,
       ),
     )
-    .then((response) => {
+    .then(async (response) => {
       if (response.data.workoutCheckinId !== entry.id)
         throw new ApiError(
           "failure",
           "Check-in response did not match this workout.",
+        );
+      // The session link and details are extras: the workout counts either way.
+      if (entry.sessionId)
+        await call(apiBaseUrl, token, `/v1/sessions/${entry.sessionId}/link`, {
+          method: "POST",
+          body: { workoutCheckinId: entry.id },
+        }).catch(() => undefined);
+      if (entry.details)
+        await setProofDetails(apiBaseUrl, token, entry.id, entry.details).catch(
+          () => undefined,
         );
       patchOutgoing(entry.id, {
         status: "sent",
@@ -166,6 +229,8 @@ export function Weekly({
   apiBaseUrl,
   onNavigate,
   onAttention,
+  onUnread,
+  onOperator,
   route,
   api,
   token,
@@ -176,6 +241,8 @@ export function Weekly({
 }: {
   apiBaseUrl: string;
   onAttention: (count: number) => void;
+  onUnread?: (count: number) => void;
+  onOperator?: (operator: boolean) => void;
   onNavigate: (
     event: React.MouseEvent<HTMLAnchorElement>,
     destination: string,
@@ -223,6 +290,9 @@ export function Weekly({
     presence?: ProofPhoto;
   }>({});
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(emptyDraft);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const shots = useCandidates();
   const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
     (entry) => entry.membershipId === membership?.membershipId,
   );
@@ -234,11 +304,30 @@ export function Weekly({
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const [feedAttention, setFeedAttention] = useState(0);
   const [cardAttention, setCardAttention] = useState(0);
-  useEffect(() => {
-    if (route === "/home") onAttention(feedAttention + cardAttention);
-  }, [route, feedAttention, cardAttention, onAttention]);
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
+  const [extras, applyExtras, reloadExtras] = useHomeExtras(
+    apiBaseUrl,
+    token,
+    cacheKey,
+    (route === "/home" || route === "/history") && Boolean(membership),
+    feedRevoked,
+  );
+  const ballotAttention = extras.exceptions.toDecide.filter(
+    (ballot) => !ballot.myResponse,
+  ).length;
+  useEffect(() => {
+    if (route === "/home")
+      onAttention(feedAttention + cardAttention + ballotAttention);
+  }, [route, feedAttention, cardAttention, ballotAttention, onAttention]);
+  useEffect(() => {
+    onUnread?.(extras.unreadNotifications);
+  }, [extras.unreadNotifications, onUnread]);
+  useEffect(() => {
+    onOperator?.(extras.safety.operator === true);
+  }, [extras.safety.operator, onOperator]);
+  const excused = new Set(extras.exceptions.excused);
+  const weekOffPending = new Set(extras.exceptions.pending);
   const feedItems = useCallback((items: ProofItem[]) => {
     const waiting = items.filter(
       (item) => item.canReview || (item.canVote && !item.myVote),
@@ -266,7 +355,12 @@ export function Weekly({
       try {
         const blob = await compressPhoto(file);
         setPhotos((current) => {
-          if (current[kind]) URL.revokeObjectURL(current[kind].url);
+          // Session photos stay listed, so their previews stay alive.
+          if (
+            current[kind] &&
+            !shots.some((shot) => shot.id === current[kind]?.id)
+          )
+            URL.revokeObjectURL(current[kind].url);
           return {
             ...current,
             [kind]: {
@@ -288,6 +382,47 @@ export function Weekly({
   const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
+  // Resend workouts that a reload interrupted, and failed ones once back online.
+  const membershipKey = membership?.membershipId;
+  useEffect(() => {
+    if (!membershipKey || restored) return;
+    restored = true;
+    void loadWorkouts().then((stored) => {
+      for (const item of stored) {
+        if (item.membershipId !== membershipKey) {
+          void forgetWorkout(item.id);
+          continue;
+        }
+        if (outbox.some((entry) => entry.id === item.id)) continue;
+        const photo = (value: { id: string; blob: Blob }) => ({
+          ...value,
+          url: URL.createObjectURL(value.blob),
+        });
+        const entry: Outgoing = {
+          ...item,
+          activityType: item.activityType as Activity,
+          intensity: item.intensity as Outgoing["intensity"],
+          activity: photo(item.activity),
+          presence: photo(item.presence),
+          details: item.details as WorkoutDetails | null,
+          status: "sending",
+        };
+        setOutbox([...outbox, entry]);
+        sendOutgoing(entry, api, apiBaseUrl, token, () => revokeRef.current());
+      }
+    });
+  }, [membershipKey, api, apiBaseUrl, token]);
+  useEffect(() => {
+    const resend = () => {
+      for (const entry of outbox)
+        if (entry.status === "failed" && !entry.rejected)
+          sendOutgoing(entry, api, apiBaseUrl, token, () =>
+            revokeRef.current(),
+          );
+    };
+    window.addEventListener("online", resend);
+    return () => window.removeEventListener("online", resend);
+  }, [api, apiBaseUrl, token]);
   const groupId = membership?.groupId;
   const targetDraft = useRef<{ signature: string; key: string } | null>(null);
   // The target count being saved, so the same save cannot run twice.
@@ -737,16 +872,51 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
-                  {hasStreaks(own) && (
-                    <p className="home-streaks">{streakText(own)}</p>
-                  )}
-                  <a
-                    className="home-target-link"
-                    href="/target"
-                    onClick={(event) => onNavigate(event, "/target")}
-                  >
-                    Change target
-                  </a>
+                  <div className="home-meta">
+                    {hasStreaks(own) && (
+                      <span className="home-streaks">{streakText(own)}</span>
+                    )}
+                    <SeasonChip
+                      season={extras.season}
+                      onOpen={(event) => onNavigate(event, "/history")}
+                    />
+                  </div>
+                  <UnlockNote unlocks={extras.unlocks} />
+                  <div className="home-actions">
+                    <a
+                      className="home-target-link"
+                      href="/target"
+                      onClick={(event) => onNavigate(event, "/target")}
+                    >
+                      Change target
+                    </a>
+                    <SessionCard
+                      apiBaseUrl={apiBaseUrl}
+                      token={token}
+                      extras={extras}
+                      apply={applyExtras}
+                      onNotice={setNotice}
+                      onFinish={(id, minutes) => {
+                        setSessionId(id);
+                        setDuration(String(minutes));
+                        setOtherDuration(
+                          ![20, 30, 45, 60, 90].includes(minutes),
+                        );
+                        if (logBlock) setLockOpen(true);
+                        else setSheetOpen(true);
+                      }}
+                    />
+                    <Exceptions
+                      part="own"
+                      apiBaseUrl={apiBaseUrl}
+                      token={token}
+                      extras={extras}
+                      apply={applyExtras}
+                      reload={reloadExtras}
+                      onNotice={setNotice}
+                      onRevoked={feedRevoked}
+                    />
+                  </div>
                   <ul className="activity-legend" aria-label="Activity colours">
                     {(
                       ["strength", "cardio", "class", "sport", "mixed"] as const
@@ -788,6 +958,17 @@ export function Weekly({
                   cacheKey={cacheKey}
                 />
               )}
+              {own && (
+                <MissedWeeks
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onError={(text) => setNotice({ kind: "error", text })}
+                  onRevoked={feedRevoked}
+                />
+              )}
               {own && progress.length > 1 && (
                 <ul className="friend-cards" aria-label="Friends this week">
                   {progress
@@ -818,38 +999,57 @@ export function Weekly({
                             ? ` · owes ${groupOwed[item.membershipId]}`
                             : ""}
                           {awaitingReview.has(item.membershipId) && " · review"}
+                          {excused.has(item.membershipId)
+                            ? " · excused"
+                            : weekOffPending.has(item.membershipId)
+                              ? " · week off?"
+                              : ""}
                         </span>
                         {hasStreaks(item) && (
                           <span className="friend-streaks">
-                            <span aria-hidden="true">
-                              {item.targetStreak} wk · {item.workoutStreak} in a
-                              row
-                            </span>
+                            {item.targetStreak > 0 && (
+                              <span aria-hidden="true">
+                                🔥 {item.targetStreak} wk
+                              </span>
+                            )}
                             <span className="visually-hidden">
                               {streakText(item)}
                             </span>
                           </span>
                         )}
-                        {item.completedWorkoutCount < item.lockedTarget && (
-                          <button
-                            type="button"
-                            className="secondary-button friend-nudge"
-                            disabled={nudged.has(item.membershipId)}
-                            aria-label={
-                              nudged.has(item.membershipId)
-                                ? `Nudged ${item.displayName} today`
-                                : `Nudge ${item.displayName}`
-                            }
-                            onClick={() => void nudge(item.membershipId)}
-                          >
-                            {nudged.has(item.membershipId)
-                              ? "Nudged ✓"
-                              : "Nudge"}
-                          </button>
-                        )}
+                        {item.completedWorkoutCount < item.lockedTarget &&
+                          !excused.has(item.membershipId) && (
+                            <button
+                              type="button"
+                              className="secondary-button friend-nudge"
+                              disabled={nudged.has(item.membershipId)}
+                              aria-label={
+                                nudged.has(item.membershipId)
+                                  ? `Nudged ${item.displayName} today`
+                                  : `Nudge ${item.displayName}`
+                              }
+                              onClick={() => void nudge(item.membershipId)}
+                            >
+                              {nudged.has(item.membershipId)
+                                ? "Nudged ✓"
+                                : "Nudge"}
+                            </button>
+                          )}
                       </li>
                     ))}
                 </ul>
+              )}
+              {own && (
+                <Exceptions
+                  part="ballots"
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onNotice={setNotice}
+                  onRevoked={feedRevoked}
+                />
               )}
               {own && (
                 <>
@@ -965,6 +1165,8 @@ export function Weekly({
                           intensity,
                           activity: photos.activity,
                           presence: photos.presence,
+                          details: draftDetails(detailsDraft, activityType),
+                          sessionId: sessionId ?? undefined,
                           paths: {},
                           status: "sending",
                         };
@@ -976,6 +1178,12 @@ export function Weekly({
                         setDuration("");
                         setOtherDuration(false);
                         setPhotos({});
+                        setDetailsDraft(emptyDraft());
+                        setSessionId(null);
+                        clearCandidates([
+                          photos.activity.id,
+                          photos.presence.id,
+                        ]);
                         sendOutgoing(entry, api, apiBaseUrl, token, () =>
                           revokeRef.current(),
                         );
@@ -1067,6 +1275,11 @@ export function Weekly({
                           )}
                         </div>
                       </fieldset>
+                      <DetailsFields
+                        activity={activityType}
+                        draft={detailsDraft}
+                        onChange={setDetailsDraft}
+                      />
                       <fieldset>
                         <legend>Proof photos</legend>
                         <div className="proof-capture">
@@ -1086,39 +1299,67 @@ export function Weekly({
                               ],
                             ] as const
                           ).map(([kind, title, facing, hint]) => (
-                            <label className="proof-capture-slot" key={kind}>
-                              {photos[kind] ? (
-                                <img
-                                  src={photos[kind].url}
-                                  alt={
-                                    kind === "activity"
-                                      ? "Activity preview"
-                                      : "Your presence preview"
+                            <div className="proof-capture-cell" key={kind}>
+                              <label className="proof-capture-slot">
+                                {photos[kind] ? (
+                                  <img
+                                    src={photos[kind].url}
+                                    alt={
+                                      kind === "activity"
+                                        ? "Activity preview"
+                                        : "Your presence preview"
+                                    }
+                                  />
+                                ) : (
+                                  <span
+                                    className="proof-capture-plus"
+                                    aria-hidden="true"
+                                  >
+                                    +
+                                  </span>
+                                )}
+                                <strong>
+                                  {photos[kind]
+                                    ? `Retake ${title.toLowerCase()}`
+                                    : title}
+                                </strong>
+                                <small>{hint}</small>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture={facing}
+                                  onChange={(event) =>
+                                    void choosePhoto(kind)(event)
                                   }
                                 />
-                              ) : (
-                                <span
-                                  className="proof-capture-plus"
-                                  aria-hidden="true"
+                              </label>
+                              {shots.length > 0 && (
+                                <fieldset
+                                  className="session-pick"
+                                  aria-label={`Use a session photo as ${title.toLowerCase()}`}
                                 >
-                                  +
-                                </span>
+                                  {shots.map((shot, index) => (
+                                    <button
+                                      type="button"
+                                      key={shot.id}
+                                      aria-pressed={
+                                        photos[kind]?.id === shot.id
+                                      }
+                                      aria-label={`Session photo ${index + 1}`}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        setPhotos((current) => ({
+                                          ...current,
+                                          [kind]: shot,
+                                        }));
+                                      }}
+                                    >
+                                      <img src={shot.url} alt="" />
+                                    </button>
+                                  ))}
+                                </fieldset>
                               )}
-                              <strong>
-                                {photos[kind]
-                                  ? `Retake ${title.toLowerCase()}`
-                                  : title}
-                              </strong>
-                              <small>{hint}</small>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture={facing}
-                                onChange={(event) =>
-                                  void choosePhoto(kind)(event)
-                                }
-                              />
-                            </label>
+                            </div>
                           ))}
                         </div>
                         {photoError && (
@@ -1188,6 +1429,11 @@ export function Weekly({
                           {entry.activityType.slice(1)} · {entry.minutes} min
                         </span>
                       </div>
+                      {entry.details && (
+                        <p className="proof-details">
+                          {detailLine(entry.details)}
+                        </p>
+                      )}
                       {entry.status === "failed" && (
                         <>
                           <p className="result error" role="alert">
@@ -1244,6 +1490,24 @@ export function Weekly({
                   cacheKey={cacheKey}
                   onRevoked={feedRevoked}
                   onItems={feedItems}
+                  onDeleted={(count) => {
+                    setProgress((items) =>
+                      items.map((item) =>
+                        item.membershipId === membership.membershipId
+                          ? {
+                              ...item,
+                              completedWorkoutCount: count,
+                              activityTypes: item.activityTypes.slice(0, count),
+                            }
+                          : item,
+                      ),
+                    );
+                    // The exact plates and streaks follow from the server.
+                    void api
+                      .progress(token, membership.groupId)
+                      .then((response) => setProgress(response.data))
+                      .catch(() => setRefreshWarning(true));
+                  }}
                 />
               )}
             </>
@@ -1383,6 +1647,8 @@ export function Weekly({
           )}
           {route === "/history" && (
             <>
+              <SeasonCard season={extras.season} />
+              <UnlockList unlocks={extras.unlocks} />
               <h2>The rack</h2>
               {historyWeeks.length ? (
                 <>
@@ -1391,13 +1657,19 @@ export function Weekly({
                       const item = ownHistory(startsAt);
                       if (!item) return null;
                       const met = item.outcome === "attained";
+                      const excusedWeek = item.outcome === "excepted";
+                      const outcomeLabel = met
+                        ? "Met"
+                        : excusedWeek
+                          ? "Excused"
+                          : "Missed";
                       const range = historyRange(item);
                       return (
                         <li key={startsAt}>
                           <button
                             type="button"
-                            className={`history-plate${met ? " met" : " missed"}`}
-                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met ? (hasStreaks(item) ? `Met, ${weekStreakText(item.targetStreak)}` : "Met") : "Missed"}`}
+                            className={`history-plate${met ? " met" : excusedWeek ? " excused" : " missed"}`}
+                            aria-label={`${range}: ${item.completedWorkoutCount}/${item.lockedTarget}, ${met && hasStreaks(item) ? `Met, ${weekStreakText(item.targetStreak)}` : outcomeLabel}`}
                             onClick={(event) => {
                               historyOpenerRef.current = event.currentTarget;
                               setSelectedWeek(startsAt);
@@ -1414,7 +1686,7 @@ export function Weekly({
                           <span className="history-caption">
                             {range}
                             <strong className="history-outcome">
-                              {met ? "Met" : "Missed"}
+                              {outcomeLabel}
                             </strong>
                             {met && hasStreaks(item) && (
                               <span className="history-streak">
@@ -1459,7 +1731,9 @@ export function Weekly({
                               You{" "}
                               {item.outcome === "attained"
                                 ? "met it"
-                                : "missed it"}
+                                : item.outcome === "excepted"
+                                  ? "were excused"
+                                  : "missed it"}
                               : {item.completedWorkoutCount} of{" "}
                               {item.lockedTarget}.
                             </p>
@@ -1472,11 +1746,13 @@ export function Weekly({
                               <span>
                                 {item.completedWorkoutCount}/{item.lockedTarget}{" "}
                                 ·{" "}
-                                {item.outcome !== "attained"
-                                  ? "Missed"
-                                  : hasStreaks(item)
-                                    ? `Met · ${weekStreakText(item.targetStreak)}`
-                                    : "Met"}
+                                {item.outcome === "excepted"
+                                  ? "Excused"
+                                  : item.outcome !== "attained"
+                                    ? "Missed"
+                                    : hasStreaks(item)
+                                      ? `Met · ${weekStreakText(item.targetStreak)}`
+                                      : "Met"}
                               </span>
                             </li>
                           ))}

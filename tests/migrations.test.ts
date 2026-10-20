@@ -53,6 +53,18 @@ describe("migrations", () => {
       { version: 28 },
       { version: 29 },
       { version: 30 },
+      { version: 31 },
+      { version: 32 },
+      { version: 33 },
+      { version: 34 },
+      { version: 35 },
+      { version: 36 },
+      { version: 37 },
+      { version: 38 },
+      { version: 39 },
+      { version: 40 },
+      { version: 41 },
+      { version: 42 },
     ]);
     await db.close();
   });

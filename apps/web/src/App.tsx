@@ -8,10 +8,16 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
+import { NotificationBell, NotificationSettings } from "./Notifications";
+import { OperatorConsole } from "./OperatorConsole";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
+import { call, removeAllProof } from "./proof";
 import { Result, useNotice } from "./Result";
+import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
+import { UpdatePrompt } from "./UpdatePrompt";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
 type Route =
@@ -21,7 +27,8 @@ type Route =
   | "/home"
   | "/target"
   | "/history"
-  | "/account";
+  | "/account"
+  | "/operator";
 type Access =
   | "checking"
   | "signed-out"
@@ -275,6 +282,11 @@ export function App({
     Array<{ invitationId: string; email: string; expiresAt: string }>
   >([]);
   const [manageGroup, setManageGroup] = useState(false);
+  const [crewNameDraft, setCrewNameDraft] = useState("");
+  const [safetyMember, setSafetyMember] = useState<{
+    membershipId: string;
+    displayName: string;
+  } | null>(null);
   const [inviteReady, setInviteReady] = useState<{
     email: string;
     token: string;
@@ -287,6 +299,23 @@ export function App({
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
   // Items waiting on the member (proof reviews, votes, card picks and approvals).
   const [attention, setAttention] = useState(0);
+  const [unread, setUnread] = useState(0);
+  const [operator, setOperator] = useState(false);
+  // The installed app's icon shows what is waiting: reviews, votes, cards, and unread news.
+  useEffect(() => {
+    const badge = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    const count = access === "signed-in" ? attention + unread : 0;
+    try {
+      void (
+        count > 0 ? badge.setAppBadge?.(count) : badge.clearAppBadge?.()
+      )?.catch(() => undefined);
+    } catch {
+      // Badging unsupported here.
+    }
+  }, [access, attention, unread]);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const displayNameScope = useRef("");
@@ -729,6 +758,26 @@ export function App({
       })
       .finally(() => release(key));
   };
+  // Applies a local roster change to the screen, its ref, and the saved copy.
+  const patchRoster = (
+    change: (roster: NonNullable<typeof groupRoster>) => typeof groupRoster,
+  ) => {
+    const current = groupRosterRef.current;
+    if (!current) return;
+    const next = change(current);
+    groupRosterRef.current = next;
+    setGroupRoster(next);
+    if (next) groupCache.set(groupScope.current, next);
+  };
+  const setMemberAdmin = (membershipId: string, admin: boolean) =>
+    patchRoster((roster) => ({
+      ...roster,
+      members: roster.members.map((member) =>
+        member.membershipId === membershipId
+          ? { ...member, creator: admin }
+          : member,
+      ),
+    }));
   // Access ends on screen at once; Auth's own sign-out (which tells other
   // tabs) finishes in the background.
   const signOut = () => {
@@ -786,6 +835,7 @@ export function App({
       "/target",
       "/history",
       "/account",
+      "/operator",
     ] as string[]
   ).includes(path)
     ? (path as Route)
@@ -797,8 +847,15 @@ export function App({
           member.membershipId === membership.membershipId && member.creator,
       ),
   );
+  // The last admin hands the role on first, unless they are the last member.
   const canLeaveGroup = Boolean(
-    groupRoster && (!currentMemberIsAdmin || groupRoster.members.length === 1),
+    groupRoster &&
+      (!currentMemberIsAdmin ||
+        groupRoster.members.length === 1 ||
+        groupRoster.members.some(
+          (member) =>
+            member.creator && member.membershipId !== membership?.membershipId,
+        )),
   );
 
   if (launching) {
@@ -822,8 +879,18 @@ export function App({
           <img src="/icons/icon.svg" alt="" width="32" height="32" />
           <span>No Excuses</span>
         </a>
+        {access === "signed-in" && membership && session && (
+          <NotificationBell
+            apiBaseUrl={apiBaseUrl}
+            token={session.access_token}
+            unread={unread}
+            onSeen={() => setUnread(0)}
+            onRevoked={recheckAccess}
+          />
+        )}
       </header>
       <main className="route-content" id="main-content" key={route ?? path}>
+        <UpdatePrompt />
         {!route ? (
           <Page
             title="Nothing shared here."
@@ -1517,17 +1584,62 @@ export function App({
                           <button
                             className="text-button"
                             type="button"
-                            onClick={() => setManageGroup(!manageGroup)}
+                            onClick={() => {
+                              setCrewNameDraft(groupRoster.groupName);
+                              setManageGroup(!manageGroup);
+                            }}
                           >
                             {manageGroup ? "Done" : "Manage"}
                           </button>
                         )}
                       </div>
                       {manageGroup && (
-                        <p className="hint">
-                          As the crew’s creator, you can remove members and
-                          revoke invites.
-                        </p>
+                        <form
+                          className="group-rename"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            const name = crewNameDraft.trim();
+                            const previous = groupRoster.groupName;
+                            if (!name || name === previous) return;
+                            const rename = (value: string) =>
+                              patchRoster((roster) => ({
+                                ...roster,
+                                groupName: value,
+                              }));
+                            rename(name);
+                            optimistic(
+                              "rename",
+                              "Crew renamed.",
+                              () => renameGroup(apiBaseUrl, token(), name),
+                              () => {
+                                rename(previous);
+                                setCrewNameDraft(previous);
+                              },
+                            );
+                          }}
+                        >
+                          <label>
+                            Crew name
+                            <input
+                              value={crewNameDraft}
+                              onChange={(event) =>
+                                setCrewNameDraft(event.target.value)
+                              }
+                              maxLength={80}
+                              required
+                            />
+                          </label>
+                          <button
+                            className="secondary-button"
+                            type="submit"
+                            disabled={
+                              !crewNameDraft.trim() ||
+                              crewNameDraft.trim() === groupRoster.groupName
+                            }
+                          >
+                            Rename
+                          </button>
+                        </form>
                       )}
                       <ul className="group-roster">
                         {groupRoster.members.map((member) => (
@@ -1542,9 +1654,62 @@ export function App({
                             </span>
                             <span className="group-member-copy">
                               <strong>{member.displayName}</strong>
-                              <span>{member.weeklyTarget} a week</span>
+                              <span>
+                                {member.weeklyTarget} a week
+                                {member.creator ? " · Admin" : ""}
+                              </span>
                             </span>
+                            {!manageGroup &&
+                              member.membershipId !==
+                                membership.membershipId && (
+                                <button
+                                  className="row-action row-more"
+                                  type="button"
+                                  aria-label={`More for ${member.displayName}`}
+                                  onClick={() => setSafetyMember(member)}
+                                >
+                                  ⋯
+                                </button>
+                              )}
                             {manageGroup &&
+                              member.membershipId !==
+                                membership.membershipId && (
+                                <button
+                                  className="row-action"
+                                  type="button"
+                                  disabled={busy(
+                                    `admin:${member.membershipId}`,
+                                  )}
+                                  onClick={() => {
+                                    const admin = !member.creator;
+                                    setMemberAdmin(member.membershipId, admin);
+                                    optimistic(
+                                      `admin:${member.membershipId}`,
+                                      admin
+                                        ? `${member.displayName} is now an admin.`
+                                        : `${member.displayName} is no longer an admin.`,
+                                      () =>
+                                        setGroupAdmin(
+                                          apiBaseUrl,
+                                          token(),
+                                          member.membershipId,
+                                          admin,
+                                        ),
+                                      () =>
+                                        setMemberAdmin(
+                                          member.membershipId,
+                                          !admin,
+                                        ),
+                                    );
+                                  }}
+                                >
+                                  {member.creator
+                                    ? "Remove admin"
+                                    : "Make admin"}
+                                </button>
+                              )}
+                            {manageGroup &&
+                              !member.creator &&
                               member.membershipId !==
                                 membership.membershipId && (
                                 <button
@@ -1751,14 +1916,34 @@ export function App({
                           </button>
                         </form>
                       )}
+                      <MemberSafety
+                        apiBaseUrl={apiBaseUrl}
+                        token={session?.access_token ?? ""}
+                        member={safetyMember}
+                        onClose={() => setSafetyMember(null)}
+                        onNotice={setNotice}
+                      />
+                      <GroupAdmin
+                        apiBaseUrl={apiBaseUrl}
+                        token={session?.access_token ?? ""}
+                        manage={manageGroup}
+                        revision={groupRevision}
+                        onNotice={setNotice}
+                        onRevoked={recheckAccess}
+                      />
                       {canLeaveGroup ? (
                         <button
                           className="danger-outline leave-group"
                           type="button"
                           disabled={busy("leave")}
                           onClick={() => {
+                            const closing = groupRoster.members.length === 1;
                             if (
-                              !window.confirm(`Leave ${groupRoster.groupName}?`)
+                              !window.confirm(
+                                closing
+                                  ? `Close ${groupRoster.groupName}? You are its last member, so it ends for good.`
+                                  : `Leave ${groupRoster.groupName}?`,
+                              )
                             )
                               return;
                             void act("leave", async () => {
@@ -1786,6 +1971,15 @@ export function App({
               </section>
             )}
             <Result notice={notice} />
+          </Page>
+        ) : route === "/operator" ? (
+          <Page title="Operator console" lead="Moderation cases and pauses.">
+            {session && (
+              <OperatorConsole
+                apiBaseUrl={apiBaseUrl}
+                token={session.access_token}
+              />
+            )}
           </Page>
         ) : route === "/account" ? (
           <Page title="You" lead="Your account and crew settings.">
@@ -1942,12 +2136,89 @@ export function App({
                 </>
               )}
               <PushToggle apiBaseUrl={apiBaseUrl} accessToken={token} />
+              {membership && (
+                <NotificationSettings
+                  apiBaseUrl={apiBaseUrl}
+                  token={session?.access_token ?? ""}
+                  onNotice={setNotice}
+                />
+              )}
               <button
                 className="account-row"
                 type="button"
                 onClick={() => setInstallHelpOpen(true)}
               >
                 <span>Install on your home screen</span>
+                <span>→</span>
+              </button>
+              {operator && (
+                <a
+                  className="account-row"
+                  href="/operator"
+                  onClick={(event) => navigate(event, "/operator")}
+                >
+                  <span>Operator console</span>
+                  <span>→</span>
+                </a>
+              )}
+              <h2 className="account-section">Privacy and data</h2>
+              <button
+                className="account-row"
+                type="button"
+                disabled={busy("export")}
+                onClick={() =>
+                  void act("export", async () => {
+                    const data = await call<unknown>(
+                      apiBaseUrl,
+                      token(),
+                      "/v1/account/export",
+                      { method: "GET" },
+                    );
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(
+                      new Blob([JSON.stringify(data, null, 2)], {
+                        type: "application/json",
+                      }),
+                    );
+                    link.download = `no-excuses-data-${new Date().toISOString().slice(0, 10)}.json`;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                    return "Your data downloaded.";
+                  })
+                }
+              >
+                <span>
+                  {busy("export") ? "Preparing your data…" : "Download my data"}
+                </span>
+                <span>↓</span>
+              </button>
+              <button
+                className="account-row"
+                type="button"
+                disabled={busy("remove-photos")}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Delete every proof photo you’ve shared? Your workout counts and finished weeks stay. This can’t be undone.",
+                    )
+                  )
+                    return;
+                  void act("remove-photos", async () => {
+                    const { removed } = await removeAllProof(
+                      apiBaseUrl,
+                      token(),
+                    );
+                    return removed === 1
+                      ? "1 post’s photos removed."
+                      : `${removed} posts’ photos removed.`;
+                  });
+                }}
+              >
+                <span>
+                  {busy("remove-photos")
+                    ? "Removing photos…"
+                    : "Remove my proof photos"}
+                </span>
                 <span>→</span>
               </button>
               <button
@@ -2193,6 +2464,8 @@ export function App({
             apiBaseUrl={apiBaseUrl}
             onNavigate={navigate}
             onAttention={setAttention}
+            onUnread={setUnread}
+            onOperator={setOperator}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
             route={route as "/home" | "/target" | "/history"}
             api={api}

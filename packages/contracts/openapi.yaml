@@ -922,7 +922,7 @@ components:
         completedWorkoutCount: { type: integer, minimum: 0 }
         outcome:
           type: string
-          enum: [attained, missed]
+          enum: [attained, missed, excepted]
     UtcInstant:
       type: string
       format: date-time

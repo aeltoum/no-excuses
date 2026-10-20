@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { homeExtras } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -227,6 +228,11 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
         };
       return ok(state);
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   const uploads: string[] = [];
@@ -330,7 +336,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText([
-    "Maya2/3 · owes 21 wk · 3 in a row1-week streak · 3 workouts since last missNudge",
+    "Maya2/3 · owes 2🔥 1 wk1-week streak · 3 workouts since last missNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),

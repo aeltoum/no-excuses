@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { homeExtras } from "./member";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
@@ -166,6 +167,11 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
         feed = feed.filter((entry) => entry.workoutCheckinId !== action[1]);
       return ok({ workoutCheckinId: action[1], status: "ok" });
     }
+    if (path === "/v1/home/extras")
+      return route.fulfill({
+        status: 200,
+        json: { contractVersion: 1, data: homeExtras() },
+      });
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");
@@ -183,7 +189,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText([
-    "Maya2/3 · review1 wk · 3 in a row1-week streak · 3 workouts since last missNudge",
+    "Maya2/3 · review🔥 1 wk1-week streak · 3 workouts since last missNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
