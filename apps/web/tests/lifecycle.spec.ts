@@ -50,10 +50,14 @@ test("a workout logged offline survives a reload and sends once back online", as
   // The phone dies; the app reopens later with a connection.
   online = true;
   await page.reload();
-  await expect(page.getByText("2 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByText("2 of 3 this week", { exact: true }),
+  ).toBeVisible();
   await expect.poll(() => keys.length).toBe(1);
+  // A sent workout leaves the device queue: the next start sends nothing again.
+  const loaded = page.waitForResponse("**/v1/home/extras");
   await page.reload();
-  await page.waitForTimeout(500);
+  await loaded;
   expect(keys).toHaveLength(1);
   expect(errors).toEqual([]);
 });

@@ -2161,6 +2161,7 @@ export function App({
                   <span>→</span>
                 </a>
               )}
+              <h2 className="account-section">Privacy and data</h2>
               <button
                 className="account-row"
                 type="button"

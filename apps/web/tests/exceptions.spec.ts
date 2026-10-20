@@ -91,7 +91,7 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
 
   const opened = await msUntilVisible(
     page,
-    () => page.getByRole("button", { name: "Need a week off?" }).click(),
+    () => page.getByRole("button", { name: "Week off" }).click(),
     page.getByRole("button", { name: "Travel or no access" }),
   );
   expect(opened).toBeLessThanOrEqual(100);

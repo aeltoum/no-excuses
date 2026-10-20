@@ -18,6 +18,7 @@ export function PostText({
   ensureConduct,
   confirmReport,
   onNotice,
+  onReportPhotos,
 }: {
   item: ProofItem;
   apiBaseUrl: string;
@@ -25,6 +26,7 @@ export function PostText({
   ensureConduct: () => Promise<boolean>;
   confirmReport: () => Promise<boolean>;
   onNotice: (notice: Notice) => void;
+  onReportPhotos?: () => void;
 }) {
   const [caption, setLocalCaption] = useState(item.caption ?? null);
   const [messages, setMessages] = useState<ProofMessage[]>(item.messages ?? []);
@@ -179,6 +181,15 @@ export function PostText({
               onClick={() => void open("message")}
             >
               Message
+            </button>
+          )}
+          {onReportPhotos && (
+            <button
+              type="button"
+              className="text-button post-report-photos"
+              onClick={onReportPhotos}
+            >
+              Report photos
             </button>
           )}
         </div>

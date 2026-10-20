@@ -189,7 +189,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText([
-    "Maya2/3 · review1 wk · 3 in a row1-week streak · 3 workouts since last missNudge",
+    "Maya2/3 · review🔥 1 wk1-week streak · 3 workouts since last missNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),

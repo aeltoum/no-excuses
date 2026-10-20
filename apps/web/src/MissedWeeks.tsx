@@ -98,10 +98,10 @@ export function MissedWeeks({
                   key={key}
                   aria-pressed={week.myResponse === key}
                   aria-label={`${label}${count ? `, ${count}` : ""}`}
+                  title={label}
                   onClick={() => respond(week, key)}
                 >
                   <span aria-hidden="true">{emoji}</span>
-                  <span>{label}</span>
                   {count > 0 && <small aria-hidden="true">{count}</small>}
                 </button>
               );

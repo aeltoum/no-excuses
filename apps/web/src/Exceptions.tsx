@@ -39,7 +39,10 @@ export function Exceptions({
   reload,
   onNotice,
   onRevoked,
+  part,
 }: {
+  // "own": the member's status and request sheet; "ballots": requests to vote on.
+  part: "own" | "ballots";
   apiBaseUrl: string;
   token: string;
   extras: HomeExtras;
@@ -145,6 +148,56 @@ export function Exceptions({
     void send(`/v1/exceptions/${id}/withdraw`, {}, previous);
   };
 
+  if (part === "ballots")
+    return toDecide.length > 0 ? (
+      <section
+        className="exception-ballots"
+        aria-labelledby="exception-heading"
+      >
+        <h2 id="exception-heading" className="feed-day">
+          Week-off requests
+          <span className="feed-badge">
+            {toDecide.filter((item) => !item.myResponse).length || "✓"}
+          </span>
+        </h2>
+        <ul>
+          {toDecide.map((ballot) => (
+            <li key={ballot.id} className="exception-ballot">
+              <strong>
+                {ballot.name} · {weekLabel(ballot.week)}
+              </strong>
+              <span>{categoryLabel(ballot.category)}</span>
+              {ballot.note && <q>{ballot.note}</q>}
+              <small>
+                Sealed vote · {hoursLeft(ballot.closesAt)}
+                {ballot.myResponse ? ` · you chose ${ballot.myResponse}` : ""}
+              </small>
+              <fieldset
+                className="exception-choices"
+                aria-label={`Your vote on ${ballot.name}’s request`}
+              >
+                {(
+                  [
+                    ["approve", "Approve"],
+                    ["deny", "Deny"],
+                    ["abstain", "Abstain"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={ballot.myResponse === value}
+                    onClick={() => vote(ballot, value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </fieldset>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
   return (
     <>
       {mine.map((item) => (
@@ -174,63 +227,14 @@ export function Exceptions({
       {taken.size < 2 && (
         <button
           type="button"
-          className="text-button exception-open"
+          className="text-button"
           onClick={() => {
             setWeek(taken.has("current") ? "next" : "current");
             setOpen(true);
           }}
         >
-          Need a week off?
+          Week off
         </button>
-      )}
-      {toDecide.length > 0 && (
-        <section
-          className="exception-ballots"
-          aria-labelledby="exception-heading"
-        >
-          <h2 id="exception-heading" className="feed-day">
-            Week-off requests
-            <span className="feed-badge">
-              {toDecide.filter((item) => !item.myResponse).length || "✓"}
-            </span>
-          </h2>
-          <ul>
-            {toDecide.map((ballot) => (
-              <li key={ballot.id} className="exception-ballot">
-                <strong>
-                  {ballot.name} · {weekLabel(ballot.week)}
-                </strong>
-                <span>{categoryLabel(ballot.category)}</span>
-                {ballot.note && <q>{ballot.note}</q>}
-                <small>
-                  Sealed vote · {hoursLeft(ballot.closesAt)}
-                  {ballot.myResponse ? ` · you chose ${ballot.myResponse}` : ""}
-                </small>
-                <fieldset
-                  className="exception-choices"
-                  aria-label={`Your vote on ${ballot.name}’s request`}
-                >
-                  {(
-                    [
-                      ["approve", "Approve"],
-                      ["deny", "Deny"],
-                      ["abstain", "Abstain"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-pressed={ballot.myResponse === value}
-                      onClick={() => vote(ballot, value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </fieldset>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
       <Sheet
         open={open}

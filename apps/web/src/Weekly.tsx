@@ -872,35 +872,51 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
-                  <SeasonChip
-                    season={extras.season}
-                    onOpen={(event) => onNavigate(event, "/history")}
-                  />
+                  <div className="home-meta">
+                    {hasStreaks(own) && (
+                      <span className="home-streaks">{streakText(own)}</span>
+                    )}
+                    <SeasonChip
+                      season={extras.season}
+                      onOpen={(event) => onNavigate(event, "/history")}
+                    />
+                  </div>
                   <UnlockNote unlocks={extras.unlocks} />
-                  {hasStreaks(own) && (
-                    <p className="home-streaks">{streakText(own)}</p>
-                  )}
-                  <a
-                    className="home-target-link"
-                    href="/target"
-                    onClick={(event) => onNavigate(event, "/target")}
-                  >
-                    Change target
-                  </a>
-                  <SessionCard
-                    apiBaseUrl={apiBaseUrl}
-                    token={token}
-                    extras={extras}
-                    apply={applyExtras}
-                    onNotice={setNotice}
-                    onFinish={(id, minutes) => {
-                      setSessionId(id);
-                      setDuration(String(minutes));
-                      setOtherDuration(![20, 30, 45, 60, 90].includes(minutes));
-                      if (logBlock) setLockOpen(true);
-                      else setSheetOpen(true);
-                    }}
-                  />
+                  <div className="home-actions">
+                    <a
+                      className="home-target-link"
+                      href="/target"
+                      onClick={(event) => onNavigate(event, "/target")}
+                    >
+                      Change target
+                    </a>
+                    <SessionCard
+                      apiBaseUrl={apiBaseUrl}
+                      token={token}
+                      extras={extras}
+                      apply={applyExtras}
+                      onNotice={setNotice}
+                      onFinish={(id, minutes) => {
+                        setSessionId(id);
+                        setDuration(String(minutes));
+                        setOtherDuration(
+                          ![20, 30, 45, 60, 90].includes(minutes),
+                        );
+                        if (logBlock) setLockOpen(true);
+                        else setSheetOpen(true);
+                      }}
+                    />
+                    <Exceptions
+                      part="own"
+                      apiBaseUrl={apiBaseUrl}
+                      token={token}
+                      extras={extras}
+                      apply={applyExtras}
+                      reload={reloadExtras}
+                      onNotice={setNotice}
+                      onRevoked={feedRevoked}
+                    />
+                  </div>
                   <ul className="activity-legend" aria-label="Activity colours">
                     {(
                       ["strength", "cardio", "class", "sport", "mixed"] as const
@@ -930,17 +946,6 @@ export function Weekly({
                     Change target
                   </a>
                 </div>
-              )}
-              {own && (
-                <Exceptions
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  extras={extras}
-                  apply={applyExtras}
-                  reload={reloadExtras}
-                  onNotice={setNotice}
-                  onRevoked={feedRevoked}
-                />
               )}
               {own && (
                 <Consequences
@@ -1002,10 +1007,11 @@ export function Weekly({
                         </span>
                         {hasStreaks(item) && (
                           <span className="friend-streaks">
-                            <span aria-hidden="true">
-                              {item.targetStreak} wk · {item.workoutStreak} in a
-                              row
-                            </span>
+                            {item.targetStreak > 0 && (
+                              <span aria-hidden="true">
+                                🔥 {item.targetStreak} wk
+                              </span>
+                            )}
                             <span className="visually-hidden">
                               {streakText(item)}
                             </span>
@@ -1032,6 +1038,18 @@ export function Weekly({
                       </li>
                     ))}
                 </ul>
+              )}
+              {own && (
+                <Exceptions
+                  part="ballots"
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onNotice={setNotice}
+                  onRevoked={feedRevoked}
+                />
               )}
               {own && (
                 <>

@@ -3385,3 +3385,55 @@ fieldset.session-pick {
   background: var(--rubber);
   color: var(--chalk);
 }
+
+/* Home: one line of stats, one line of actions */
+.home-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-top: 4px;
+}
+.home-meta .home-streaks,
+.home-meta .season-chip {
+  margin: 0;
+}
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0 16px;
+  margin-top: 4px;
+}
+.home-actions .home-target-link,
+.home-actions .session-start,
+.home-actions .text-button {
+  margin: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-decoration: underline;
+}
+.home-actions .session-card,
+.home-actions .exception-status {
+  flex-basis: 100%;
+}
+.missed-responses button {
+  min-width: 44px;
+  justify-content: center;
+}
+.post-report-photos {
+  margin-left: auto;
+}
+.account-section {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

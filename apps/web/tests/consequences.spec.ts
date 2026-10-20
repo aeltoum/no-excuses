@@ -336,7 +336,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText([
-    "Maya2/3 · owes 21 wk · 3 in a row1-week streak · 3 workouts since last missNudge",
+    "Maya2/3 · owes 2🔥 1 wk1-week streak · 3 workouts since last missNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),

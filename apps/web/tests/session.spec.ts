@@ -33,7 +33,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
   await delayRoute(page, "**/v1/sessions/**", 1000);
   const started = await msUntilVisible(
     page,
-    () => page.getByRole("button", { name: "Start a timed workout" }).click(),
+    () => page.getByRole("button", { name: "Start timer" }).click(),
     page.getByRole("timer"),
   );
   expect(started).toBeLessThanOrEqual(100);

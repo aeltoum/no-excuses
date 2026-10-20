@@ -485,6 +485,26 @@ export function ProofFeed({
             ensureConduct={ensureConduct}
             confirmReport={confirmReport}
             onNotice={setNotice}
+            onReportPhotos={
+              item.mine
+                ? undefined
+                : async () => {
+                    if (
+                      await ask({
+                        title: "Report these photos?",
+                        body: "They’ll be hidden from the Group until the Group admin reviews them.",
+                        confirm: "Report photos",
+                        tone: "danger",
+                      })
+                    )
+                      void act(
+                        item,
+                        "report",
+                        "",
+                        "Reported. The photos are hidden.",
+                      );
+                  }
+            }
           />
         )}
         {item.reviewStatus === "questioned" && (
@@ -552,31 +572,6 @@ export function ProofFeed({
             }}
           >
             {disabled ? "Deleting…" : "Delete post"}
-          </button>
-        )}
-        {!item.mine && !item.hidden && (
-          <button
-            type="button"
-            className="proof-report"
-            disabled={disabled}
-            onClick={async () => {
-              if (
-                await ask({
-                  title: "Report these photos?",
-                  body: "They’ll be hidden from the Group until the Group admin reviews them.",
-                  confirm: "Report photos",
-                  tone: "danger",
-                })
-              )
-                void act(
-                  item,
-                  "report",
-                  "",
-                  "Reported. The photos are hidden.",
-                );
-            }}
-          >
-            Report photos
           </button>
         )}
       </li>

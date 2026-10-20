@@ -117,7 +117,7 @@ export function SessionCard({
         className="text-button session-start"
         onClick={start}
       >
-        Start a timed workout
+        Start timer
       </button>
     );
   return (
