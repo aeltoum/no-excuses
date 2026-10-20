@@ -136,6 +136,14 @@ export function ProofClip({
       );
       return;
     }
+    // A permission prompt that never appears leaves getUserMedia pending forever.
+    const stalled = window.setTimeout(
+      () =>
+        fail(
+          "Camera didn’t open. Allow camera for this site in Chrome (Site settings › Camera) and try again.",
+        ),
+      10_000,
+    );
     const open = (video: MediaTrackConstraints) =>
       media.getUserMedia({ video, audio: true });
     open({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" })
@@ -146,6 +154,7 @@ export function ProofClip({
           : open({ facingMode: "user" }),
       )
       .then((granted) => {
+        window.clearTimeout(stalled);
         if (!live) {
           for (const track of granted.getTracks()) track.stop();
           return;
@@ -158,6 +167,7 @@ export function ProofClip({
         setCameraReady(true);
       })
       .catch((error: unknown) => {
+        window.clearTimeout(stalled);
         if (!live) return;
         fail(
           error instanceof DOMException && error.name === "NotReadableError"
@@ -167,6 +177,7 @@ export function ProofClip({
       });
     return () => {
       live = false;
+      window.clearTimeout(stalled);
       if (recorder.current?.state === "recording") recorder.current.stop();
       for (const track of stream.current?.getTracks() ?? []) track.stop();
       stream.current = null;
@@ -370,7 +381,11 @@ export function ProofClip({
               aria-busy={!cameraReady || !challenge}
               onClick={start}
             >
-              {cameraReady && challenge ? "Start recording" : "Getting ready…"}
+              {!cameraReady
+                ? "Opening camera…"
+                : challenge
+                  ? "Start recording"
+                  : "Getting code…"}
             </button>
           )}
         </div>

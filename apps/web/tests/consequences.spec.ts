@@ -434,7 +434,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   // No stale toast from earlier actions covers the recorder.
   await expect(page.locator(".event-notice")).toHaveCount(0);
   await expect(
-    recorder.getByRole("button", { name: "Getting ready…" }),
+    recorder.getByRole("button", { name: /^(Opening camera|Getting code)…$/ }),
   ).toBeDisabled();
   await expect(recorder.locator('input[type="file"]')).toHaveCount(0);
   await expect(recorder.getByText("042")).toBeVisible();
