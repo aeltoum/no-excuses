@@ -514,18 +514,18 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   const pauseReview = page
     .getByRole("list", { name: "Pause requests to approve" })
     .getByRole("listitem");
-  await expect(pauseReview).toContainText(
-    "Maya asked to pause 200 jumping jacks",
-  );
+  await expect(pauseReview).toContainText("Maya asked to pause");
+  await expect(pauseReview).toContainText("200 jumping jacks");
   await pauseReview.getByRole("button", { name: "Approve pause" }).click();
-  await expect(
-    pauseReview.getByRole("button", { name: "Approve pause" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  // Voted: a receipt replaces the buttons.
+  await expect(pauseReview).toContainText("You approved Maya’s pause.");
+  await expect(pauseReview.getByRole("button")).toHaveCount(0);
 
   const review = page
     .getByRole("list", { name: "Consequence cards to approve" })
     .getByRole("listitem");
-  await expect(review).toContainText("Maya finished 100 push-ups");
+  await expect(review).toContainText("Maya says they did their card");
+  await expect(review).toContainText("100 push-ups");
   const friendClip = review.getByLabel("Maya’s proof clip");
   await expect(friendClip).toHaveAttribute("src", friendClipUrl);
   await expect(friendClip).toHaveAttribute("preload", "none");
@@ -537,10 +537,10 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     ]),
   ).toEqual([false, true]);
   await review.getByRole("button", { name: "Approve" }).click();
-  await expect(review.getByRole("button", { name: "Approve" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  // Voted: the clip and buttons give way to a one-line receipt.
+  await expect(review).toContainText("You approved Maya’s 100 push-ups.");
+  await expect(review.getByRole("button")).toHaveCount(0);
+  await expect(review.getByLabel("Maya’s proof clip")).toHaveCount(0);
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("card-home.png"),
