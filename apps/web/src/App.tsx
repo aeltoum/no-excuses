@@ -17,6 +17,7 @@ import { call, removeAllProof } from "./proof";
 import { Result, useNotice } from "./Result";
 import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
+import { UpdatePrompt } from "./UpdatePrompt";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
 type Route =
@@ -300,6 +301,21 @@ export function App({
   const [attention, setAttention] = useState(0);
   const [unread, setUnread] = useState(0);
   const [operator, setOperator] = useState(false);
+  // The installed app's icon shows what is waiting: reviews, votes, cards, and unread news.
+  useEffect(() => {
+    const badge = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    const count = access === "signed-in" ? attention + unread : 0;
+    try {
+      void (
+        count > 0 ? badge.setAppBadge?.(count) : badge.clearAppBadge?.()
+      )?.catch(() => undefined);
+    } catch {
+      // Badging unsupported here.
+    }
+  }, [access, attention, unread]);
   const [displayName, setDisplayName] = useState("");
   const [displayNameLoaded, setDisplayNameLoaded] = useState(false);
   const displayNameScope = useRef("");
@@ -874,6 +890,7 @@ export function App({
         )}
       </header>
       <main className="route-content" id="main-content" key={route ?? path}>
+        <UpdatePrompt />
         {!route ? (
           <Page
             title="Nothing shared here."

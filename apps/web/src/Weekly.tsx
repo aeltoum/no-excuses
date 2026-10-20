@@ -21,6 +21,12 @@ import {
   emptyDraft,
   type WorkoutDetails,
 } from "./details";
+import {
+  clearWorkouts,
+  forgetWorkout,
+  loadWorkouts,
+  saveWorkout,
+} from "./durable";
 import { Exceptions } from "./Exceptions";
 import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
@@ -63,7 +69,8 @@ type ProofPhoto = { id: string; blob: Blob; url: string };
 type Activity = "strength" | "cardio" | "class" | "sport" | "mixed";
 
 // A workout logged on this device that the server has not confirmed yet. Its
-// photos stay in memory for the session so Retry never asks for them again.
+// photos stay on the device (memory and IndexedDB) so Retry never asks for them
+// again, even after a reload.
 type Outgoing = {
   id: string;
   key: string;
@@ -84,10 +91,37 @@ type Outgoing = {
 };
 let outbox: Outgoing[] = [];
 const outboxListeners = new Set<() => void>();
+// Mirrors the queue to IndexedDB: unsent workouts are kept, sent or refused ones go.
+const persistOutbox = (previous: Outgoing[], next: Outgoing[]) => {
+  const live = new Set<string>();
+  for (const entry of next) {
+    if (entry.status === "sent" || entry.rejected) continue;
+    live.add(entry.id);
+    void saveWorkout({
+      id: entry.id,
+      key: entry.key,
+      membershipId: entry.membershipId,
+      activityType: entry.activityType,
+      minutes: entry.minutes,
+      intensity: entry.intensity,
+      activity: { id: entry.activity.id, blob: entry.activity.blob },
+      presence: { id: entry.presence.id, blob: entry.presence.blob },
+      details: entry.details,
+      sessionId: entry.sessionId,
+      paths: entry.paths,
+    });
+  }
+  for (const entry of previous)
+    if (!live.has(entry.id)) void forgetWorkout(entry.id);
+};
 const setOutbox = (next: Outgoing[]) => {
+  const previous = outbox;
   outbox = next;
+  persistOutbox(previous, next);
   for (const listener of outboxListeners) listener();
 };
+// Workouts saved by an earlier visit are picked up once per app start.
+let restored = false;
 const patchOutgoing = (id: string, patch: Partial<Outgoing>) =>
   setOutbox(
     outbox.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
@@ -107,6 +141,8 @@ const dropOutgoing = (id: string) => {
 };
 onClearPersisted(() => {
   for (const entry of outbox) dropOutgoing(entry.id);
+  void clearWorkouts();
+  restored = false;
 });
 
 // Uploads both photos and submits the check-in in the background. A retry
@@ -346,6 +382,47 @@ export function Weekly({
   const historyOpenerRef = useRef<HTMLButtonElement>(null);
   const revokeRef = useRef(onRevoked);
   revokeRef.current = onRevoked;
+  // Resend workouts that a reload interrupted, and failed ones once back online.
+  const membershipKey = membership?.membershipId;
+  useEffect(() => {
+    if (!membershipKey || restored) return;
+    restored = true;
+    void loadWorkouts().then((stored) => {
+      for (const item of stored) {
+        if (item.membershipId !== membershipKey) {
+          void forgetWorkout(item.id);
+          continue;
+        }
+        if (outbox.some((entry) => entry.id === item.id)) continue;
+        const photo = (value: { id: string; blob: Blob }) => ({
+          ...value,
+          url: URL.createObjectURL(value.blob),
+        });
+        const entry: Outgoing = {
+          ...item,
+          activityType: item.activityType as Activity,
+          intensity: item.intensity as Outgoing["intensity"],
+          activity: photo(item.activity),
+          presence: photo(item.presence),
+          details: item.details as WorkoutDetails | null,
+          status: "sending",
+        };
+        setOutbox([...outbox, entry]);
+        sendOutgoing(entry, api, apiBaseUrl, token, () => revokeRef.current());
+      }
+    });
+  }, [membershipKey, api, apiBaseUrl, token]);
+  useEffect(() => {
+    const resend = () => {
+      for (const entry of outbox)
+        if (entry.status === "failed" && !entry.rejected)
+          sendOutgoing(entry, api, apiBaseUrl, token, () =>
+            revokeRef.current(),
+          );
+    };
+    window.addEventListener("online", resend);
+    return () => window.removeEventListener("online", resend);
+  }, [api, apiBaseUrl, token]);
   const groupId = membership?.groupId;
   const targetDraft = useRef<{ signature: string; key: string } | null>(null);
   // The target count being saved, so the same save cannot run twice.

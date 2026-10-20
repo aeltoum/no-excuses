@@ -164,11 +164,16 @@ export function NotificationSettings({
 }) {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<Prefs | null>(centerCache?.prefs ?? null);
+  // A load that lands after the member changed something must not undo it.
+  const edited = useRef(false);
   useEffect(() => {
     if (!open) return;
     let active = true;
+    edited.current = false;
     loadCenter(apiBaseUrl, token)
-      .then((center) => active && setPrefs(center.prefs))
+      .then((center) => {
+        if (active && !edited.current) setPrefs(center.prefs);
+      })
       .catch(() => undefined);
     return () => {
       active = false;
@@ -176,6 +181,7 @@ export function NotificationSettings({
   }, [open, apiBaseUrl, token]);
   const save = (patch: Partial<Prefs>) => {
     if (!prefs) return;
+    edited.current = true;
     const previous = prefs;
     const next = { ...prefs, ...patch };
     setPrefs(next);

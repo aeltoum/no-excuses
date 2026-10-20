@@ -41,11 +41,15 @@ self.addEventListener("push", (event) => {
     message = { ...message, ...event.data.json() };
   } catch {}
   event.waitUntil(
-    self.registration.showNotification(message.title, {
-      body: message.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-    }),
+    Promise.all([
+      self.registration.showNotification(message.title, {
+        body: message.body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+      }),
+      // A dot on the app icon until the app opens and sets the real count.
+      self.navigator.setAppBadge?.().catch(() => {}),
+    ]),
   );
 });
 

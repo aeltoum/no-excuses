@@ -78,7 +78,8 @@ test("Account mutes social pushes and moves the digest, instantly", async ({
   );
   await page.getByRole("button", { name: "Notification settings" }).click();
   const social = page.getByLabel(/Push reactions, nudges, and cheers/);
-  await social.uncheck();
+  // The mocked failure can roll back before uncheck() would re-read the box.
+  await social.click();
   await expect(
     page.getByText("Something went wrong. Try again."),
   ).toBeVisible();

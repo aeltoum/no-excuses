@@ -3365,3 +3365,23 @@ fieldset.session-pick {
   padding: 0;
   border: 0;
 }
+
+/* Update prompt */
+.update-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  background: var(--chalk);
+  color: var(--rubber);
+  font-size: 0.875rem;
+}
+.update-prompt button {
+  width: auto;
+  min-height: 36px;
+  padding-inline: 12px;
+  border-color: var(--rubber);
+  background: var(--rubber);
+  color: var(--chalk);
+}
