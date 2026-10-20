@@ -450,7 +450,11 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     ),
   ).toEqual({
     constraints: {
-      video: { width: 1280, height: 720, facingMode: "user" },
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: "user",
+      },
       audio: true,
     },
     options: {
