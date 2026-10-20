@@ -13,7 +13,7 @@ import { NotificationBell, NotificationSettings } from "./Notifications";
 import { OperatorConsole } from "./OperatorConsole";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
-import { removeAllProof } from "./proof";
+import { call, removeAllProof } from "./proof";
 import { Result, useNotice } from "./Result";
 import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
@@ -2144,6 +2144,36 @@ export function App({
                   <span>→</span>
                 </a>
               )}
+              <button
+                className="account-row"
+                type="button"
+                disabled={busy("export")}
+                onClick={() =>
+                  void act("export", async () => {
+                    const data = await call<unknown>(
+                      apiBaseUrl,
+                      token(),
+                      "/v1/account/export",
+                      { method: "GET" },
+                    );
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(
+                      new Blob([JSON.stringify(data, null, 2)], {
+                        type: "application/json",
+                      }),
+                    );
+                    link.download = `no-excuses-data-${new Date().toISOString().slice(0, 10)}.json`;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                    return "Your data downloaded.";
+                  })
+                }
+              >
+                <span>
+                  {busy("export") ? "Preparing your data…" : "Download my data"}
+                </span>
+                <span>↓</span>
+              </button>
               <button
                 className="account-row"
                 type="button"

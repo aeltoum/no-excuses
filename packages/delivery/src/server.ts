@@ -1665,6 +1665,10 @@ function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
     return nudges(request);
   if (path === "/v1/consequences") return consequences(request, path);
+  if (path === "/v1/account/export" && request.method === "GET")
+    return memberRoute(request, async ({ now, data }) =>
+      ok(await data("select app_private.account_export($1) as data", [now])),
+    );
   if (path === "/v1/operator" || path.startsWith("/v1/operator/"))
     return operatorRoutes(request, path);
   if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
