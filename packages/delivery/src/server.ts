@@ -222,6 +222,7 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_consequence_push(now())");
     await pool.query("select app_private.enqueue_social_push(now())");
     await pool.query("select app_private.enqueue_exception_push(now())");
+    await pool.query("select app_private.enqueue_missed_response_push(now())");
     const pending = await pool.query(
       "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
     );
@@ -1361,6 +1362,29 @@ const exceptionRoutes = (request: Request, path: string) =>
     );
   });
 
+const missedResponses = [
+  "next_week",
+  "got_you",
+  "bounce_back",
+  "rest_up",
+  "no_excuses",
+];
+const missedAction = /^\/v1\/missed\/([0-9a-f-]{36})\/respond$/;
+const missedRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = missedAction.exec(path);
+    if (!match || method !== "POST") return fail("not_found", 404);
+    const response = body.response ?? null;
+    if (response !== null && !missedResponses.includes(String(response)))
+      return invalid();
+    const value = await data(
+      "select app_private.respond_to_missed_week($1,$2,$3) as data",
+      [match[1], response, now],
+    );
+    setImmediate(() => void deliverPush());
+    return ok(value);
+  });
+
 // Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
 const extraRoutes: Array<
   [string, (request: Request, path: string) => Promise<Response>]
@@ -1370,6 +1394,7 @@ const extraRoutes: Array<
   ["/v1/group/", groupRoutes],
   ["/v1/home/", homeExtras],
   ["/v1/exceptions/", exceptionRoutes],
+  ["/v1/missed/", missedRoutes],
 ];
 function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/enrollment" && request.method === "POST")

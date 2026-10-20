@@ -27,6 +27,23 @@ export type ExceptionBallot = {
   closesAt: string;
   myResponse: "approve" | "deny" | "abstain" | null;
 };
+export type MissedResponse =
+  | "next_week"
+  | "got_you"
+  | "bounce_back"
+  | "rest_up"
+  | "no_excuses";
+export type MissedWeek = {
+  memberWeekId: string;
+  membershipId: string;
+  name: string;
+  mine: boolean;
+  completed: number;
+  target: number;
+  endsAt: string;
+  responses: Array<{ response: MissedResponse; count: number }>;
+  myResponse: MissedResponse | null;
+};
 // Home data from the newer slices, served by one request. Older cached copies may lack keys.
 export type HomeExtras = {
   exceptions: {
@@ -35,9 +52,11 @@ export type HomeExtras = {
     excused: string[];
     pending: string[];
   };
+  missed: MissedWeek[];
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
+  missed: [],
 };
 
 const cache = persistentMap<HomeExtras>("extras");

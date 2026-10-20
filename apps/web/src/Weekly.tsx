@@ -16,6 +16,7 @@ import { Consequences, type LogBlock } from "./Consequences";
 import { Exceptions } from "./Exceptions";
 import { useHomeExtras } from "./extras";
 import { InstallPrompt } from "./InstallPrompt";
+import { MissedWeeks } from "./MissedWeeks";
 import { onClearPersisted } from "./persist";
 import {
   compressPhoto,
@@ -812,6 +813,17 @@ export function Weekly({
                   onAttention={setCardAttention}
                   onLogBlock={setLogBlock}
                   cacheKey={cacheKey}
+                />
+              )}
+              {own && (
+                <MissedWeeks
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onError={(text) => setNotice({ kind: "error", text })}
+                  onRevoked={feedRevoked}
                 />
               )}
               {own && progress.length > 1 && (

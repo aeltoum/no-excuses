@@ -2896,3 +2896,51 @@ textarea:focus-visible {
   color: var(--ink);
   font-size: 0.875rem;
 }
+
+/* Missed-week responses */
+.missed-weeks {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.missed-week {
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+.missed-week p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.missed-week strong {
+  color: var(--ink);
+}
+.missed-responses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.missed-responses button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.missed-responses button[aria-pressed="true"] {
+  border-color: var(--chalk);
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.missed-responses small {
+  font-weight: 700;
+}
