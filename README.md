@@ -42,6 +42,10 @@ invalidates outstanding tokens. Server credentials stay server-only. API startup
 idempotent weekly rollover/close and retries pending Auth hard deletions after DB cutoff;
 maintenance repeats each minute while API runs.
 
+To make an Account the Private-pilot operator (Operator console at `/operator`), insert a
+row into `app_private.staff_assignments` with role `operator` and a past `starts_at`; end it by
+setting `ends_at`.
+
 For local unmocked browser validation, start the API and web preview against local Supabase,
 then set `LIVE_PWA_INTEGRATION=1` and run the opt-in `live-local.spec.ts` suite. The suite
 uses synthetic local Auth users and Groups; never point it at hosted services. With a local

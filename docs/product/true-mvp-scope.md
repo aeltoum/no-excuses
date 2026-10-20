@@ -71,8 +71,10 @@ Excluded means deferred, not rejected.
 
 ## Activated deferred slices
 
-Owner approval on 2026-10-13 activated three deferred slices, and approval on 2026-10-15
-activated lightweight reactions and nudges on the live PWA. Their
+Owner approval on 2026-10-13 activated three deferred slices, approval on 2026-10-15
+activated lightweight reactions and nudges, and approval on 2026-10-20 activated every
+remaining slice the PWA can deliver (rows below). Still deferred: Top Steps and activity-source
+sync, native apps and app-store distribution, and Validation-pilot operations. Their
 behavior is now active scope; the excluded list below applies only to what these slices
 leave out.
 
@@ -81,6 +83,16 @@ leave out.
 | Notifications | Web Push for a friend's check-in or proof to review, a last-24-hours reminder when under target, weekly Met/Missed, questioned-report votes and outcomes, new Card offers, 12 hours left on a card, and friends' card claims. | Push only; no digests, email, or in-app notification center. iPhone delivery requires a Home Screen install, so Home shows an install tip on iPhone Safari. | #215 |
 | Proof photos and peer verification (lean v1) | Every check-in carries one camera Activity photo and one Member-presence photo with media-sharing consent. Verified after one other member verifies or 24 unquestioned hours; Questioned goes to a 48-hour strict-majority Group decision; Rejected owes a Consequence card; Unsupported does not count. Only Verified completions settle a week, and settlement waits for open reviews. Home is the proof feed; Verified proof stays 90 days. | Photo required on every check-in; live camera capture, re-encoded on device to strip metadata. Report-only moderation: a report hides the pair until the Group admin restores or removes it; no automated screening. Timed Workout sessions, multi-capture selection, descriptions, and appeals remain deferred. | #216 |
 | Consequence system | Missed weeks and Rejected reports owe cards (backlog cap 5). The member is dealt three cards, may reroll the hand once, has 48 hours after locking one in, and two other members approve the claim. Missed deadlines owe another card; a safety pause stops the deadline. Owed counts are Group-visible. | Catalog release 2: 14 heavy physical cards with no lower-impact variant. Obligations recorded before cards were playable were waived at launch. | #215, #217 |
+| Group governance | Group admins rename the Group, promote and demote admins (one always remains), and set the start day and time zone from the next week. Members see Membership events from their own membership onward. | A first week under a new schedule starts where the last one ended; a remainder under three days joins the following week. | Owner approval 2026-10-20 |
+| Post deletion and review completeness | Authors delete their own pending, Verified, or Questioned post while its week runs; it stops counting at once so a replacement keeps them on track. Voters may record Cannot assess. Members may remove every shared Proof photo. | Rejected reports cannot be deleted. | Owner approval 2026-10-20 |
+| Exceptions | As in `CONTEXT.md`: six categories, optional 280-character note, sealed 48-hour Approve/Deny/Abstain ballots, strict majority, tie or timeout denies, settlement waits, approved weeks settle as Excepted and freeze both streaks. | Requests cover this week or next. | Owner approval 2026-10-20 |
+| Missed-target events | For five days after a week, each miss shows with five preset supportive responses; one changeable response per member; the affected member gets a push per responder. | No free-text responses. | Owner approval 2026-10-20 |
+| Streaks and Workout details | Target and Workout streaks (#247). Optional catalog lifts and cardio distance/time on posts, added within an hour. | Catalog values only. | #247; owner approval 2026-10-20 |
+| Crowns and Seasons | Load Progression and Cardio Leap Crowns per settled week against each member's previous eight weeks; Seasons of four weeks with standings and champions. | Top Steps stays deferred: browsers have no step source. | Owner approval 2026-10-20 |
+| Card unlock visibility | Members see the progression cards their streaks unlocked; one push per unlock. | Unlocks themselves were already active. | Owner approval 2026-10-20 |
+| Notification center and digest | Every notification is listed in the app for 30 days; Immediate social pushes can be muted; optional daily digest at a chosen hour. | Reverses the earlier "no in-app notification center" decision. | Owner approval 2026-10-20 |
+| Safety and member text | Group conduct rules, 140-character captions, 200-character messages on posts, Safety block, message and member reports opening operator Moderation cases. | Report-only moderation; no automated screening. | Owner approval 2026-10-20 |
+| Operator console, export, sessions, PWA lifecycle | Operator queue and actions, Moderation holds, Technical and Service pauses; Account data export; timed Workout sessions with on-device photo picks; durable offline workout queue, app-icon badge, and update prompt. | Operators are assigned in `app_private.staff_assignments`. | Owner approval 2026-10-20 |
 | Lightweight reactions and nudges | Members react to other members' proof with one of strong, fire, or cheer (one changeable reaction per member per post; counts are Group-visible) and nudge a member who is behind their current weekly target, once per sender, recipient, and UTC day. Each sends an Immediate social push to the recipient only: the first at once, later ones within 15 minutes bundled, at most three social pushes per rolling day; extra items stay in-app. | Reactions do not verify proof. Free-text motivational messages, playful responses, the daily Social and competition digest, separate social push controls, and Blocking remain deferred. | Slice 1 |
 
 ## Deferred-feature preservation rule
