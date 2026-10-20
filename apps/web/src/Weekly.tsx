@@ -35,7 +35,7 @@ import {
   uploadProofPhoto,
 } from "./proof";
 import { Result, useNotice } from "./Result";
-import { SeasonCard, SeasonChip } from "./Season";
+import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
 
@@ -774,6 +774,7 @@ export function Weekly({
                     season={extras.season}
                     onOpen={(event) => onNavigate(event, "/history")}
                   />
+                  <UnlockNote unlocks={extras.unlocks} />
                   {hasStreaks(own) && (
                     <p className="home-streaks">{streakText(own)}</p>
                   )}
@@ -1479,6 +1480,7 @@ export function Weekly({
           {route === "/history" && (
             <>
               <SeasonCard season={extras.season} />
+              <UnlockList unlocks={extras.unlocks} />
               <h2>The rack</h2>
               {historyWeeks.length ? (
                 <>

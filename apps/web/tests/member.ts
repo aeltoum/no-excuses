@@ -33,6 +33,8 @@ export const progressItem = (overrides: Record<string, unknown> = {}) => ({
 export const homeExtras = (overrides: Record<string, unknown> = {}) => ({
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
   missed: [],
+  season: null,
+  unlocks: [],
   ...overrides,
 });
 

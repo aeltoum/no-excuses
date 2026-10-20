@@ -3058,3 +3058,36 @@ textarea:focus-visible {
   padding: 0;
   list-style: none;
 }
+
+/* Card unlocks */
+.unlock-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--chalk);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.unlock-list {
+  margin-bottom: 24px;
+}
+.unlock-list h3 {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.unlock-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.unlock-list li {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+}
+.unlock-list small {
+  color: var(--muted);
+}

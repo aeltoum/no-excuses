@@ -1,4 +1,4 @@
-import type { CrownCategory, SeasonState } from "./extras";
+import type { CardUnlock, CrownCategory, SeasonState } from "./extras";
 
 const categoryName: Record<CrownCategory, string> = {
   load_progression: "Load Progression",
@@ -98,6 +98,36 @@ export function SeasonCard({ season }: { season: SeasonState | null }) {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+// The newest unlock, for a week after it lands.
+export function UnlockNote({ unlocks }: { unlocks: CardUnlock[] }) {
+  const latest = unlocks.find((unlock) => unlock.recent);
+  if (!latest) return null;
+  return (
+    <p className="unlock-note">
+      <span aria-hidden="true">🃏</span> {latest.milestone}-week streak: you
+      added “{latest.title}” to your crew’s card deck.
+    </p>
+  );
+}
+
+export function UnlockList({ unlocks }: { unlocks: CardUnlock[] }) {
+  if (unlocks.length === 0) return null;
+  return (
+    <section className="unlock-list" aria-labelledby="unlock-heading">
+      <h3 id="unlock-heading">Cards you added to the deck</h3>
+      <ul>
+        {unlocks.map((unlock) => (
+          <li key={unlock.unlockedAt}>
+            {unlock.title}
+            <small> · {unlock.milestone}-week streak</small>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">Friends may draw these when they owe a card.</p>
     </section>
   );
 }

@@ -67,6 +67,12 @@ export type SeasonState = {
   } | null;
   champions: Array<{ season: number; names: string[]; crowns: number }>;
 };
+export type CardUnlock = {
+  title: string;
+  milestone: number;
+  unlockedAt: string;
+  recent: boolean;
+};
 // Home data from the newer slices, served by one request. Older cached copies may lack keys.
 export type HomeExtras = {
   exceptions: {
@@ -77,11 +83,13 @@ export type HomeExtras = {
   };
   missed: MissedWeek[];
   season: SeasonState | null;
+  unlocks: CardUnlock[];
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
   missed: [],
   season: null,
+  unlocks: [],
 };
 
 const cache = persistentMap<HomeExtras>("extras");

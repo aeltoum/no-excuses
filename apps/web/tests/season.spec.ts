@@ -41,10 +41,25 @@ test("Home shows the Season line and History the standings and Crowns", async ({
   page,
 }) => {
   const { errors } = await signIn(page, ({ path }) =>
-    path === "/v1/home/extras" ? homeExtras({ season }) : undefined,
+    path === "/v1/home/extras"
+      ? homeExtras({
+          season,
+          unlocks: [
+            {
+              title: "1 mile time trial",
+              milestone: 2,
+              unlockedAt: new Date().toISOString(),
+              recent: true,
+            },
+          ],
+        })
+      : undefined,
   );
   const chip = page.getByRole("link", { name: /Season 2 · Week 3\/4/ });
   await expect(chip).toContainText("You 1 👑 · Maya leads");
+  await expect(
+    page.getByText(/2-week streak: you added “1 mile time trial”/),
+  ).toBeVisible();
   await chip.click();
   await expect(page).toHaveURL(/\/history$/);
   const standings = page.getByRole("list", { name: "Season standings" });
@@ -57,5 +72,8 @@ test("Home shows the Season line and History the standings and Crowns", async ({
     page.getByText(/Cardio Leap: No Crown — needs two members/),
   ).toBeVisible();
   await expect(page.getByText("Season 1: Akrum & Maya · 3 👑")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Cards you added to the deck" }),
+  ).toContainText("1 mile time trial · 2-week streak");
   expect(errors).toEqual([]);
 });
