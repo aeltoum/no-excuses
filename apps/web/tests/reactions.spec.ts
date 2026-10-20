@@ -88,6 +88,8 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
           lockedTarget: 3,
           completedWorkoutCount: 3,
           activityTypes: [],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
         {
           membershipId: friendMembershipId,
@@ -95,6 +97,8 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
           lockedTarget: 3,
           completedWorkoutCount: 1,
           activityTypes: ["strength"],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
         {
           membershipId: "30000000-0000-4000-8000-000000000003",
@@ -102,6 +106,8 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
           lockedTarget: 2,
           completedWorkoutCount: 2,
           activityTypes: ["cardio"],
+          targetStreak: 1,
+          workoutStreak: 3,
         },
       ]);
     // Home's background loads, which a longer session reaches.
@@ -539,6 +545,8 @@ test("Signing out drops the cached reactor names", async ({ page }) => {
           lockedTarget: 3,
           completedWorkoutCount: 1,
           activityTypes: [],
+          targetStreak: 0,
+          workoutStreak: 1,
         })),
       );
     if (path === "/v1/nudges") return ok([]);

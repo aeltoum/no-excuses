@@ -345,6 +345,8 @@ describe("True-MVP workout check-ins", () => {
         locked_target: 3,
         completed_workout_count: 2,
         activity_types: ["strength", "cardio"],
+        target_streak: 0,
+        workout_streak: 2,
       },
       {
         membership_id: "40000000-0000-4000-8000-000000000002",
@@ -352,6 +354,8 @@ describe("True-MVP workout check-ins", () => {
         locked_target: 2,
         completed_workout_count: 0,
         activity_types: [],
+        target_streak: 0,
+        workout_streak: 0,
       },
     ]);
     await db.exec("reset role");

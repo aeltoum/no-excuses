@@ -206,6 +206,7 @@ describe("True-MVP weekly settlement", () => {
         locked_target: 2,
         completed_workout_count: 2,
         outcome: "attained",
+        target_streak: 1,
       },
       {
         membership_id: "40000000-0000-4000-8000-000000000002",
@@ -215,6 +216,7 @@ describe("True-MVP weekly settlement", () => {
         locked_target: 2,
         completed_workout_count: 1,
         outcome: "missed",
+        target_streak: 0,
       },
     ]);
     await expect(
@@ -267,6 +269,63 @@ describe("True-MVP weekly settlement", () => {
         ends_at: new Date("2026-03-09T00:00:00.000Z"),
         membership_id: "40000000-0000-4000-8000-000000000002",
       },
+    ]);
+  });
+
+  it("derives Target streak per week and Workout streak since the latest miss", async () => {
+    const db = await database();
+    const member = "40000000-0000-4000-8000-000000000001";
+    await db.exec(`
+      insert into app_private.accountability_weeks
+        (accountability_week_id, group_id, starts_at, ends_at, time_zone, activation_at) values
+        ('50000000-0000-4000-8000-000000000003', '${group}', '2026-03-16Z', '2026-03-23Z', 'UTC', null),
+        ('50000000-0000-4000-8000-000000000004', '${group}', '2026-03-23Z', '2026-03-30Z', 'UTC', null),
+        ('50000000-0000-4000-8000-000000000005', '${group}', '2026-03-30Z', '2026-04-06Z', 'UTC', null);
+      insert into app_private.member_weeks
+        (member_week_id, membership_id, accountability_week_id, target, target_locked_at, status) values
+        ('60000000-0000-4000-8000-000000000004', '${member}', '50000000-0000-4000-8000-000000000003', 1, '2026-03-16Z', 'attained'),
+        ('60000000-0000-4000-8000-000000000005', '${member}', '50000000-0000-4000-8000-000000000004', 1, '2026-03-23Z', 'attained'),
+        ('60000000-0000-4000-8000-000000000006', '${member}', '50000000-0000-4000-8000-000000000005', 2, '2026-03-30Z', 'active');
+      update app_private.member_weeks set status = 'attained'
+        where member_week_id = '60000000-0000-4000-8000-000000000001';
+      update app_private.member_weeks set status = 'missed'
+        where member_week_id = '60000000-0000-4000-8000-000000000003';
+      update app_private.memberships set target_streak = 2 where membership_id = '${member}';
+      insert into app_private.workout_checkins
+        (workout_checkin_id, member_week_id, membership_id, activity_type, completed_at,
+         duration_minutes, perceived_intensity, self_report_attested, submitted_at, review_status) values
+        ('70000000-0000-4000-8000-000000000004', '60000000-0000-4000-8000-000000000003', '${member}', 'cardio', '2026-03-10Z', 30, 'moderate', true, '2026-03-10Z', 'verified'),
+        ('70000000-0000-4000-8000-000000000005', '60000000-0000-4000-8000-000000000004', '${member}', 'cardio', '2026-03-17Z', 30, 'moderate', true, '2026-03-17Z', 'verified'),
+        ('70000000-0000-4000-8000-000000000006', '60000000-0000-4000-8000-000000000005', '${member}', 'cardio', '2026-03-24Z', 30, 'moderate', true, '2026-03-24Z', 'verified'),
+        ('70000000-0000-4000-8000-000000000007', '60000000-0000-4000-8000-000000000006', '${member}', 'cardio', '2026-03-31Z', 30, 'moderate', true, '2026-03-31Z', 'verified'),
+        ('70000000-0000-4000-8000-000000000008', '60000000-0000-4000-8000-000000000006', '${member}', 'cardio', '2026-04-01Z', 30, 'moderate', true, '2026-04-01Z', 'pending');
+    `);
+    await auth(db, memberAuth);
+    await db.exec("set role authenticated");
+    expect(
+      (
+        await db.query<{ starts_at: Date; target_streak: number }>(
+          `select starts_at, target_streak
+           from app_private.finalized_weekly_history('${group}')
+           where membership_id = '${member}'`,
+        )
+      ).rows.map((row) => [row.starts_at.toISOString(), row.target_streak]),
+    ).toEqual([
+      ["2026-03-23T00:00:00.000Z", 2],
+      ["2026-03-16T00:00:00.000Z", 1],
+      ["2026-03-09T00:00:00.000Z", 0],
+      ["2026-03-02T00:00:00.000Z", 1],
+    ]);
+    expect(
+      (
+        await db.query(
+          `select target_streak, workout_streak, completed_workout_count
+           from app_private.current_week_progress('${group}', '2026-04-02Z')
+           where membership_id = '${member}'`,
+        )
+      ).rows,
+    ).toEqual([
+      { target_streak: 2, workout_streak: 3, completed_workout_count: 2 },
     ]);
   });
 });

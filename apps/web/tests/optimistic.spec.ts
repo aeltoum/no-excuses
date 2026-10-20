@@ -137,6 +137,8 @@ async function mockServer(page: Page, options: { member?: boolean } = {}) {
           lockedTarget: 4,
           completedWorkoutCount: server.count,
           activityTypes: Array(server.count).fill("cardio"),
+          targetStreak: 0,
+          workoutStreak: server.count,
         },
         {
           membershipId: friendMembershipId,
@@ -144,6 +146,8 @@ async function mockServer(page: Page, options: { member?: boolean } = {}) {
           lockedTarget: 2,
           completedWorkoutCount: 1,
           activityTypes: ["cardio"],
+          targetStreak: 0,
+          workoutStreak: 1,
         },
       ]);
     if (path.endsWith("/finalized-weekly-history")) return ok([]);

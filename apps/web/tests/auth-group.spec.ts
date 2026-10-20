@@ -129,6 +129,8 @@ async function mockApi(page: Page, member: boolean, denyInvite = true) {
               lockedTarget: 3,
               completedWorkoutCount: 0,
               activityTypes: [],
+              targetStreak: 1,
+              workoutStreak: 3,
             },
           ],
         },
