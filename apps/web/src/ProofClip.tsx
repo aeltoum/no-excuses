@@ -116,37 +116,62 @@ export function ProofClip({
       });
   }, [apiBaseUrl, token, attemptId, onError]);
 
+  // Kept in a ref so a token refresh (e.g. on refocus after Android's permission prompt)
+  // never tears down and reopens the camera, which Android reports as busy.
+  const reportError = useRef(onError);
+  reportError.current = onError;
+
+  useEffect(() => {
+    newChallenge();
+  }, [newChallenge]);
+
   useEffect(() => {
     let live = true;
-    newChallenge();
-    navigator.mediaDevices
-      ?.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: "user" },
-        audio: true,
-      })
-      .then((media) => {
+    const fail = (text: string) =>
+      reportError.current(new ApiError("failure", text));
+    const media = navigator.mediaDevices;
+    if (!media?.getUserMedia) {
+      fail(
+        "This browser can’t open the camera here. Use a secure (https) link.",
+      );
+      return;
+    }
+    const open = (video: MediaTrackConstraints) =>
+      media.getUserMedia({ video, audio: true });
+    open({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" })
+      // Some Android cameras reject the sized request; fall back to defaults.
+      .catch((error: unknown) =>
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? Promise.reject(error)
+          : open({ facingMode: "user" }),
+      )
+      .then((granted) => {
         if (!live) {
-          for (const track of media.getTracks()) track.stop();
+          for (const track of granted.getTracks()) track.stop();
           return;
         }
-        stream.current = media;
-        if (preview.current) preview.current.srcObject = media;
+        stream.current = granted;
+        if (preview.current) {
+          preview.current.srcObject = granted;
+          void preview.current.play().catch(() => {});
+        }
         setCameraReady(true);
       })
-      .catch(() =>
-        onError(
-          new ApiError(
-            "failure",
-            "Camera access is needed to record proof. Allow it and try again.",
-          ),
-        ),
-      );
+      .catch((error: unknown) => {
+        if (!live) return;
+        fail(
+          error instanceof DOMException && error.name === "NotReadableError"
+            ? "The camera is in use by another app. Close it and try again."
+            : "Camera access is needed to record proof. Allow it and try again.",
+        );
+      });
     return () => {
       live = false;
       if (recorder.current?.state === "recording") recorder.current.stop();
       for (const track of stream.current?.getTracks() ?? []) track.stop();
+      stream.current = null;
     };
-  }, [newChallenge, onError]);
+  }, []);
 
   // A code left on screen too long is swapped for a fresh one before recording starts.
   useEffect(() => {
