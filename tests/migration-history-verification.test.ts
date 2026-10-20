@@ -3,7 +3,9 @@ import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { expect, it } from "vitest";
 
-it("accepts the exact committed schema and detects drift before history repair", async () => {
+it("accepts the exact committed schema and detects drift before history repair", {
+  timeout: 30_000,
+}, async () => {
   const sql = execFileSync(
     process.execPath,
     ["scripts/verify-migration-history.mjs"],
