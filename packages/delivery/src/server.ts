@@ -223,6 +223,7 @@ async function deliverPush() {
     await pool.query("select app_private.enqueue_social_push(now())");
     await pool.query("select app_private.enqueue_exception_push(now())");
     await pool.query("select app_private.enqueue_missed_response_push(now())");
+    await pool.query("select app_private.enqueue_crown_push(now())");
     const pending = await pool.query(
       "select o.outbox_id, o.title, o.body, s.endpoint, s.p256dh, s.auth from app_private.web_push_outbox o join app_private.web_push_subscriptions s on s.account_id=o.account_id where o.sent_at is null order by o.outbox_id limit 200",
     );
@@ -267,6 +268,7 @@ async function maintenance() {
   try {
     await pool.query("select app_private.advance_true_mvp_weeks(now())");
     await pool.query("select app_private.advance_consequences(now())");
+    await pool.query("select app_private.advance_crowns(now())");
     const pending = await pool.query(
       "select auth_user_id from app_private.accounts where status='deleted' and auth_deleted_at is null limit 50",
     );

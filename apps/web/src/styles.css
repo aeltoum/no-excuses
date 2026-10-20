@@ -2993,3 +2993,68 @@ textarea:focus-visible {
 .details-lift .text-button {
   justify-self: start;
 }
+
+/* Seasons and Crowns */
+.season-chip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 6px;
+  margin: 4px auto 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+.season-chip:hover span:first-child {
+  text-decoration: underline;
+}
+.season-card {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+.season-card h2 {
+  margin: 0 0 8px;
+}
+.season-card h2 small {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.season-card h3 {
+  margin: 16px 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.season-standings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.season-standings li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: center;
+  min-height: 40px;
+  border-bottom: 1px solid var(--rule);
+}
+.season-standings li.mine {
+  font-weight: 700;
+}
+.season-rank {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.season-latest p,
+.season-champions li {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+.season-champions ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

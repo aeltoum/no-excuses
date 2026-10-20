@@ -35,6 +35,7 @@ import {
   uploadProofPhoto,
 } from "./proof";
 import { Result, useNotice } from "./Result";
+import { SeasonCard, SeasonChip } from "./Season";
 import { Sheet } from "./Sheet";
 import { ProofFeed } from "./Wall";
 
@@ -259,7 +260,7 @@ export function Weekly({
     apiBaseUrl,
     token,
     cacheKey,
-    route === "/home" && Boolean(membership),
+    (route === "/home" || route === "/history") && Boolean(membership),
     feedRevoked,
   );
   const ballotAttention = extras.exceptions.toDecide.filter(
@@ -769,6 +770,10 @@ export function Weekly({
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  <SeasonChip
+                    season={extras.season}
+                    onOpen={(event) => onNavigate(event, "/history")}
+                  />
                   {hasStreaks(own) && (
                     <p className="home-streaks">{streakText(own)}</p>
                   )}
@@ -1473,6 +1478,7 @@ export function Weekly({
           )}
           {route === "/history" && (
             <>
+              <SeasonCard season={extras.season} />
               <h2>The rack</h2>
               {historyWeeks.length ? (
                 <>

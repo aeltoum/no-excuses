@@ -44,6 +44,29 @@ export type MissedWeek = {
   responses: Array<{ response: MissedResponse; count: number }>;
   myResponse: MissedResponse | null;
 };
+export type CrownCategory = "load_progression" | "cardio_leap";
+export type SeasonState = {
+  season: number | null;
+  week: number | null;
+  standings: Array<{
+    membershipId: string;
+    name: string;
+    crowns: number;
+    mine: boolean;
+    rank: number;
+  }>;
+  latest: {
+    endsAt: string;
+    results: Array<{
+      category: CrownCategory;
+      name: string;
+      mine: boolean;
+      score: number;
+      winner: boolean;
+    }>;
+  } | null;
+  champions: Array<{ season: number; names: string[]; crowns: number }>;
+};
 // Home data from the newer slices, served by one request. Older cached copies may lack keys.
 export type HomeExtras = {
   exceptions: {
@@ -53,10 +76,12 @@ export type HomeExtras = {
     pending: string[];
   };
   missed: MissedWeek[];
+  season: SeasonState | null;
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
   missed: [],
+  season: null,
 };
 
 const cache = persistentMap<HomeExtras>("extras");
