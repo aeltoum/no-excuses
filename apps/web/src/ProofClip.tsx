@@ -144,15 +144,12 @@ export function ProofClip({
         ),
       10_000,
     );
-    const open = (video: MediaTrackConstraints) =>
-      media.getUserMedia({ video, audio: true });
+    const open = (video: MediaTrackConstraints, audio = true) =>
+      media.getUserMedia({ video, audio });
     open({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" })
-      // Some Android cameras reject the sized request; fall back to defaults.
-      .catch((error: unknown) =>
-        error instanceof DOMException && error.name === "NotAllowedError"
-          ? Promise.reject(error)
-          : open({ facingMode: "user" }),
-      )
+      // Some Android cameras reject the sized request, and a blocked or busy
+      // microphone fails the whole request; fall back to camera only.
+      .catch(() => open({ facingMode: "user" }, false))
       .then((granted) => {
         window.clearTimeout(stalled);
         if (!live) {
@@ -172,7 +169,9 @@ export function ProofClip({
         fail(
           error instanceof DOMException && error.name === "NotReadableError"
             ? "The camera is in use by another app. Close it and try again."
-            : "Camera access is needed to record proof. Allow it and try again.",
+            : `Camera access is needed to record proof. Allow it and try again.${
+                error instanceof DOMException ? ` (${error.name})` : ""
+              }`,
         );
       });
     return () => {
