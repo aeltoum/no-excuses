@@ -469,6 +469,9 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toBeVisible();
   // A second take stops itself at 30 seconds.
   await recorder.getByRole("button", { name: "Record again" }).click();
+  // The old take's playback goes away so the live preview shows again.
+  await expect(recorder.getByLabel("Your recorded proof")).toHaveCount(0);
+  await expect(recorder.getByLabel("Camera preview")).toBeVisible();
   await recorder.getByRole("button", { name: "Start recording" }).click();
   await expect(recorder.getByText(/Recording 0:00/)).toBeVisible();
   await page.clock.fastForward(29_000);

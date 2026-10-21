@@ -217,7 +217,10 @@ export function ProofClip({
     if (!clip) return;
     const url = URL.createObjectURL(clip.blob);
     setClipUrl(url);
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      URL.revokeObjectURL(url);
+      setClipUrl(null);
+    };
   }, [clip]);
 
   useEffect(() => {
