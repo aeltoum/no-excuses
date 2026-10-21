@@ -144,12 +144,25 @@ export function ProofClip({
         ),
       10_000,
     );
-    const open = (video: MediaTrackConstraints, audio = true) =>
-      media.getUserMedia({ video, audio });
+    const denied = (error: unknown) =>
+      error instanceof DOMException && error.name === "NotAllowedError";
+    const open = (video: MediaTrackConstraints) =>
+      media.getUserMedia({ video, audio: true });
+    // Proof needs sound: a blocked mic fails the request even with camera allowed,
+    // so probe the camera alone to tell the member which permission to allow.
+    const blocked = () =>
+      media
+        .getUserMedia({ video: true })
+        .then((probe) => {
+          for (const track of probe.getTracks()) track.stop();
+          return "microphone";
+        })
+        .catch(() => "camera");
     open({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" })
-      // Some Android cameras reject the sized request, and a blocked or busy
-      // microphone fails the whole request; fall back to camera only.
-      .catch(() => open({ facingMode: "user" }, false))
+      // Some Android cameras reject the sized request; fall back to defaults.
+      .catch((error: unknown) =>
+        denied(error) ? Promise.reject(error) : open({ facingMode: "user" }),
+      )
       .then((granted) => {
         window.clearTimeout(stalled);
         if (!live) {
@@ -163,15 +176,22 @@ export function ProofClip({
         }
         setCameraReady(true);
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         window.clearTimeout(stalled);
         if (!live) return;
+        const missing = denied(error) ? await blocked() : null;
+        if (!live) return;
         fail(
-          error instanceof DOMException && error.name === "NotReadableError"
-            ? "The camera is in use by another app. Close it and try again."
-            : `Camera access is needed to record proof. Allow it and try again.${
-                error instanceof DOMException ? ` (${error.name})` : ""
-              }`,
+          missing === "microphone"
+            ? "Proof needs sound. Allow microphone for this site in Chrome (Site settings › Microphone) and try again."
+            : missing === "camera"
+              ? "Camera access is needed to record proof. Allow it and try again."
+              : error instanceof DOMException &&
+                  error.name === "NotReadableError"
+                ? "The camera or microphone is in use by another app. Close it and try again."
+                : `Camera didn’t open. Try again.${
+                    error instanceof DOMException ? ` (${error.name})` : ""
+                  }`,
         );
       });
     return () => {
