@@ -8,12 +8,13 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import { NotificationBell, NotificationSettings } from "./Notifications";
 import { OperatorConsole } from "./OperatorConsole";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
-import { call, removeAllProof } from "./proof";
+import { call, removeAllProof, setTokenSource } from "./proof";
 import { Result, useNotice } from "./Result";
 import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
@@ -142,34 +143,35 @@ export function App({
   auth: SupabaseClient;
   apiBaseUrl: string;
 }) {
-  const api = useRef(
-    createApiClient(apiBaseUrl, fetch, async () => {
-      let result: Awaited<ReturnType<typeof auth.auth.getSession>>;
-      try {
-        result = await auth.auth.getSession();
-      } catch {
-        throw new ApiError("failure", "Service unavailable. Try again.", true);
-      }
-      const { data, error } = result;
-      if (error) {
-        const unavailable =
-          error.status === undefined ||
-          error.status === 0 ||
-          error.status === 429 ||
-          error.status >= 500;
-        throw new ApiError(
-          unavailable ? "failure" : "unauthorized",
-          unavailable
-            ? "Service unavailable. Try again."
-            : "Access ended. Sign in again.",
-          unavailable,
-        );
-      }
-      if (!data.session)
-        throw new ApiError("unauthorized", "Access ended. Sign in again.");
-      return data.session.access_token;
-    }),
-  ).current;
+  const freshToken = useRef(async () => {
+    let result: Awaited<ReturnType<typeof auth.auth.getSession>>;
+    try {
+      result = await auth.auth.getSession();
+    } catch {
+      throw new ApiError("failure", "Service unavailable. Try again.", true);
+    }
+    const { data, error } = result;
+    if (error) {
+      const unavailable =
+        error.status === undefined ||
+        error.status === 0 ||
+        error.status === 429 ||
+        error.status >= 500;
+      throw new ApiError(
+        unavailable ? "failure" : "unauthorized",
+        unavailable
+          ? "Service unavailable. Try again."
+          : "Access ended. Sign in again.",
+        unavailable,
+      );
+    }
+    if (!data.session)
+      throw new ApiError("unauthorized", "Access ended. Sign in again.");
+    return data.session.access_token;
+  }).current;
+  const api = useRef(createApiClient(apiBaseUrl, fetch, freshToken)).current;
+  // Every API call sends the session's current token, not the one a screen rendered with.
+  setTokenSource(freshToken);
   const weeklyCache = useRef(persistentMap<WeeklySnapshot>("weekly")).current;
   const nameCache = useRef(persistentMap<string>("name")).current;
   const groupCache = useRef(
@@ -261,6 +263,7 @@ export function App({
   const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
   const emailInput = useRef<HTMLInputElement>(null);
   const [groupRevision, setGroupRevision] = useState(0);
+  const fresh = useFreshness();
   const [groupLoad, setGroupLoad] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -589,6 +592,7 @@ export function App({
   ]);
   useEffect(() => {
     void groupRevision;
+    void fresh;
     if (
       access !== "signed-in" ||
       (path !== "/group" && path !== "/account") ||
@@ -618,7 +622,8 @@ export function App({
     void api
       .roster(session.access_token, membership.groupId)
       .then(async (response) => {
-        if (!active) return;
+        // A reload landing under an optimistic change waits for the next one.
+        if (!active || (hasCache && running.current.size > 0)) return;
         if (
           !hasCache ||
           JSON.stringify(previousRoster) !== JSON.stringify(response.data)
@@ -677,6 +682,7 @@ export function App({
   }, [
     access,
     api,
+    fresh,
     groupCache,
     groupRevision,
     invitationCache,

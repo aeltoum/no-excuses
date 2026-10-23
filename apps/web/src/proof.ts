@@ -51,18 +51,48 @@ export type ProofAction =
   | "report"
   | "moderate";
 
+// The signed-in session's current token. Screens hold the token they rendered
+// with, which can expire while the app sits in the background.
+let freshToken: (() => Promise<string>) | null = null;
+export const setTokenSource = (source: () => Promise<string>) => {
+  freshToken = source;
+};
+const currentToken = (fallback: string) =>
+  freshToken ? freshToken().catch(() => fallback) : Promise.resolve(fallback);
+
+// Writes still waiting on the server. A background reload that lands meanwhile
+// would show the old state over an optimistic change, so loaders skip it.
+let writes = 0;
+export const writing = () => writes > 0;
+
 export async function call<T>(
   baseUrl: string,
   token: string,
   path: string,
   init: { method: "GET" | "POST"; body?: unknown },
 ): Promise<T> {
+  if (init.method === "GET") return request<T>(baseUrl, token, path, init);
+  writes++;
+  try {
+    return await request<T>(baseUrl, token, path, init);
+  } finally {
+    writes--;
+  }
+}
+
+async function request<T>(
+  baseUrl: string,
+  token: string,
+  path: string,
+  init: { method: "GET" | "POST"; body?: unknown },
+): Promise<T> {
+  let accessToken = await currentToken(token);
   let response: Response;
   const send = (timeoutMs: number) =>
     fetch(`${baseUrl}${path}`, {
       method: init.method,
       headers: {
-        authorization: `Bearer ${token}`,
+        authorization: `Bearer ${accessToken}`,
         ...(init.body === undefined
           ? {}
           : { "content-type": "application/json" }),
@@ -71,13 +101,24 @@ export async function call<T>(
       signal: AbortSignal.timeout(timeoutMs),
     });
   try {
-    try {
-      response = await send(requestTimeoutMs);
-    } catch (error) {
-      // Reads retry once: after a cold app launch the first attempt often
-      // only wakes the API host, which would leave the feed empty until a refresh.
-      if (init.method !== "GET") throw error;
+    if (init.method !== "GET")
+      // Writes are not retried, so one attempt waits out a sleeping host.
       response = await send(wakeTimeoutMs);
+    else
+      try {
+        response = await send(requestTimeoutMs);
+      } catch {
+        // Reads retry once: after a cold app launch the first attempt often
+        // only wakes the API host, which would leave the feed empty until a refresh.
+        response = await send(wakeTimeoutMs);
+      }
+    if (response.status === 401 && init.method === "GET") {
+      // A token that expired in flight: read again once with the refreshed one.
+      const next = await currentToken(accessToken);
+      if (next !== accessToken) {
+        accessToken = next;
+        response = await send(requestTimeoutMs);
+      }
     }
   } catch {
     throw new ApiError("failure", "Connection failed. Try again.", true);

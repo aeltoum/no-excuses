@@ -78,13 +78,16 @@ export function createApiClient(
           // A sleeping API host must surface as a retryable failure, never a hang.
           signal: AbortSignal.timeout(timeoutMs),
         });
-      try {
-        response = await send();
-      } catch (error) {
-        // Reads retry once: the first attempt often only wakes the host.
-        if (command) throw error;
+      if (command)
+        // Commands are not retried here, so one attempt waits out a sleeping host.
         response = await send(wakeTimeoutMs);
-      }
+      else
+        try {
+          response = await send();
+        } catch {
+          // Reads retry once: the first attempt often only wakes the host.
+          response = await send(wakeTimeoutMs);
+        }
       if (response.status === 401 && !command && getFreshToken) {
         const nextToken = await getFreshToken();
         if (nextToken !== accessToken) {

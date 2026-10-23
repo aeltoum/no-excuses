@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
+import { useFreshness } from "./freshness";
 import { persistentMap } from "./persist";
-import { call } from "./proof";
+import { call, writing } from "./proof";
 import { rememberSafety } from "./Safety";
 
 export type ExceptionCategory =
@@ -122,15 +123,18 @@ export function useHomeExtras(
     merge(cache.get(cacheKey)),
   );
   const [revision, setRevision] = useState(0);
+  const fresh = useFreshness();
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
   useEffect(() => {
     void revision;
+    void fresh;
     if (!active) return;
     let live = true;
     call<HomeExtras>(apiBaseUrl, token, "/v1/home/extras", { method: "GET" })
       .then((next) => {
-        if (!live) return;
+        // A reload landing under an optimistic change waits for the next one.
+        if (!live || (cache.has(cacheKey) && writing())) return;
         const merged = merge(next);
         rememberSafety(merged.safety);
         cache.set(cacheKey, merged);
@@ -143,7 +147,7 @@ export function useHomeExtras(
     return () => {
       live = false;
     };
-  }, [apiBaseUrl, token, cacheKey, active, revision]);
+  }, [apiBaseUrl, token, cacheKey, active, revision, fresh]);
   const apply = useCallback(
     (next: HomeExtras | ((current: HomeExtras) => HomeExtras)) =>
       setExtras((current) => {

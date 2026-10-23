@@ -105,6 +105,7 @@ export async function signIn(
   page: Page,
   handler: Handler = () => undefined,
   start = "/home",
+  sessionOverrides: Record<string, unknown> = {},
 ) {
   const calls: ApiCall[] = [];
   const errors: string[] = [];
@@ -113,7 +114,10 @@ export async function signIn(
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/otp")) return route.fulfill({ status: 200, json: {} });
     if (path.endsWith("/verify"))
-      return route.fulfill({ status: 200, json: session });
+      return route.fulfill({
+        status: 200,
+        json: { ...session, ...sessionOverrides },
+      });
     if (path.endsWith("/user"))
       return route.fulfill({ status: 200, json: session.user });
     return route.fulfill({ status: 401, json: { message: "no session" } });

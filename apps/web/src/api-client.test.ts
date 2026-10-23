@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError, createApiClient } from "./api-client";
+import {
+  ApiError,
+  createApiClient,
+  requestTimeoutMs,
+  wakeTimeoutMs,
+} from "./api-client";
 
 const uuid = "10000000-0000-4000-8000-000000000001";
 const workout = {
@@ -301,6 +306,20 @@ describe("browser API client", () => {
         }),
       }),
     );
+  });
+
+  it("gives a command one attempt long enough to wake a sleeping host", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const fetcher = vi.fn(async () =>
+      Response.json({ contractVersion: 1, data: { membershipId: uuid } }),
+    );
+    const api = createApiClient("https://api.example.test", fetcher);
+    await api.leave("token", uuid);
+    expect(timeout).toHaveBeenLastCalledWith(wakeTimeoutMs);
+    await api.target("token").catch(() => undefined);
+    expect(timeout).toHaveBeenLastCalledWith(requestTimeoutMs);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    timeout.mockRestore();
   });
 
   it("uses current session token for commands and never sends a stale fallback on refresh failure", async () => {

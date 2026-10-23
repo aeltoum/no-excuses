@@ -29,6 +29,7 @@ import {
 } from "./durable";
 import { Exceptions } from "./Exceptions";
 import { useHomeExtras } from "./extras";
+import { useFreshness } from "./freshness";
 import { InstallPrompt } from "./InstallPrompt";
 import { onClearPersisted } from "./persist";
 import {
@@ -274,6 +275,7 @@ export function Weekly({
   const [nudged, setNudged] = useState<ReadonlySet<string>>(new Set());
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
+  const fresh = useFreshness();
   const [target, setTarget] = useState(
     saved?.targetContext ? String(saved.targetContext.recurringTarget) : "",
   );
@@ -484,6 +486,7 @@ export function Weekly({
   });
   useEffect(() => {
     void retry;
+    void fresh;
     let active = true;
     const previous = cache.get(cacheKey);
     if (!previous) setState("loading");
@@ -503,6 +506,14 @@ export function Weekly({
     )
       .then((next) => {
         if (!active) return;
+        // A reload landing while a workout or target is still saving would
+        // count it twice or undo it; the save's own refresh follows.
+        if (
+          previous &&
+          (targetSaving.current !== null ||
+            outbox.some((entry) => entry.status === "sending"))
+        )
+          return;
         const differs =
           !previous ||
           JSON.stringify({ ...previous, syncedAt: 0 }) !==
@@ -552,7 +563,7 @@ export function Weekly({
       active = false;
       window.clearTimeout(changedTimer.current);
     };
-  }, [api, token, groupId, route, retry, cache, cacheKey, setNotice]);
+  }, [api, token, groupId, route, retry, fresh, cache, cacheKey, setNotice]);
   // Only fetch who was nudged when some friend is still behind target.
   const nudgeable = progress.some(
     (item) =>
@@ -560,6 +571,7 @@ export function Weekly({
       item.completedWorkoutCount < item.lockedTarget,
   );
   useEffect(() => {
+    void fresh;
     if (route !== "/home" || !groupId || !nudgeable) return;
     let active = true;
     loadNudged(apiBaseUrl, token)
@@ -568,7 +580,7 @@ export function Weekly({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, route, groupId, nudgeable]);
+  }, [apiBaseUrl, token, route, groupId, nudgeable, fresh]);
   const nudge = async (membershipId: string) => {
     setNudged((ids) => new Set(ids).add(membershipId));
     try {
