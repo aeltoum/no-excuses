@@ -10,7 +10,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ApiError, type createApiClient } from "./api-client";
+import {
+  ApiError,
+  type createApiClient,
+  overlappedWrite,
+  writeMark,
+} from "./api-client";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
 import {
@@ -488,6 +493,7 @@ export function Weekly({
     void retry;
     void fresh;
     let active = true;
+    const mark = writeMark();
     const previous = cache.get(cacheKey);
     if (!previous) setState("loading");
     if (!groupId) {
@@ -506,11 +512,11 @@ export function Weekly({
     )
       .then((next) => {
         if (!active) return;
-        // A reload landing while a workout or target is still saving would
-        // count it twice or undo it; the save's own refresh follows.
+        // A reload that overlapped a save, or lands while a workout is still
+        // sending, would count it twice or undo it; the save's own refresh follows.
         if (
           previous &&
-          (targetSaving.current !== null ||
+          (overlappedWrite(mark) ||
             outbox.some((entry) => entry.status === "sending"))
         )
           return;

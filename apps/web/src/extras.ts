@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "./api-client";
+import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { useFreshness } from "./freshness";
 import { persistentMap } from "./persist";
-import { call, writing } from "./proof";
+import { call } from "./proof";
 import { rememberSafety } from "./Safety";
 
 export type ExceptionCategory =
@@ -131,10 +131,11 @@ export function useHomeExtras(
     void fresh;
     if (!active) return;
     let live = true;
+    const mark = writeMark();
     call<HomeExtras>(apiBaseUrl, token, "/v1/home/extras", { method: "GET" })
       .then((next) => {
         // A reload landing under an optimistic change waits for the next one.
-        if (!live || (cache.has(cacheKey) && writing())) return;
+        if (!live || (cache.has(cacheKey) && overlappedWrite(mark))) return;
         const merged = merge(next);
         rememberSafety(merged.safety);
         cache.set(cacheKey, merged);

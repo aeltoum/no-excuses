@@ -1,4 +1,9 @@
-import { ApiError, requestTimeoutMs, wakeTimeoutMs } from "./api-client";
+import {
+  ApiError,
+  requestTimeoutMs,
+  trackWrite,
+  wakeTimeoutMs,
+} from "./api-client";
 import type { WorkoutDetails } from "./details";
 import { onClearPersisted } from "./persist";
 
@@ -60,24 +65,15 @@ export const setTokenSource = (source: () => Promise<string>) => {
 const currentToken = (fallback: string) =>
   freshToken ? freshToken().catch(() => fallback) : Promise.resolve(fallback);
 
-// Writes still waiting on the server. A background reload that lands meanwhile
-// would show the old state over an optimistic change, so loaders skip it.
-let writes = 0;
-export const writing = () => writes > 0;
-
 export async function call<T>(
   baseUrl: string,
   token: string,
   path: string,
   init: { method: "GET" | "POST"; body?: unknown },
 ): Promise<T> {
-  if (init.method === "GET") return request<T>(baseUrl, token, path, init);
-  writes++;
-  try {
-    return await request<T>(baseUrl, token, path, init);
-  } finally {
-    writes--;
-  }
+  return init.method === "GET"
+    ? request<T>(baseUrl, token, path, init)
+    : trackWrite(() => request<T>(baseUrl, token, path, init));
 }
 
 async function request<T>(

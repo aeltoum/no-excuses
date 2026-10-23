@@ -12,8 +12,14 @@ let last = Date.now();
 let timer: number | undefined;
 const listeners = new Set<() => void>();
 
+// The minute restarts at every reload, so a focus just before it never stretches the gap.
+const schedule = () => {
+  window.clearInterval(timer);
+  timer = window.setInterval(onWake, pollMs);
+};
 const bump = () => {
   last = Date.now();
+  schedule();
   tick++;
   for (const listener of listeners) listener();
 };
@@ -32,7 +38,7 @@ function subscribe(listener: () => void) {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onWake);
     window.addEventListener("online", onWake);
-    timer = window.setInterval(onWake, pollMs);
+    schedule();
   }
   listeners.add(listener);
   return () => {

@@ -1,6 +1,11 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, createApiClient } from "./api-client";
+import {
+  ApiError,
+  createApiClient,
+  overlappedWrite,
+  writeMark,
+} from "./api-client";
 import {
   normalizeOtp,
   requestOtp,
@@ -619,11 +624,12 @@ export function App({
       setPendingInvitations([]);
       setGroupLoad("loading");
     }
+    const mark = writeMark();
     void api
       .roster(session.access_token, membership.groupId)
       .then(async (response) => {
         // A reload landing under an optimistic change waits for the next one.
-        if (!active || (hasCache && running.current.size > 0)) return;
+        if (!active || (hasCache && overlappedWrite(mark))) return;
         if (
           !hasCache ||
           JSON.stringify(previousRoster) !== JSON.stringify(response.data)

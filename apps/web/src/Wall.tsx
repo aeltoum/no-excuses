@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError } from "./api-client";
+import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { useConfirm } from "./Confirm";
 import { detailLine } from "./details";
 import { useFreshness } from "./freshness";
@@ -15,7 +15,6 @@ import {
   type ProofItem,
   reactToProof,
   removeProofPhotos,
-  writing,
 } from "./proof";
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
@@ -158,12 +157,13 @@ export function ProofFeed({
     void reload;
     void fresh;
     let active = true;
+    const mark = writeMark();
     const previous = cachedFeed(cacheKey);
     if (previous) onItems(previous);
     loadProofFeed(apiBaseUrl, token)
       .then((loaded) => {
         // A reload landing under an optimistic change waits for the next one.
-        if (!active || (previous && writing())) return;
+        if (!active || (previous && overlappedWrite(mark))) return;
         const next = keepPhotoUrls(feedCache.get(cacheKey) ?? [], loaded);
         feedCache.set(cacheKey, next);
         setItems((current) =>

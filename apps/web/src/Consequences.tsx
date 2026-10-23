@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
-import { ApiError } from "./api-client";
+import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { useConfirm } from "./Confirm";
 import { useFreshness } from "./freshness";
 import { maxClipSeconds, ProofClip } from "./ProofClip";
@@ -192,8 +192,6 @@ export function Consequences({
   // Controls waiting on the server, by action and target.
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const busy = (key: string) => pending.has(key);
-  const pendingRef = useRef(pending);
-  pendingRef.current = pending;
   const fresh = useFreshness();
   const [picking, setPicking] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -218,10 +216,12 @@ export function Consequences({
   useEffect(() => {
     void fresh;
     let active = true;
+    const mark = writeMark();
+    const previous = homeCache.has(cacheKey);
     request(apiBaseUrl, token, "/v1/consequences")
       .then((next) => {
-        // A background reload must not undo an action still in flight.
-        if (!active || pendingRef.current.size > 0) return;
+        // A reload that overlapped an action must not undo it on screen.
+        if (!active || (previous && overlappedWrite(mark))) return;
         homeCache.set(cacheKey, next);
         setHome(next);
         onGroupOwed(next.groupOwed);

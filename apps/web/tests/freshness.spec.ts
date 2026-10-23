@@ -170,3 +170,72 @@ test("a token that expired in the background refreshes Home without an access ch
   expect(rejected).toEqual([]);
   await page.screenshot({ path: info.outputPath("expired.png") });
 });
+
+test("a reaction tapped while a background reload is in flight stays", async ({
+  page,
+}, info) => {
+  let mine: string[] = [];
+  const feed = () => [
+    post({
+      reactions: [{ emoji: "🔥", count: 2 + mine.length }],
+      myReactions: [...mine],
+    }),
+  ];
+  let reacted = false;
+  await signIn(page, ({ path, body }) => {
+    if (path.endsWith("/react")) {
+      mine = body?.on ? ["🔥"] : [];
+      reacted = true;
+      return { emoji: "🔥", on: Boolean(body?.on) };
+    }
+    return path === "/v1/proof/feed" ? feed() : undefined;
+  });
+  const fire = page.getByRole("button", { name: /^🔥, \d/ }).first();
+  await expect(fire).toHaveAttribute("aria-pressed", "false");
+  // The reload reads the server before the tap and answers after it lands.
+  let answer = () => {};
+  const held = new Promise<void>((resolve) => {
+    answer = resolve;
+  });
+  await page.route("http://127.0.0.1:8787/v1/proof/feed", async (route) => {
+    const before = feed();
+    await held;
+    await route.fulfill({
+      status: 200,
+      json: { contractVersion: 1, data: before },
+    });
+  });
+  const reload = page.waitForRequest("http://127.0.0.1:8787/v1/proof/feed");
+  await leaveAndReturn(page);
+  await reload;
+  await page.getByRole("button", { name: "Add reaction" }).first().click();
+  await page.getByRole("button", { name: "React 🔥" }).click();
+  await expect(fire).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => reacted).toBe(true);
+  const landed = page.waitForResponse("http://127.0.0.1:8787/v1/proof/feed");
+  answer();
+  await landed;
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(resolve)),
+  );
+  await expect(fire).toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({ path: info.outputPath("reaction.png") });
+});
+
+test("a focus refresh restarts the minute instead of stretching it", async ({
+  page,
+}) => {
+  await page.clock.install();
+  let maya = 2;
+  await signIn(page, ({ path }) =>
+    path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
+  );
+  const friends = page.getByRole("list", { name: "Friends this week" });
+  await expect(friends).toContainText("2/3");
+  await page.clock.runFor(55_000);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  maya = 3;
+  // Within a minute of the focus reload, never more.
+  await page.clock.runFor(60_000);
+  await expect(friends).toContainText("3/3");
+});

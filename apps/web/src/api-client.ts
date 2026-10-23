@@ -40,13 +40,46 @@ export const requestTimeoutMs = 20_000;
 // that long instead of aborting the very request that is waking the host.
 export const wakeTimeoutMs = 75_000;
 
+// Writes still waiting on the server, and a mark that moves whenever one
+// starts or ends. A background read that overlapped a write may hold the
+// state from before it, so loaders drop it rather than undo the write on screen.
+let writes = 0;
+let writeEpoch = 0;
+export const writeMark = () => writeEpoch;
+export const overlappedWrite = (mark: number) =>
+  writes > 0 || writeEpoch !== mark;
+export async function trackWrite<T>(work: () => Promise<T>) {
+  writes++;
+  writeEpoch++;
+  try {
+    return await work();
+  } finally {
+    writes--;
+    writeEpoch++;
+  }
+}
+
 export function createApiClient(
   baseUrl: string,
   fetcher: typeof fetch = fetch,
   getFreshToken?: () => Promise<string>,
 ) {
   const root = baseUrl.replace(/\/$/, "");
-  async function request<T>(
+  function request<T>(
+    path: string,
+    token: string,
+    parser: Parser<T>,
+    command?: {
+      method: "POST" | "DELETE" | "PUT";
+      body?: unknown;
+      key: string;
+    },
+  ) {
+    return command
+      ? trackWrite(() => requestNow(path, token, parser, command))
+      : requestNow(path, token, parser);
+  }
+  async function requestNow<T>(
     path: string,
     token: string,
     parser: Parser<T>,
