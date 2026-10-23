@@ -43,11 +43,34 @@ export const wakeTimeoutMs = 75_000;
 // Writes still waiting on the server, and a mark that moves whenever one
 // starts or ends. A background read that overlapped a write may hold the
 // state from before it, so loaders drop it rather than undo the write on screen.
+// Each dropped read is made again once writes settle, so the screen never
+// waits for the next scheduled reload to catch up.
 let writes = 0;
 let writeEpoch = 0;
+let dropped = false;
+let queued = false;
+const settledListeners = new Set<() => void>();
+const settle = () => {
+  dropped = false;
+  queued = false;
+  for (const listener of settledListeners) listener();
+};
+export const onWritesSettled = (listener: () => void) => {
+  settledListeners.add(listener);
+  return () => {
+    settledListeners.delete(listener);
+  };
+};
 export const writeMark = () => writeEpoch;
-export const overlappedWrite = (mark: number) =>
-  writes > 0 || writeEpoch !== mark;
+export function overlappedWrite(mark: number) {
+  if (writes === 0 && writeEpoch === mark) return false;
+  if (writes > 0) dropped = true;
+  else if (!queued) {
+    queued = true;
+    queueMicrotask(settle);
+  }
+  return true;
+}
 export async function trackWrite<T>(work: () => Promise<T>) {
   writes++;
   writeEpoch++;
@@ -56,6 +79,7 @@ export async function trackWrite<T>(work: () => Promise<T>) {
   } finally {
     writes--;
     writeEpoch++;
+    if (writes === 0 && dropped) settle();
   }
 }
 

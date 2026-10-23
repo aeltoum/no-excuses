@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { onWritesSettled } from "./api-client";
 
 // A counter that moves when screens should reload in the background: the app
 // comes back to the foreground or online, or a minute passes on screen. Loaders
@@ -10,6 +11,7 @@ const settleMs = 10_000;
 let tick = 0;
 let last = Date.now();
 let timer: number | undefined;
+let stopSettled: (() => void) | undefined;
 const listeners = new Set<() => void>();
 
 // The minute restarts at every reload, so a focus just before it never stretches the gap.
@@ -38,6 +40,8 @@ function subscribe(listener: () => void) {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onWake);
     window.addEventListener("online", onWake);
+    // A reload dropped because it overlapped a write runs again right away.
+    stopSettled = onWritesSettled(bump);
     schedule();
   }
   listeners.add(listener);
@@ -47,6 +51,7 @@ function subscribe(listener: () => void) {
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("focus", onWake);
     window.removeEventListener("online", onWake);
+    stopSettled?.();
     window.clearInterval(timer);
   };
 }

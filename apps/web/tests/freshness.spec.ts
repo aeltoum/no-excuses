@@ -226,16 +226,78 @@ test("a focus refresh restarts the minute instead of stretching it", async ({
   page,
 }) => {
   await page.clock.install();
-  let maya = 2;
-  await signIn(page, ({ path }) =>
-    path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
-  );
-  const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends).toContainText("2/3");
-  await page.clock.runFor(55_000);
+  const { calls } = await signIn(page);
+  await expect(
+    page.getByRole("list", { name: "Friends this week" }),
+  ).toBeVisible();
+  const polls = () =>
+    calls.filter((call) => call.path.endsWith("/current-week-progress")).length;
+  // Reloads run on a minute from app start. Focus five seconds before one is
+  // due, then let time move only when the test says.
+  const started = await page.evaluate(() => Date.now() - performance.now());
+  await page.clock.pauseAt(started + 55_000);
+  const focusReload = page.waitForResponse(/current-week-progress/);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  maya = 3;
-  // Within a minute of the focus reload, never more.
-  await page.clock.runFor(60_000);
-  await expect(friends).toContainText("3/3");
+  await focusReload;
+  await page.clock.runFor(1_000);
+  const afterFocus = polls();
+  // The next automatic reload comes a minute after the focus one, not later.
+  await page.clock.runFor(59_500);
+  await expect.poll(polls).toBeGreaterThan(afterFocus);
+});
+
+test("a reload dropped for an overlapping write runs again at once", async ({
+  page,
+}) => {
+  let mine: string[] = [];
+  let posts = 1;
+  const feed = () => [
+    post({
+      reactions: [{ emoji: "🔥", count: 2 + mine.length }],
+      myReactions: [...mine],
+    }),
+    ...(posts > 1
+      ? [
+          post({
+            workoutCheckinId: "70000000-0000-4000-8000-000000000010",
+            activityType: "cardio",
+          }),
+        ]
+      : []),
+  ];
+  await signIn(page, ({ path, body }) => {
+    if (path.endsWith("/react")) {
+      mine = body?.on ? ["🔥"] : [];
+      return { emoji: "🔥", on: Boolean(body?.on) };
+    }
+    return path === "/v1/proof/feed" ? feed() : undefined;
+  });
+  const fire = page.getByRole("button", { name: /^🔥, \d/ }).first();
+  await expect(fire).toHaveAttribute("aria-pressed", "false");
+  let answer = () => {};
+  const held = new Promise<void>((resolve) => {
+    answer = resolve;
+  });
+  let first = true;
+  await page.route("http://127.0.0.1:8787/v1/proof/feed", async (route) => {
+    if (!first) return route.fallback();
+    first = false;
+    const before = feed();
+    await held;
+    await route.fulfill({
+      status: 200,
+      json: { contractVersion: 1, data: before },
+    });
+  });
+  const reload = page.waitForRequest("http://127.0.0.1:8787/v1/proof/feed");
+  await leaveAndReturn(page);
+  await reload;
+  await page.getByRole("button", { name: "Add reaction" }).first().click();
+  await page.getByRole("button", { name: "React 🔥" }).click();
+  await expect(fire).toHaveAttribute("aria-pressed", "true");
+  // Maya posts again meanwhile; the dropped reload must not hide it for a minute.
+  posts = 2;
+  answer();
+  await expect(page.getByAltText("Maya's workout activity")).toHaveCount(2);
+  await expect(fire).toHaveAttribute("aria-pressed", "true");
 });
