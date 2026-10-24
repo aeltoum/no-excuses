@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { ApiError } from "./api-client";
+import { call } from "./proof";
 import { Sheet } from "./Sheet";
 
 type Challenge = {
@@ -37,29 +38,16 @@ async function post<T>(
   path: string,
   body: unknown,
 ): Promise<T> {
-  let response: Response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new ApiError("failure", "Connection failed. Try again.", true);
+    return await call<T>(baseUrl, token, path, { method: "POST", body });
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === "denied")
+      throw new ApiError(
+        "denied",
+        "That code expired. Record again with a new code.",
+      );
+    throw error;
   }
-  if (response.status === 401)
-    throw new ApiError("unauthorized", "Access ended. Sign in again.");
-  if (response.status === 403)
-    throw new ApiError(
-      "denied",
-      "That code expired. Record again with a new code.",
-    );
-  if (!response.ok)
-    throw new ApiError("failure", "Something went wrong. Try again.", true);
-  return ((await response.json()) as { data: T }).data;
 }
 
 const clock = (seconds: number) => `0:${String(seconds).padStart(2, "0")}`;

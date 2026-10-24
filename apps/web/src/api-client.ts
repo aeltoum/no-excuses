@@ -40,13 +40,70 @@ export const requestTimeoutMs = 20_000;
 // that long instead of aborting the very request that is waking the host.
 export const wakeTimeoutMs = 75_000;
 
+// Writes still waiting on the server, and a mark that moves whenever one
+// starts or ends. A background read that overlapped a write may hold the
+// state from before it, so loaders drop it rather than undo the write on screen.
+// Each dropped read is made again once writes settle, so the screen never
+// waits for the next scheduled reload to catch up.
+let writes = 0;
+let writeEpoch = 0;
+let dropped = false;
+let queued = false;
+const settledListeners = new Set<() => void>();
+const settle = () => {
+  dropped = false;
+  queued = false;
+  for (const listener of settledListeners) listener();
+};
+export const onWritesSettled = (listener: () => void) => {
+  settledListeners.add(listener);
+  return () => {
+    settledListeners.delete(listener);
+  };
+};
+export const writeMark = () => writeEpoch;
+export function overlappedWrite(mark: number) {
+  if (writes === 0 && writeEpoch === mark) return false;
+  if (writes > 0) dropped = true;
+  else if (!queued) {
+    queued = true;
+    queueMicrotask(settle);
+  }
+  return true;
+}
+export async function trackWrite<T>(work: () => Promise<T>) {
+  writes++;
+  writeEpoch++;
+  try {
+    return await work();
+  } finally {
+    writes--;
+    writeEpoch++;
+    if (writes === 0 && dropped) settle();
+  }
+}
+
 export function createApiClient(
   baseUrl: string,
   fetcher: typeof fetch = fetch,
   getFreshToken?: () => Promise<string>,
 ) {
   const root = baseUrl.replace(/\/$/, "");
-  async function request<T>(
+  function request<T>(
+    path: string,
+    token: string,
+    parser: Parser<T>,
+    command?: {
+      method: "POST" | "DELETE" | "PUT";
+      body?: unknown;
+      key: string;
+    },
+  ) {
+    return command
+      ? trackWrite(() => requestNow(path, token, parser, command))
+      : requestNow(path, token, parser);
+  }
+  async function requestNow<T>(
     path: string,
     token: string,
     parser: Parser<T>,
@@ -78,13 +135,16 @@ export function createApiClient(
           // A sleeping API host must surface as a retryable failure, never a hang.
           signal: AbortSignal.timeout(timeoutMs),
         });
-      try {
-        response = await send();
-      } catch (error) {
-        // Reads retry once: the first attempt often only wakes the host.
-        if (command) throw error;
+      if (command)
+        // Commands are not retried here, so one attempt waits out a sleeping host.
         response = await send(wakeTimeoutMs);
-      }
+      else
+        try {
+          response = await send();
+        } catch {
+          // Reads retry once: the first attempt often only wakes the host.
+          response = await send(wakeTimeoutMs);
+        }
       if (response.status === 401 && !command && getFreshToken) {
         const nextToken = await getFreshToken();
         if (nextToken !== accessToken) {

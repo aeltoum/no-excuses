@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError } from "./api-client";
+import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { useConfirm } from "./Confirm";
 import { detailLine } from "./details";
+import { useFreshness } from "./freshness";
 import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
 import {
@@ -133,6 +134,7 @@ export function ProofFeed({
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const fresh = useFreshness();
   const [stamped, setStamped] = useState<string | null>(null);
   // Posts the viewer just acted on; their buttons hide before the refetch lands.
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
@@ -153,12 +155,15 @@ export function ProofFeed({
   useEffect(() => {
     void revision;
     void reload;
+    void fresh;
     let active = true;
+    const mark = writeMark();
     const previous = cachedFeed(cacheKey);
     if (previous) onItems(previous);
     loadProofFeed(apiBaseUrl, token)
       .then((loaded) => {
-        if (!active) return;
+        // A reload landing under an optimistic change waits for the next one.
+        if (!active || (previous && overlappedWrite(mark))) return;
         const next = keepPhotoUrls(feedCache.get(cacheKey) ?? [], loaded);
         feedCache.set(cacheKey, next);
         setItems((current) =>
@@ -177,7 +182,16 @@ export function ProofFeed({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, revision, reload, cacheKey, onRevoked, onItems]);
+  }, [
+    apiBaseUrl,
+    token,
+    revision,
+    reload,
+    fresh,
+    cacheKey,
+    onRevoked,
+    onItems,
+  ]);
 
   const act = useCallback(
     async (

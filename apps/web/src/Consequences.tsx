@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { AugmentPicker } from "./AugmentPicker";
-import { ApiError } from "./api-client";
+import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { useFreshness } from "./freshness";
 import { maxClipSeconds, ProofClip } from "./ProofClip";
 import { persistentMap } from "./persist";
+import { call } from "./proof";
 import { Result, useNotice } from "./Result";
 
 type Card = {
@@ -64,26 +66,17 @@ async function request(
   path: string,
   body?: unknown,
 ): Promise<ConsequenceHome> {
-  let response: Response;
+  let data: unknown;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    data = await call<unknown>(baseUrl, token, path, {
       method: body === undefined ? "GET" : "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body,
     });
-  } catch {
-    throw new ApiError("failure", "Connection failed. Try again.", true);
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === "denied")
+      throw new ApiError("denied", "That card action is no longer available.");
+    throw error;
   }
-  if (response.status === 401)
-    throw new ApiError("unauthorized", "Access ended. Sign in again.");
-  if (response.status === 403)
-    throw new ApiError("denied", "That card action is no longer available.");
-  if (!response.ok)
-    throw new ApiError("failure", "Something went wrong. Try again.", true);
-  const data = ((await response.json()) as { data?: unknown }).data;
   if (!data || typeof data !== "object" || !("owed" in data))
     throw new ApiError("failure", "Couldn’t load your cards.", true);
   // Older API builds omit the pause and log-gate fields.
@@ -199,6 +192,7 @@ export function Consequences({
   // Controls waiting on the server, by action and target.
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const busy = (key: string) => pending.has(key);
+  const fresh = useFreshness();
   const [picking, setPicking] = useState(false);
   const [recording, setRecording] = useState(false);
   const [notice, setNotice] = useNotice();
@@ -220,10 +214,14 @@ export function Consequences({
   );
 
   useEffect(() => {
+    void fresh;
     let active = true;
+    const mark = writeMark();
+    const previous = homeCache.has(cacheKey);
     request(apiBaseUrl, token, "/v1/consequences")
       .then((next) => {
-        if (!active) return;
+        // A reload that overlapped an action must not undo it on screen.
+        if (!active || (previous && overlappedWrite(mark))) return;
         homeCache.set(cacheKey, next);
         setHome(next);
         onGroupOwed(next.groupOwed);
@@ -241,7 +239,7 @@ export function Consequences({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed]);
+  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed, fresh]);
 
   useEffect(() => {
     if (!home) return;
