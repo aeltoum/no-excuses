@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { as, data, database, submitProof } from "./support/pwa-db.js";
+import {
+  accounts,
+  as,
+  data,
+  database,
+  group,
+  memberships,
+  submitProof,
+} from "./support/pwa-db.js";
 
 type Season = {
   season: number;
@@ -143,5 +151,42 @@ describe("Crowns and Seasons", { timeout: 60_000 }, () => {
     expect(
       positions.rows.map((row) => `${row.season_number}.${row.week_number}`),
     ).toEqual(["1.1", "1.2", "1.3", "1.4", "2.1", "2.2"]);
+  });
+
+  it("names a finished Season's champion while paused, counting a rejoin as one person", async () => {
+    const db = await database();
+    const weeks = [1, 2, 3, 4].map(
+      (n) => `60000000-0000-4000-8000-00000000000${n}`,
+    );
+    const rejoin = "70000000-0000-4000-8000-000000000001";
+    await db.exec(`
+      insert into app_private.accountability_weeks
+        (accountability_week_id, group_id, starts_at, ends_at, time_zone, activation_at)
+      select w, '${group}', '2026-03-09Z'::timestamptz + (n - 1) * interval '7 days',
+        '2026-03-16Z'::timestamptz + (n - 1) * interval '7 days', 'UTC',
+        '2026-03-09Z'::timestamptz + (n - 1) * interval '7 days'
+      from unnest(array['${weeks.join("','")}']::uuid[]) with ordinality as t(w, n);
+      insert into app_private.pwa_crown_weeks
+        (accountability_week_id, group_id, season_number, week_number, crowned_at)
+      select w, '${group}', 1, n, '2026-03-16Z'::timestamptz + (n - 1) * interval '7 days'
+      from unnest(array['${weeks.join("','")}']::uuid[]) with ordinality as t(w, n);
+      -- Blair leaves after week 1 and rejoins for week 3.
+      update app_private.memberships set ended_at = '2026-03-18Z', end_reason = 'left'
+        where membership_id = '${memberships[1]}';
+      insert into app_private.memberships
+        (membership_id, account_id, group_id, joined_at, recurring_target)
+        values ('${rejoin}', '${accounts[1]}', '${group}', '2026-03-25Z', 1);
+      insert into app_private.pwa_crown_results values
+        ('${weeks[0]}', 'load_progression', '${memberships[1]}', 5, true, null),
+        ('${weeks[1]}', 'load_progression', '${memberships[0]}', 5, true, null),
+        ('${weeks[2]}', 'load_progression', '${rejoin}', 5, true, null);
+    `);
+    // No week is open on this date: the Group is paused after Season 1.
+    const season = await data<{
+      champions: Array<{ season: number; names: string[]; crowns: number }>;
+    }>(db, 0, "select app_private.season_home('2026-06-01Z') as data");
+    expect(season.champions).toEqual([
+      { season: 1, names: ["Blair"], crowns: 2 },
+    ]);
   });
 });
