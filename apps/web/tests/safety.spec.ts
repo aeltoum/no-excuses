@@ -84,6 +84,7 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   await expect(mine.getByRole("textbox", { name: "Caption" })).toHaveValue(
     "New PR",
   );
+  await expect(page.locator(".home-log-button")).toBeHidden();
   await mine.getByRole("textbox", { name: "Caption" }).fill("PR day");
   await mine.getByRole("button", { name: "Add" }).click();
   await expect(page.getByText("PR day")).toBeVisible();

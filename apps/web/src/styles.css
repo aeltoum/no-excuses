@@ -1605,6 +1605,10 @@ button:disabled {
   font-size: 1rem;
   box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
 }
+/* Writing on a post: the button would cover the form's own actions. */
+body:has(.caption-compose, .post-compose) .home-log-button {
+  display: none;
+}
 .log-plus {
   font-size: 1.5rem;
   line-height: 1;
@@ -3136,6 +3140,7 @@ textarea:focus-visible {
 }
 .caption-compose {
   display: grid;
+  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom));
   gap: 8px;
   margin-top: 6px;
 }
@@ -3230,6 +3235,7 @@ textarea:focus-visible {
 }
 .post-compose {
   display: grid;
+  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom));
   grid-template-columns: 1fr auto auto;
   gap: 6px;
   margin-top: 6px;
