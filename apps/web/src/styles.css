@@ -3122,10 +3122,18 @@ textarea:focus-visible {
   line-height: 1.1;
   overflow-wrap: anywhere;
 }
-.post-caption.activity-strength { --caption-bar: var(--strength); }
-.post-caption.activity-cardio { --caption-bar: var(--cardio); }
-.post-caption.activity-class { --caption-bar: var(--class); }
-.post-caption.activity-sport { --caption-bar: var(--sport); }
+.post-caption.activity-strength {
+  --caption-bar: var(--strength);
+}
+.post-caption.activity-cardio {
+  --caption-bar: var(--cardio);
+}
+.post-caption.activity-class {
+  --caption-bar: var(--class);
+}
+.post-caption.activity-sport {
+  --caption-bar: var(--sport);
+}
 .caption-compose {
   display: grid;
   gap: 8px;
