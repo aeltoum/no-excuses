@@ -3389,10 +3389,17 @@ fieldset.session-pick {
   text-transform: uppercase;
 }
 
-/* App shell: no sideways panning and no stray text selection on a phone. */
-html,
+/* App shell: no sideways panning and no stray text selection on a phone.
+   Root takes hidden, not clip: Android Chrome still widens the layout viewport
+   past clipped overflow, leaving a blank strip down the right edge. */
+html {
+  overflow-x: hidden;
+}
 body {
   overflow-x: clip;
+}
+html,
+body {
   overscroll-behavior-x: none;
 }
 body {
