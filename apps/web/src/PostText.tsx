@@ -10,6 +10,40 @@ import {
 
 type Notice = { kind: "success" | "error"; text: string };
 
+const captionLimit = 140;
+
+// Caption starters drawn from the workout itself, so a member can tap
+// what they hit instead of retyping it.
+export const captionStarters = (item: ProofItem): string[] => {
+  const starters: string[] = [];
+  const lift = item.details?.lifts?.reduce<
+    NonNullable<ProofItem["details"]>["lifts"]
+  >(
+    (best, next) =>
+      !best?.[0] || (next.weightKg ?? 0) > (best[0].weightKg ?? 0)
+        ? [next]
+        : best,
+    [],
+  )?.[0];
+  if (lift) {
+    const name = lift.exercise.replace(/_/g, " ");
+    const label = name.charAt(0).toUpperCase() + name.slice(1);
+    starters.push(
+      lift.weightKg
+        ? `${label} ${lift.weightKg} kg`
+        : `${label} ${lift.sets}×${lift.reps}`,
+    );
+  }
+  const km = item.details?.cardio?.distanceKm;
+  if (km) starters.push(`${Number(km.toFixed(1))} km done`);
+  starters.push(`${item.durationMinutes} min in`);
+  starters.push("New PR");
+  starters.push(
+    item.perceivedIntensity === "high" ? "That one hurt" : "Showed up anyway",
+  );
+  return starters;
+};
+
 // A post's caption and messages, with the inputs to add them.
 export function PostText({
   item,
@@ -42,6 +76,8 @@ export function PostText({
   ]
     .filter((message) => !reported.has(message.id))
     .sort((left, right) => left.at.localeCompare(right.at));
+  const starters = writing === "caption" ? captionStarters(item) : [];
+  const left = captionLimit - draft.length;
   const visible = showAll ? all : all.slice(-3);
   const canCaption =
     item.mine &&
@@ -98,7 +134,11 @@ export function PostText({
   };
   return (
     <div className="post-text">
-      {shownCaption && <p className="post-caption">{shownCaption}</p>}
+      {shownCaption && (
+        <p className={`post-caption activity-${item.activityType}`}>
+          {shownCaption}
+        </p>
+      )}
       {all.length > 3 && !showAll && (
         <button
           type="button"
@@ -139,21 +179,75 @@ export function PostText({
           ))}
         </ul>
       )}
-      {writing ? (
+      {writing === "caption" ? (
+        <form className="caption-compose" onSubmit={submit}>
+          <textarea
+            aria-label="Caption"
+            placeholder="What did you hit?"
+            maxLength={captionLimit}
+            rows={2}
+            value={draft}
+            // biome-ignore lint/a11y/noAutofocus: the field opens on request.
+            autoFocus
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <fieldset className="caption-starters" aria-label="Caption starters">
+            {starters.map((starter) => (
+              <button
+                key={starter}
+                type="button"
+                className="caption-starter"
+                onClick={() =>
+                  setDraft((current) =>
+                    (current.trim()
+                      ? `${current.trim()} · ${starter}`
+                      : starter
+                    ).slice(0, captionLimit),
+                  )
+                }
+              >
+                {starter}
+              </button>
+            ))}
+          </fieldset>
+          <div className="caption-compose-actions">
+            <span
+              className={`caption-count${left <= 20 ? " is-near" : ""}`}
+              aria-live="polite"
+            >
+              {left <= 20 ? `${left} left` : ""}
+            </span>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setWriting(null)}
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={!draft.trim()}>
+              Add
+            </button>
+          </div>
+        </form>
+      ) : writing ? (
         <form className="post-compose" onSubmit={submit}>
           <input
-            aria-label={writing === "caption" ? "Caption" : "Message"}
-            placeholder={
-              writing === "caption" ? "What did you hit?" : "Say something…"
-            }
-            maxLength={writing === "caption" ? 140 : 200}
+            aria-label="Message"
+            placeholder="Say something…"
+            maxLength={200}
             value={draft}
             // biome-ignore lint/a11y/noAutofocus: the field opens on request.
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
           />
           <button type="submit" disabled={!draft.trim()}>
-            {writing === "caption" ? "Add" : "Send"}
+            Send
           </button>
           <button
             type="button"

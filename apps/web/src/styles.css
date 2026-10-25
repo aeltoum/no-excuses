@@ -108,6 +108,7 @@ a:focus-visible {
 }
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 select:focus-visible {
   outline: 3px solid var(--safety);
   outline-offset: 3px;
@@ -1603,6 +1604,10 @@ button:disabled {
   border-radius: 28px;
   font-size: 1rem;
   box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+}
+/* Writing on a post: the button would cover the form's own actions. */
+body:has(.caption-compose, .post-compose) .home-log-button {
+  display: none;
 }
 .log-plus {
   font-size: 1.5rem;
@@ -3111,7 +3116,97 @@ textarea:focus-visible {
   margin-top: 8px;
 }
 .post-caption {
-  margin: 0 0 6px;
+  --caption-bar: var(--mixed);
+  margin: 4px 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--caption-bar);
+  font-family: "Big Shoulders Display", Archivo, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.post-caption.activity-strength {
+  --caption-bar: var(--strength);
+}
+.post-caption.activity-cardio {
+  --caption-bar: var(--cardio);
+}
+.post-caption.activity-class {
+  --caption-bar: var(--class);
+}
+.post-caption.activity-sport {
+  --caption-bar: var(--sport);
+}
+.caption-compose {
+  display: grid;
+  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom));
+  gap: 8px;
+  margin-top: 6px;
+}
+.caption-compose textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Big Shoulders Display", Archivo, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.caption-compose textarea::placeholder {
+  color: var(--muted);
+  font-weight: 700;
+}
+.caption-starters {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.caption-starter {
+  flex: none;
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px dashed var(--muted);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.caption-starter:active {
+  border-style: solid;
+  background: var(--rule);
+}
+.caption-compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.caption-compose-actions button {
+  flex: none;
+  width: auto;
+  min-width: max-content;
+  padding-inline: 16px;
+}
+.caption-count {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.caption-count.is-near {
+  color: var(--error);
 }
 .post-messages {
   margin: 0;
@@ -3140,6 +3235,7 @@ textarea:focus-visible {
 }
 .post-compose {
   display: grid;
+  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom));
   grid-template-columns: 1fr auto auto;
   gap: 6px;
   margin-top: 6px;
