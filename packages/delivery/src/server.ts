@@ -1506,6 +1506,22 @@ const notificationRoutes = (request: Request, path: string) =>
           [now],
         ),
       });
+    if (path === "/v1/notifications/dismiss" && method === "POST") {
+      const ids = body.ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.length > 60 ||
+        !ids.every((id) => Number.isSafeInteger(id) && id > 0)
+      )
+        return invalid();
+      return ok({
+        dismissed: await data(
+          "select app_private.dismiss_notifications($1::bigint[],$2) as data",
+          [ids, now],
+        ),
+      });
+    }
     if (path === "/v1/notifications/prefs" && method === "POST") {
       const flag = (value: unknown) =>
         value === undefined || typeof value === "boolean";

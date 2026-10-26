@@ -31,6 +31,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
       return { workoutCheckinId: body?.workoutCheckinId, currentWeekCount: 2 };
   });
   await delayRoute(page, "**/v1/sessions/**", 1000);
+  await page.getByRole("button", { name: "Week options" }).click();
   const started = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Start timer" }).click(),

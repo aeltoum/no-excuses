@@ -107,3 +107,60 @@ test("Account mutes social pushes and moves the digest, instantly", async ({
     )
     .toEqual([{ socialPush: false }, { socialPush: false }, { digestHour: 7 }]);
 });
+
+test("opening a notification goes to its subject; seeing a subject clears it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const list = {
+    ...center,
+    items: [
+      {
+        id: 5,
+        title: "Week Met",
+        body: "Target hit. Keep it going.",
+        at: new Date(Date.now() - 60_000).toISOString(),
+        unread: true,
+        kind: "result",
+        ref: "60000000-0000-4000-8000-000000000010",
+      },
+      {
+        id: 4,
+        title: "Less than 24 hours left",
+        body: "You have 1 of 3 workouts.",
+        at: new Date(Date.now() - 120_000).toISOString(),
+        unread: true,
+        kind: "reminder",
+        ref: "60000000-0000-4000-8000-000000000010",
+      },
+    ],
+  };
+  const { calls, errors } = await signIn(page, ({ path }) => {
+    if (path === "/v1/home/extras")
+      return homeExtras({ unreadNotifications: 2 });
+    if (path === "/v1/notifications") return list;
+    if (path.startsWith("/v1/notifications/")) return { done: true };
+  });
+  // Home is the reminder's subject, so being here clears it.
+  await expect
+    .poll(
+      () =>
+        calls.find((c) => c.path === "/v1/notifications/dismiss")?.body?.ids,
+    )
+    .toEqual([4]);
+  await page.getByRole("button", { name: /Notifications/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Notifications" });
+  await expect(sheet.getByText("Less than 24 hours left")).toHaveCount(0);
+  await expect(sheet.getByText("1 notification")).toBeVisible();
+  // Tapping the result opens History and clears it.
+  await sheet.getByRole("button", { name: /Week Met/ }).click();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect
+    .poll(() =>
+      calls
+        .filter((c) => c.path === "/v1/notifications/dismiss")
+        .map((c) => c.body?.ids),
+    )
+    .toContainEqual([5]);
+  expect(errors).toEqual([]);
+});

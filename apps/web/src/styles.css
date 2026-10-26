@@ -3082,7 +3082,7 @@ textarea:focus-visible {
   margin-bottom: 8px;
   border: 0;
 }
-.notification-list li.unread strong::before {
+.notification-list li.unread:not(:has(> button)) strong::before {
   content: "";
   display: inline-block;
   width: 8px;
@@ -4101,9 +4101,56 @@ svg {
   font-size: 0.75rem;
   line-height: 1.6;
 }
+.notification-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
 .notification-clear {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.notification-list li:has(> button) {
+  display: block;
+  padding: 0;
+}
+.notification-list li > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
   width: 100%;
-  margin-top: 12px;
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.notification-list li > button:active {
+  background: var(--surface);
+}
+.notification-list li.unread > button strong::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--error);
+  vertical-align: middle;
 }
 
 /* Log sheet: intensity slider with effort faces. */
@@ -4158,4 +4205,205 @@ svg {
   .intensity-marks span {
     transition: none;
   }
+}
+
+/* Week recap as a pop-up: the sheet is the frame, so the card chrome goes. */
+.sheet .week-recap {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  animation: none;
+}
+.recap-verdict {
+  display: grid;
+  margin: 0 0 12px;
+}
+.recap-verdict strong {
+  font-family: "Big Shoulders Display", Archivo, sans-serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.recap-verdict.recap-missed strong {
+  color: var(--error);
+}
+.recap-verdict span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.recap-history {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.recap-done {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Week options: one button in the header instead of a row of links under the bar. */
+.home-header {
+  align-items: center;
+}
+.home-header h1 {
+  margin-right: auto;
+}
+.week-tools-button {
+  flex: none;
+  width: 44px;
+  min-height: 44px;
+  margin: 0 -10px 0 -8px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.week-tools {
+  display: grid;
+}
+.week-tools > a,
+.week-tools-row {
+  display: grid;
+  gap: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+}
+.week-tools-row:empty {
+  display: none;
+}
+.week-tools strong,
+.week-tools-row .text-button {
+  justify-self: start;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+.week-tools-row .text-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.week-tools-row {
+  position: relative;
+}
+.week-tools span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Friends: slim chips so the feed starts sooner. The strip keeps the page gutter
+   on both ends while scrolling edge to edge. */
+.friend-cards {
+  display: flex;
+  gap: 8px;
+  margin: 18px -20px 0;
+  padding: 2px 20px 4px;
+  scroll-padding-inline: 20px;
+}
+.friend-cards li {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(260px, calc(100vw - 40px));
+  min-width: 0;
+  padding: 8px;
+  border-radius: 999px;
+  text-align: left;
+}
+.friend-card-body {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.2;
+}
+.friend-cards .friend-card-name {
+  font-size: 0.875rem;
+}
+.friend-card-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.friend-cards li .barbell-mini {
+  width: 40px;
+  margin: 0;
+}
+.friend-cards .friend-nudge {
+  width: auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+}
+
+/* Log sheet: four activity plates fill the row now that Mixed is gone. */
+.activity-plates {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+/* How long: one segmented track; the number carries it, the unit stays small. */
+.duration-track {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.duration-track button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: "Big Shoulders Display", Archivo, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.duration-track button + button {
+  border-left: 1px solid var(--line-strong);
+}
+.duration-track button small {
+  font-family: Archivo, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.duration-track button:last-child {
+  font-family: Archivo, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.duration-track button[aria-pressed="true"] {
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.duration-track button[aria-pressed="true"] small {
+  color: var(--rubber);
 }

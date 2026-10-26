@@ -53,10 +53,13 @@ test("the day after a week, any emoji reacts to a result, instantly", async ({
       });
     }
   });
-  const recap = page.getByRole("region", { name: "Last week" });
+  // The results arrive as a pop-up; the picker swaps into the same sheet.
+  const recap = page.getByRole("dialog");
+  await expect(
+    page.getByRole("dialog", { name: "The results are in" }),
+  ).toContainText("Week missed");
   await expect(recap).toContainText("Met 3/3");
   await expect(recap).toContainText("Missed 1/3");
-  await expect(recap).toContainText(/Clears in \d+h/);
 
   // A failed reaction rolls back.
   const chips = recap.getByRole("group", { name: "React to Maya’s week" });
@@ -75,6 +78,7 @@ test("the day after a week, any emoji reacts to a result, instantly", async ({
     .getByRole("button", { name: "React to Maya’s week with any emoji" })
     .click();
   const sheet = page.getByRole("dialog", { name: "React to Maya" });
+  await expect(sheet).toBeVisible();
   const shown = await msUntilVisible(
     page,
     () => sheet.getByRole("button", { name: "React 🐐" }).click(),
@@ -101,7 +105,7 @@ test("a recap past its day stays hidden", async ({ page }) => {
       : undefined,
   );
   await expect(page.getByText(/this week/).first()).toBeVisible();
-  await expect(page.getByRole("region", { name: "Last week" })).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("Home is phone-fixed: no sideways scroll, no text selection, count under the bar", async ({
@@ -128,7 +132,11 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
           }
         : undefined,
   );
-  await expect(page.getByRole("region", { name: "Last week" })).toBeVisible();
+  // The results pop up once; Done puts Home back.
+  await page
+    .getByRole("dialog", { name: "The results are in" })
+    .getByRole("button", { name: "Done" })
+    .click();
   const overflow = () =>
     page.evaluate(() => {
       const width = document.documentElement.clientWidth;
@@ -164,4 +172,21 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
     expect(close.x + close.width).toBeLessThanOrEqual(360);
   }
   expect(await overflow()).toEqual({ scroll: 0, wide: [] });
+});
+
+test("the results pop up once a week, then live in History", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, ({ path }) =>
+    path === "/v1/home/extras"
+      ? homeExtras({ recap: [maya, mine] })
+      : undefined,
+  );
+  const popup = page.getByRole("dialog", { name: "The results are in" });
+  await popup.getByRole("button", { name: "Done" }).click();
+  await expect(popup).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(/this week/).first()).toBeVisible();
+  await expect(popup).toHaveCount(0);
 });

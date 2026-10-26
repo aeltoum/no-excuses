@@ -4,6 +4,7 @@ import { Avatar, useAvatars } from "./avatars";
 import { useConfirm } from "./Confirm";
 import { detailLine } from "./details";
 import { useFreshness } from "./freshness";
+import { markViewed, viewedPost } from "./Notifications";
 import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
 import {
@@ -400,6 +401,26 @@ export function ProofFeed({
     [apiBaseUrl, token, cacheKey, onRevoked, setNotice],
   );
 
+  // A post scrolled into view clears the notifications about it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: new posts need observing.
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).dataset.post;
+          if (!entry.isIntersecting || !id) continue;
+          observer.unobserve(entry.target);
+          markViewed(viewedPost(id));
+        }
+      },
+      { threshold: 0.5 },
+    );
+    for (const node of document.querySelectorAll("[data-post]"))
+      observer.observe(node);
+    return () => observer.disconnect();
+  }, [items]);
+
   // A choice already made, here or on another device, needs no buttons.
   const needsReview = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canReview;
@@ -416,7 +437,11 @@ export function ProofFeed({
     const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
     return (
-      <li className="proof-post" key={item.workoutCheckinId}>
+      <li
+        className="proof-post"
+        key={item.workoutCheckinId}
+        data-post={item.workoutCheckinId}
+      >
         <header>
           <Avatar name={who} url={avatars[item.authorMembershipId]} />
           <span className="proof-byline">
