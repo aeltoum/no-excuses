@@ -371,7 +371,7 @@ export function Consequences({
               ? `Due in ${hoursLeft(attempt.expiresAt)}`
               : attempt?.status === "review"
                 ? offer
-                  ? "Proof in review · next card ready"
+                  ? "In review. Your next card is ready"
                   : "Proof in review"
                 : offer
                   ? "Tap to pick a card"

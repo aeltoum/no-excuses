@@ -18,6 +18,7 @@ This repository is in project-setup phase. Product scope and technology stack re
 - Default to optimistic UI for member actions: show the result at once, send the request, and on failure roll back only that change and show the error notice. Votes and decisions are optimistic too; the server still settles the final tally.
 - Keep a pending state, on the acting control only, for auth, server-generated results (codes, invites, previews), irreversible or destructive actions, account deletion, random draws, and OS permission prompts.
 - Meet the speed budgets in `docs/agents/implementation-loop.md` (Speed) for any added or changed UI.
+- Use the `frontend-design` skill for every UI change, and review the result with screenshots before handing off.
 
 ## Communication
 

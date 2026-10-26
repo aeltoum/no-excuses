@@ -72,28 +72,13 @@ const intensityLabels = {
   high: { emoji: "🥵", text: "Brutal" },
 };
 
-// Flame and count, like a chat streak; the full sentence stays for screen readers.
-function Streak({
-  item,
-  compact = false,
-}: {
-  item: CurrentWeekProgressItem;
-  compact?: boolean;
-}) {
+// Friend cards: flame and week count; the full sentence stays for screen readers.
+function Streak({ item }: { item: CurrentWeekProgressItem }) {
   return (
-    <span className={`streak${compact ? " streak-compact" : ""}`}>
+    <span className="streak">
       {item.targetStreak > 0 && (
         <span className="streak-flame" aria-hidden="true">
           🔥<b>{item.targetStreak}</b>
-          {!compact && (
-            <small>{item.targetStreak === 1 ? "week" : "weeks"}</small>
-          )}
-        </span>
-      )}
-      {!compact && item.workoutStreak > 0 && (
-        <span className="streak-flame" aria-hidden="true">
-          💪<b>{item.workoutStreak}</b>
-          <small>in a row</small>
         </span>
       )}
       <span className="visually-hidden">{streakText(item)}</span>
@@ -977,14 +962,13 @@ export function Weekly({
                       activityTypes={own.activityTypes}
                     />
                   </a>
+                  <p className="home-count">
+                    {own.completedWorkoutCount} of {own.lockedTarget} this week
+                  </p>
                   <div className="home-meta">
-                    <p className="home-count">
-                      <strong>
-                        {own.completedWorkoutCount} of {own.lockedTarget}
-                      </strong>{" "}
-                      this week
-                    </p>
-                    {hasStreaks(own) && <Streak item={own} />}
+                    {hasStreaks(own) && (
+                      <span className="home-streaks">{streakText(own)}</span>
+                    )}
                     <SeasonChip
                       season={extras.season}
                       onOpen={(event) => onNavigate(event, "/history")}
@@ -1044,17 +1028,6 @@ export function Weekly({
                   </a>
                 </div>
               )}
-              {own && (
-                <WeekRecap
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  extras={extras}
-                  apply={applyExtras}
-                  reload={reloadExtras}
-                  onError={(text) => setNotice({ kind: "error", text })}
-                  onRevoked={feedRevoked}
-                />
-              )}
               {own && progress.length > 1 && (
                 <ul className="friend-cards" aria-label="Friends this week">
                   {progress
@@ -1095,8 +1068,9 @@ export function Weekly({
                             : weekOffPending.has(item.membershipId)
                               ? " · week off?"
                               : ""}
+                          {hasStreaks(item) && item.targetStreak > 0 && " "}
+                          {hasStreaks(item) && <Streak item={item} />}
                         </span>
-                        {hasStreaks(item) && <Streak item={item} compact />}
                         {item.completedWorkoutCount < item.lockedTarget &&
                           !excused.has(item.membershipId) && (
                             <button
@@ -1128,6 +1102,17 @@ export function Weekly({
                   onAttention={setCardAttention}
                   onLogBlock={setLogBlock}
                   cacheKey={cacheKey}
+                />
+              )}
+              {own && (
+                <WeekRecap
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  extras={extras}
+                  apply={applyExtras}
+                  reload={reloadExtras}
+                  onError={(text) => setNotice({ kind: "error", text })}
+                  onRevoked={feedRevoked}
                 />
               )}
               {own && (
