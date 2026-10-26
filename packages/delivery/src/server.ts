@@ -854,7 +854,11 @@ async function proof(request: Request, path: string): Promise<Response> {
   const now = new Date().toISOString();
   try {
     if (path === "/v1/proof/uploads" && request.method === "POST") {
-      if (body.kind !== "activity" && body.kind !== "presence")
+      if (
+        body.kind !== "activity" &&
+        body.kind !== "presence" &&
+        body.kind !== "avatar"
+      )
         return reply(fail("invalid_request", 400));
       const created = await query(
         actor,
@@ -1399,11 +1403,16 @@ const groupRoutes = (request: Request, path: string) =>
   });
 
 const homeExtras = (request: Request, path: string) =>
-  memberRoute(request, async ({ method, now, data }) =>
-    path === "/v1/home/extras" && method === "GET"
-      ? ok(await data("select app_private.home_extras($1) as data", [now]))
-      : fail("not_found", 404),
-  );
+  memberRoute(request, async ({ actor, method, now, data }) => {
+    if (path !== "/v1/home/extras" || method !== "GET")
+      return fail("not_found", 404);
+    const [extras, avatars] = await Promise.all([
+      data("select app_private.home_extras($1) as data", [now]),
+      // Photos are decoration: a storage hiccup must not blank Home.
+      groupAvatars(actor, now).catch(() => ({})),
+    ]);
+    return ok({ ...(extras as Record<string, unknown>), avatars });
+  });
 
 const exceptionCategories = [
   "health_safety",
@@ -1490,6 +1499,13 @@ const notificationRoutes = (request: Request, path: string) =>
           [now],
         ),
       });
+    if (path === "/v1/notifications/clear" && method === "POST")
+      return ok({
+        cleared: await data(
+          "select app_private.clear_notifications($1) as data",
+          [now],
+        ),
+      });
     if (path === "/v1/notifications/prefs" && method === "POST") {
       const flag = (value: unknown) =>
         value === undefined || typeof value === "boolean";
@@ -1509,6 +1525,49 @@ const notificationRoutes = (request: Request, path: string) =>
       );
     }
     return fail("not_found", 404);
+  });
+
+const avatarPath = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/;
+// Signed profile photo URLs for the caller's Group, by membership id.
+async function groupAvatars(actor: Actor, now: string) {
+  const rows = (
+    await query(actor, "select * from app_private.group_avatars($1)", [now])
+  ).rows;
+  const avatars: Record<string, string> = {};
+  if (rows.length === 0) return avatars;
+  // Day-long URLs, like proof photos, so the browser reuses cached images.
+  const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+    expiresIn: 86_400,
+    paths: rows.map((row) => row.avatar_path as string),
+  })) as Array<{ path?: string; signedURL?: string }>;
+  const urls = new Map(
+    signed.map((item) => [
+      item.path,
+      item.signedURL ? `${authUrl}/storage/v1${item.signedURL}` : null,
+    ]),
+  );
+  for (const row of rows) {
+    const url = urls.get(row.avatar_path as string);
+    if (url) avatars[row.membership_id as string] = url;
+  }
+  return avatars;
+}
+// Sets or, with a null path, clears the caller's profile photo.
+const avatarRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path !== "/v1/avatars" || method !== "POST")
+      return fail("not_found", 404);
+    const requested = body.path ?? null;
+    if (
+      requested !== null &&
+      !(typeof requested === "string" && avatarPath.test(requested))
+    )
+      return invalid();
+    await data("select app_private.set_avatar($1,$2) as data", [
+      requested,
+      now,
+    ]);
+    return ok({ path: requested });
   });
 
 const reportCategories = [
@@ -1710,6 +1769,7 @@ function dispatch(request: Request, path: string): Promise<Response> {
     return operatorRoutes(request, path);
   if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
     return notificationRoutes(request, path);
+  if (path === "/v1/avatars") return avatarRoutes(request, path);
   for (const [prefix, handler] of extraRoutes)
     if (path.startsWith(prefix)) return handler(request, path);
   return route(request);

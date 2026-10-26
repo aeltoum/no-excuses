@@ -56,6 +56,16 @@ test("member tabs retain data while background refresh resolves", async ({
     if (path.endsWith("/current-week-progress")) return ok([]);
     if (path.endsWith("/finalized-weekly-history")) return ok([]);
     if (path.endsWith("/weekly-target")) {
+      // Home reads the week's end too; only the target screen's reads count here.
+      if (new URL(page.url()).pathname === "/home")
+        return ok({
+          membershipId,
+          recurringTarget: 3,
+          lockedTarget: null,
+          nextWeekStartsAt: null,
+          memberCount: 1,
+          timeZone: "America/Chicago",
+        });
       targetGets++;
       if (targetGets >= 7)
         return route.fulfill({

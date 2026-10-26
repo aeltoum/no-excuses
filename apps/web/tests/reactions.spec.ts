@@ -247,11 +247,13 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   failNextReactors = true;
   failNextReaction = true;
 
-  // Chips open a drawer of who reacted; on your own proof it is view-only.
+  // Chips open a drawer of who reacted; on your own proof it is view-only,
+  // with the comment button beside the chips.
   const reactions = page.getByRole("group", { name: "Reactions" });
   await expect(reactions).toHaveCount(2);
   const own = reactions.nth(1);
-  await expect(own.getByRole("button")).toHaveCount(1);
+  await expect(own.getByRole("button")).toHaveCount(2);
+  await expect(own.getByRole("button", { name: "Comment" })).toBeVisible();
   const strong = own.getByRole("button", { name: "💪, 1" });
   const drawer = page.getByRole("dialog", { name: "Reactions" });
   const emojiTabs = drawer.getByRole("tablist", { name: "Emoji" });

@@ -104,7 +104,7 @@ test("a recap past its day stays hidden", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Last week" })).toHaveCount(0);
 });
 
-test("Home is phone-fixed: no sideways scroll, no text selection, key under the bar", async ({
+test("Home is phone-fixed: no sideways scroll, no text selection, count under the bar", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 780 });
@@ -145,16 +145,11 @@ test("Home is phone-fixed: no sideways scroll, no text selection, key under the 
     await page.evaluate(() => getComputedStyle(document.body).userSelect),
   ).toBe("none");
 
+  // The colour key moved to the target screen; the count sits under the bar.
   const bar = await page.locator(".own-progress .barbell-big").boundingBox();
-  const key = await page
-    .getByRole("list", { name: "Activity colours" })
-    .boundingBox();
   const count = await page.getByText(/of 3 this week/).boundingBox();
-  expect(bar && key && count).toBeTruthy();
-  if (bar && key && count) {
-    expect(key.y).toBeGreaterThan(bar.y + bar.height - 1);
-    expect(key.y).toBeLessThan(count.y);
-  }
+  expect(bar && count).toBeTruthy();
+  if (bar && count) expect(count.y).toBeGreaterThan(bar.y + bar.height - 1);
 
   await page.getByRole("button", { name: /Notifications/ }).click();
   const sheet = page.getByRole("dialog", { name: "Notifications" });

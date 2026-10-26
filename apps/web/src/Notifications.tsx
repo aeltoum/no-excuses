@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
-import { onClearPersisted } from "./persist";
+import { onClearPersisted, persistentMap } from "./persist";
 import { call } from "./proof";
 import { Sheet } from "./Sheet";
 
@@ -15,8 +15,15 @@ type Item = {
 type Prefs = { socialPush: boolean; digest: boolean; digestHour: number };
 type Center = { items: Item[]; prefs: Prefs };
 
-// The last list stays for the session so reopening the sheet is instant.
-let centerCache: Center | null = null;
+// The last list is kept across launches and refreshed ahead of the tap, so the
+// sheet opens with it already in place.
+const saved = persistentMap<Center>("notifications");
+let centerCache: Center | null = saved.get("center") ?? null;
+const keep = (center: Center | null) => {
+  centerCache = center;
+  if (center) saved.set("center", center);
+  else saved.delete("center");
+};
 onClearPersisted(() => {
   centerCache = null;
 });
@@ -36,7 +43,9 @@ const ago = (iso: string) => {
 const loadCenter = (apiBaseUrl: string, token: string) =>
   call<Center>(apiBaseUrl, token, "/v1/notifications", { method: "GET" }).then(
     (center) => {
-      centerCache = center;
+      if (!Array.isArray(center?.items) || !center.prefs)
+        throw new ApiError("failure", "Unexpected notifications response.");
+      keep(center);
       return center;
     },
   );
@@ -58,8 +67,22 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [center, setCenter] = useState<Center | null>(centerCache);
   const [failed, setFailed] = useState(false);
+  const [clearFailed, setClearFailed] = useState(false);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
+  // New activity refreshes the list in the background before the bell is tapped.
+  useEffect(() => {
+    if (unread === 0) return;
+    let active = true;
+    loadCenter(apiBaseUrl, token)
+      .then((next) => {
+        if (active) setCenter(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [unread, apiBaseUrl, token]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -131,15 +154,47 @@ export function NotificationBell({
             Nothing yet. Activity from your crew shows here.
           </p>
         ) : (
-          <ul className="notification-list">
-            {center.items.map((item) => (
-              <li key={item.id} className={item.unread ? "unread" : undefined}>
-                <strong>{item.title}</strong>
-                <span>{item.body}</span>
-                <time dateTime={item.at}>{ago(item.at)}</time>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="notification-list">
+              {center.items.map((item) => (
+                <li
+                  key={item.id}
+                  className={item.unread ? "unread" : undefined}
+                >
+                  <strong>{item.title}</strong>
+                  <span>{item.body}</span>
+                  <time dateTime={item.at}>{ago(item.at)}</time>
+                </li>
+              ))}
+            </ul>
+            {clearFailed && (
+              <p className="result error" role="alert">
+                Couldn’t clear notifications. Try again.
+              </p>
+            )}
+            <button
+              type="button"
+              className="secondary-button notification-clear"
+              onClick={() => {
+                // Optimistic: the list empties now; a failure brings it back.
+                const previous = center;
+                setClearFailed(false);
+                const cleared = { ...center, items: [] };
+                setCenter(cleared);
+                keep(cleared);
+                call(apiBaseUrl, token, "/v1/notifications/clear", {
+                  method: "POST",
+                  body: {},
+                }).catch(() => {
+                  setCenter(previous);
+                  keep(previous);
+                  setClearFailed(true);
+                });
+              }}
+            >
+              Clear all
+            </button>
+          </>
         )}
       </Sheet>
     </>
@@ -185,13 +240,13 @@ export function NotificationSettings({
     const previous = prefs;
     const next = { ...prefs, ...patch };
     setPrefs(next);
-    if (centerCache) centerCache = { ...centerCache, prefs: next };
+    if (centerCache) keep({ ...centerCache, prefs: next });
     call<Prefs>(apiBaseUrl, token, "/v1/notifications/prefs", {
       method: "POST",
       body: patch,
     }).catch((error) => {
       setPrefs(previous);
-      if (centerCache) centerCache = { ...centerCache, prefs: previous };
+      if (centerCache) keep({ ...centerCache, prefs: previous });
       onNotice({
         kind: "error",
         text:
@@ -223,17 +278,21 @@ export function NotificationSettings({
           </div>
         ) : (
           <div className="notification-prefs">
-            <label className="check-label">
+            <label className="switch-label">
               <input
                 type="checkbox"
+                role="switch"
+                aria-checked={prefs.socialPush}
                 checked={prefs.socialPush}
                 onChange={(event) => save({ socialPush: event.target.checked })}
               />
               Push reactions, nudges, and cheers right away
             </label>
-            <label className="check-label">
+            <label className="switch-label">
               <input
                 type="checkbox"
+                role="switch"
+                aria-checked={prefs.digest}
                 checked={prefs.digest}
                 onChange={(event) => save({ digest: event.target.checked })}
               />

@@ -519,7 +519,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
 
   // Cached cards render at once on reload while the API is still slow.
   await page.reload();
-  await expect(cards.getByText("100 push-ups", { exact: true })).toBeVisible({
+  await expect(cards.locator(".consequence-strip")).toBeVisible({
     timeout: 900,
   });
 

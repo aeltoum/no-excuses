@@ -76,6 +76,32 @@ export function Sheet({
     };
   }, [open]);
 
+  // Dragging the handle or header down moves the sheet; a long or quick pull closes it.
+  const drag = useRef<{ y: number; at: number; dy: number } | null>(null);
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dismissible || (event.target as HTMLElement).closest("button")) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { y: event.clientY, at: event.timeStamp, dy: 0 };
+    if (dialogRef.current) dialogRef.current.style.transition = "none";
+  };
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current || !dialogRef.current) return;
+    drag.current.dy = Math.max(0, event.clientY - drag.current.y);
+    dialogRef.current.style.transform = `translateY(${drag.current.dy}px)`;
+  };
+  const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = drag.current;
+    const sheet = dialogRef.current;
+    drag.current = null;
+    if (!state || !sheet) return;
+    const speed = state.dy / Math.max(1, event.timeStamp - state.at);
+    sheet.style.transition = "";
+    if (state.dy > Math.min(140, sheet.offsetHeight / 3) || speed > 0.6) {
+      sheet.style.transform = "translateY(100%)";
+      window.setTimeout(() => dismissRef.current(), 160);
+    } else sheet.style.transform = "";
+  };
+
   if (!open) return null;
   return (
     <div className="sheet-layer">
@@ -96,17 +122,41 @@ export function Sheet({
         aria-labelledby={titleId}
         ref={dialogRef}
       >
-        <div className="sheet-grab" aria-hidden="true" />
-        <header className="sheet-header">
-          <h2 id={titleId} tabIndex={-1}>
-            {title}
-          </h2>
-          {dismissible && (
-            <button type="button" aria-label="Close" onClick={onDismiss}>
-              ×
-            </button>
-          )}
-        </header>
+        <div
+          className="sheet-drag"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          <div className="sheet-grab" aria-hidden="true" />
+          <header className="sheet-header">
+            <h2 id={titleId} tabIndex={-1}>
+              {title}
+            </h2>
+            {dismissible && (
+              <button
+                type="button"
+                className="sheet-close"
+                aria-label="Close"
+                onClick={onDismiss}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            )}
+          </header>
+        </div>
         {children}
       </div>
     </div>

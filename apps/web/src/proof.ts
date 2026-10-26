@@ -282,9 +282,9 @@ export const nudgeMember = (
   });
 
 // Re-encoding through a canvas strips EXIF (including location) and bounds the upload size.
-export async function compressPhoto(file: Blob): Promise<Blob> {
+export async function compressPhoto(file: Blob, max = 1600): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
@@ -300,7 +300,7 @@ export async function compressPhoto(file: Blob): Promise<Blob> {
 export async function uploadProofPhoto(
   baseUrl: string,
   token: string,
-  kind: "activity" | "presence",
+  kind: "activity" | "presence" | "avatar",
   photo: Blob,
 ): Promise<string> {
   const target = await call<{ path: string; uploadUrl: string }>(

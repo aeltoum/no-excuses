@@ -64,14 +64,14 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   });
   const maya = page.getByRole("listitem").filter({ hasText: "Leg day" });
   await expect(maya.getByText("Let's go")).toBeVisible();
-  await maya.getByRole("button", { name: "Message", exact: true }).click();
+  await maya.getByRole("button", { name: "Comment", exact: true }).click();
   const rules = page.getByRole("dialog", { name: "Crew conduct rules" });
   await rules.getByRole("button", { name: "I agree" }).click();
   await delayRoute(page, "**/v1/proof/*/message", 1000);
-  await maya.getByRole("textbox", { name: "Message" }).fill("Monster");
+  await maya.getByRole("textbox", { name: "Comment" }).fill("Monster");
   const sent = await msUntilVisible(
     page,
-    () => maya.getByRole("button", { name: "Send" }).click(),
+    () => maya.getByRole("button", { name: "Post" }).click(),
     maya.getByText("Monster"),
   );
   expect(sent).toBeLessThanOrEqual(100);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, overlappedWrite, writeMark } from "./api-client";
+import { Avatar, useAvatars } from "./avatars";
 import { useConfirm } from "./Confirm";
 import { detailLine } from "./details";
 import { useFreshness } from "./freshness";
@@ -93,6 +94,17 @@ const remaining = (until: string | null) => {
   );
   return hours <= 1 ? "under 1 hour left" : `${hours}h left`;
 };
+const ago = (iso: string) => {
+  const minutes = Math.max(
+    0,
+    Math.round((Date.now() - Date.parse(iso)) / 60_000),
+  );
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+};
 const dayLabel = (iso: string) => {
   const day = new Date(iso);
   const today = new Date();
@@ -139,6 +151,9 @@ export function ProofFeed({
   // Posts the viewer just acted on; their buttons hide before the refetch lands.
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
+  const avatars = useAvatars();
+  // The comment icon asks that post's text block to open its composer.
+  const [commenting, setCommenting] = useState({ id: "", count: 0 });
   const [confirmSheet, ask] = useConfirm();
   const [conductSheet, ensureConduct] = useConduct(apiBaseUrl, token);
   const confirmReport = useCallback(
@@ -403,10 +418,11 @@ export function ProofFeed({
     return (
       <li className="proof-post" key={item.workoutCheckinId}>
         <header>
-          <span className="proof-avatar" aria-hidden="true">
-            {who.slice(0, 2).toUpperCase()}
+          <Avatar name={who} url={avatars[item.authorMembershipId]} />
+          <span className="proof-byline">
+            <strong>{who}</strong>
+            <time dateTime={item.submittedAt}>{ago(item.submittedAt)}</time>
           </span>
-          <strong>{who}</strong>
           <span className={`proof-status proof-${item.reviewStatus}`}>
             {item.hidden
               ? "Reported"
@@ -512,7 +528,7 @@ export function ProofFeed({
             Can’t tell from these photos
           </button>
         )}
-        {!item.hidden && (!item.mine || reactionList(item).length > 0) && (
+        {!item.hidden && (
           <Reactions
             reactions={reactionList(item)}
             mine={item.myReactions ?? []}
@@ -522,11 +538,41 @@ export function ProofFeed({
               loadReactors(apiBaseUrl, token, item.workoutCheckinId)
             }
             cachedReactors={() => cachedReactors(item.workoutCheckinId)}
+            trailing={
+              <button
+                type="button"
+                className="proof-reaction proof-comment"
+                aria-label="Comment"
+                onClick={() =>
+                  setCommenting((current) => ({
+                    id: item.workoutCheckinId,
+                    count: current.count + 1,
+                  }))
+                }
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20.5 11.5a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1.4-4.4A8.5 8.5 0 1 1 20.5 11.5Z" />
+                </svg>
+              </button>
+            }
           />
         )}
         {!item.hidden && (
           <PostText
             item={item}
+            authorName={who}
+            askComment={
+              commenting.id === item.workoutCheckinId ? commenting.count : 0
+            }
             apiBaseUrl={apiBaseUrl}
             token={token}
             ensureConduct={ensureConduct}
