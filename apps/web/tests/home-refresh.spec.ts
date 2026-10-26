@@ -184,7 +184,7 @@ test("sheets drag down to close; notification settings use switches", async ({
   expect(errors).toEqual([]);
 });
 
-test("a nudge from yesterday clears at the day change, even if the refresh fails", async ({
+test("a nudge clears after 4 hours, even if the refresh fails", async ({
   page,
 }) => {
   await page.clock.install({ time: new Date("2026-10-27T23:58:00Z") });
@@ -197,10 +197,10 @@ test("a nudge from yesterday clears at the day change, even if the refresh fails
   const friends = page.getByRole("list", { name: "Friends this week" });
   await friends.getByRole("button", { name: "Nudge Maya" }).click();
   await expect(
-    friends.getByRole("button", { name: "Nudged Maya today" }),
+    friends.getByRole("button", { name: "Nudged Maya" }),
   ).toBeDisabled();
   failNudges = true;
-  await page.clock.fastForward("03:00");
+  await page.clock.fastForward("04:01:00");
   await expect(
     friends.getByRole("button", { name: "Nudge Maya" }),
   ).toBeEnabled();

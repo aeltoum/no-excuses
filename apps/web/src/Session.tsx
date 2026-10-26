@@ -47,7 +47,6 @@ export function SessionCard({
   apply,
   onFinish,
   onNotice,
-  onStart,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -55,7 +54,6 @@ export function SessionCard({
   apply: (next: HomeExtras) => void;
   onFinish: (sessionId: string, minutes: number) => void;
   onNotice: (notice: Notice) => void;
-  onStart?: () => void;
 }) {
   const session = extras.session;
   const [now, setNow] = useState(Date.now);
@@ -78,7 +76,6 @@ export function SessionCard({
     const id = crypto.randomUUID();
     // Optimistic: the timer runs at once.
     apply({ ...extras, session: { id, startedAt: new Date().toISOString() } });
-    onStart?.();
     setNow(Date.now());
     call(apiBaseUrl, token, `/v1/sessions/${id}/start`, {
       method: "POST",
@@ -117,10 +114,24 @@ export function SessionCard({
     return (
       <button
         type="button"
-        className="text-button session-start"
+        className="session-start"
+        aria-label="Start timer"
         onClick={start}
       >
-        Start timer
+        <svg
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="13.5" r="7.5" />
+          <path d="M12 9.5v4l2.5 2M9.5 2.5h5M19 6.5l-1.5-1.5" />
+        </svg>
       </button>
     );
   return (

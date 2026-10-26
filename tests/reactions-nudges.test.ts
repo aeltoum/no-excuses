@@ -252,13 +252,16 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     ).rejects.toThrow("Reactions unavailable");
   });
 
-  it("nudges only members behind target, once per day", async () => {
+  it("nudges only members behind target, once every 4 hours", async () => {
     const db = await database();
     await submit(db, 2);
     await expect(nudge(db, 0, 0)).rejects.toThrow("Nudge unavailable");
     await expect(nudge(db, 0, 2)).rejects.toThrow("Nudge unavailable");
     await nudge(db, 0, 1);
-    await expect(nudge(db, 0, 1)).rejects.toThrow("Already nudged today");
+    await expect(nudge(db, 0, 1, "2026-03-05T14:59Z")).rejects.toThrow(
+      "Already nudged",
+    );
+    await nudge(db, 0, 1, "2026-03-05T15:01Z");
     await nudge(db, 0, 1, "2026-03-06T11:00Z");
     await expect(nudge(db, 0, 1, "2026-03-09T01:00Z")).rejects.toThrow(
       "Nudge unavailable",
@@ -270,6 +273,12 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
       )
     ).rows.map((row) => row.id);
     expect(today).toEqual([memberships[1]]);
+    const later = (
+      await db.query<{ id: string }>(
+        "select app_private.nudged_today('2026-03-06T15:30Z') as id",
+      )
+    ).rows;
+    expect(later).toEqual([]);
   });
 
   it("nudges a member whose only report was rejected", async () => {

@@ -63,7 +63,7 @@ const weekStreakText = (weeks: number) => `${weeks}-week streak`;
 const streakText = (item: CurrentWeekProgressItem) =>
   `${weekStreakText(item.targetStreak)} · ${item.workoutStreak} workout${item.workoutStreak === 1 ? "" : "s"} since last miss`;
 
-const utcDay = () => new Date().toISOString().slice(0, 10);
+const nudgeCooldown = 4 * 3_600_000;
 
 const intensityLevels = ["low", "moderate", "high"] as const;
 const intensityLabels = {
@@ -333,13 +333,15 @@ export function Weekly({
   // Only the refresh buttons wait on a request; everything else is instant.
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useNotice();
-  // Nudges reset each UTC day, like the server; each entry keeps its day so a
-  // long-open app or a failed refresh never shows yesterday's nudge.
-  const [nudgedOn, setNudgedOn] = useState<ReadonlyMap<string, string>>(
+  // A friend can be nudged again 4 hours later, like the server; each entry keeps
+  // its time so a long-open app never shows an expired nudge.
+  const [nudgedOn, setNudgedOn] = useState<ReadonlyMap<string, number>>(
     new Map(),
   );
   const nudged = new Set(
-    [...nudgedOn].filter(([, day]) => day === utcDay()).map(([id]) => id),
+    [...nudgedOn]
+      .filter(([, at]) => Date.now() - at < nudgeCooldown)
+      .map(([id]) => id),
   );
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -656,7 +658,7 @@ export function Weekly({
     loadNudged(apiBaseUrl, token)
       .then(
         (ids) =>
-          active && setNudgedOn(new Map(ids.map((id) => [id, utcDay()]))),
+          active && setNudgedOn(new Map(ids.map((id) => [id, Date.now()]))),
       )
       .catch(() => undefined);
     return () => {
@@ -664,12 +666,12 @@ export function Weekly({
     };
   }, [apiBaseUrl, token, route, groupId, nudgeable, fresh]);
   const nudge = async (membershipId: string) => {
-    setNudgedOn((ids) => new Map(ids).set(membershipId, utcDay()));
+    setNudgedOn((ids) => new Map(ids).set(membershipId, Date.now()));
     try {
       await nudgeMember(apiBaseUrl, token, membershipId);
       setNotice({ kind: "success", text: "Nudge sent." });
     } catch (error) {
-      // Already nudged today (409) still counts as sent.
+      // Already nudged (409) still counts as sent.
       if (error instanceof ApiError && error.kind === "conflict") return;
       setNudgedOn((ids) => {
         const next = new Map(ids);
@@ -837,9 +839,8 @@ export function Weekly({
     Number(duration) >= 1 &&
     photos.activity !== undefined &&
     photos.presence !== undefined;
-  const sessionCard = (onStart?: () => void) => (
+  const sessionCard = () => (
     <SessionCard
-      onStart={onStart}
       apiBaseUrl={apiBaseUrl}
       token={token}
       extras={extras}
@@ -862,27 +863,6 @@ export function Weekly({
         <header className="home-header">
           <h1>Our week</h1>
           <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
-          {own && (
-            <button
-              type="button"
-              className="week-tools-button"
-              aria-haspopup="dialog"
-              aria-label="Week options"
-              onClick={() => setToolsOpen(true)}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="22"
-                height="22"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <circle cx="5" cy="12" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="19" cy="12" r="2" />
-              </svg>
-            </button>
-          )}
         </header>
       ) : (
         <>
@@ -1048,12 +1028,6 @@ export function Weekly({
                           week.
                         </span>
                       </a>
-                      {!extras.session && (
-                        <div className="week-tools-row">
-                          {sessionCard(() => setToolsOpen(false))}
-                          <span>Time it now, log it when you finish.</span>
-                        </div>
-                      )}
                       <div className="week-tools-row">
                         <Exceptions
                           part="own"
@@ -1149,7 +1123,7 @@ export function Weekly({
                               disabled={nudged.has(item.membershipId)}
                               aria-label={
                                 nudged.has(item.membershipId)
-                                  ? `Nudged ${item.displayName} today`
+                                  ? `Nudged ${item.displayName}`
                                   : `Nudge ${item.displayName}`
                               }
                               onClick={() => void nudge(item.membershipId)}
@@ -1200,6 +1174,31 @@ export function Weekly({
               )}
               {own && (
                 <>
+                  {!extras.session && (
+                    <div className="dock-mini dock-timer">{sessionCard()}</div>
+                  )}
+                  <button
+                    type="button"
+                    className="dock-mini dock-week"
+                    aria-haspopup="dialog"
+                    aria-label="Change target or take a week off"
+                    onClick={() => setToolsOpen(true)}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="22"
+                      height="22"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="8.5" />
+                      <circle cx="12" cy="12" r="4.5" />
+                      <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+                    </svg>
+                  </button>
                   <button
                     className={`home-log-button${logBlock ? " is-locked" : ""}`}
                     type="button"

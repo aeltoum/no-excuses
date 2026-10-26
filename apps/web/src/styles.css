@@ -4245,25 +4245,7 @@ svg {
   margin-top: 8px;
 }
 
-/* Week options: one button in the header instead of a row of links under the bar. */
-.home-header {
-  align-items: center;
-}
-.home-header h1 {
-  margin-right: auto;
-}
-.week-tools-button {
-  flex: none;
-  width: 44px;
-  min-height: 44px;
-  margin: 0 -10px 0 -8px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-}
+/* Week tools sheet: Change target and Week off, opened from the Log dock. */
 .week-tools {
   display: grid;
 }
@@ -4318,10 +4300,12 @@ svg {
 }
 .friend-cards li {
   flex: 0 0 auto;
+  justify-content: space-between;
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: min(260px, calc(100vw - 40px));
+  /* One width for everyone: long names truncate instead of stretching a chip. */
+  width: min(224px, calc(100vw - 56px));
   min-width: 0;
   padding: 8px;
   border-radius: 999px;
@@ -4406,4 +4390,51 @@ svg {
 }
 .duration-track button[aria-pressed="true"] small {
   color: var(--rubber);
+}
+
+/* Log dock: timer and week tools ride above +Log, out of the page flow. */
+.dock-mini {
+  position: fixed;
+  z-index: 7;
+  right: calc(max(16px, calc(50% - 300px)) + 6px);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 40%);
+}
+.dock-week {
+  bottom: calc(148px + env(safe-area-inset-bottom));
+}
+.dock-timer {
+  bottom: calc(202px + env(safe-area-inset-bottom));
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.dock-timer .session-start {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 40%);
+}
+body:has(.caption-compose, .post-compose) .dock-mini {
+  display: none;
+}
+body:has(.home-log-button) .result.event-notice {
+  bottom: calc(256px + env(safe-area-inset-bottom));
 }

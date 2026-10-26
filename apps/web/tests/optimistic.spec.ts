@@ -540,7 +540,9 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
   await expect(page.getByRole("button", { name: "I’m ready" })).toHaveCount(0);
 
   // Weekly target: instant, then undone on failure.
-  await page.getByRole("button", { name: "Week options" }).click();
+  await page
+    .getByRole("button", { name: "Change target or take a week off" })
+    .click();
   await page.getByRole("link", { name: "Change target" }).click();
   await page.getByRole("button", { name: "Increase weekly target" }).click();
   await timed(

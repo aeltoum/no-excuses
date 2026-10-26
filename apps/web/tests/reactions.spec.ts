@@ -487,7 +487,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await friends.getByRole("button", { name: "Nudge Maya" }).click();
   await expect(page.getByRole("status")).toHaveText("Nudge sent.");
   await expect(
-    friends.getByRole("button", { name: "Nudged Maya today" }),
+    friends.getByRole("button", { name: "Nudged Maya" }),
   ).toBeDisabled();
   expect(calls).toEqual([
     "react:🔥:true",
