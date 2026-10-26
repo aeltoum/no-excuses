@@ -3514,12 +3514,13 @@ svg {
   margin: 6px 0 12px;
 }
 
-/* Week recap: the day after a week ends, a scoreboard everyone can react to. */
+/* Week recap: the day after a week ends, a small scoreboard everyone can react to.
+   One line per member so it never pushes the feed down. */
 .week-recap {
-  margin-top: 20px;
-  padding: 14px 16px 6px;
-  border-top: 4px solid var(--chalk);
-  border-radius: 4px 4px 12px 12px;
+  margin-top: 16px;
+  padding: 10px 14px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
   background: var(--surface);
   animation: recap-in 420ms var(--ease-out) both;
 }
@@ -3542,60 +3543,77 @@ svg {
 }
 .week-recap-head h2 {
   margin: 0;
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1;
+  font-family: Archivo, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
 }
 .week-recap-head span {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
+/* Rows share one column grid so bars, scores, and reactions line up. */
 .week-recap ul {
-  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px auto auto;
+  margin: 4px 0 0;
   padding: 0;
   list-style: none;
 }
 .recap-row {
   display: grid;
-  gap: 8px;
-  padding: 12px 0;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
 }
 .recap-row + .recap-row {
   border-top: 1px solid var(--rule);
 }
-.recap-result {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px auto;
-  align-items: center;
-  gap: 10px;
-}
-.recap-result strong {
+.recap-name {
   overflow: hidden;
+  font-size: 0.875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.recap-result .barbell-mini {
-  width: 84px;
+.recap-row .barbell-mini {
+  width: 52px;
   height: auto;
 }
 .recap-outcome {
-  min-width: 5.5em;
+  font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: right;
+  white-space: nowrap;
 }
 .recap-missed .recap-outcome {
   color: var(--muted);
+  font-weight: 500;
 }
 .recap-reactions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 4px;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+.recap-reactions .proof-reaction {
+  gap: 3px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 7px;
+  border-radius: 16px;
+  font-size: 0.8125rem;
+}
+.recap-more {
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }
 
 /* Card votes: watch, decide, then a one-line receipt. */
@@ -3733,23 +3751,9 @@ svg {
 .own-progress .barbell-big {
   width: min(100%, 280px);
 }
-.home-meta {
-  gap: 4px 14px;
-  align-items: center;
-  margin-top: 6px;
-}
-.home-meta .home-count {
-  margin: 0;
-  color: var(--muted);
-  font-family: Archivo, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-.home-meta .home-count strong {
-  color: var(--ink);
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.5rem;
-  font-weight: 800;
+.own-progress .home-count {
+  margin-top: 12px;
+  text-align: center;
 }
 .streak {
   display: inline-flex;
@@ -3759,24 +3763,13 @@ svg {
 .streak-flame {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
-  font-size: 0.875rem;
+  gap: 2px;
+  font-size: 0.75rem;
 }
 .streak-flame b {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.25rem;
+  font-size: 0.8125rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-}
-.streak-flame small {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.streak-compact .streak-flame {
-  font-size: 0.75rem;
-}
-.streak-compact .streak-flame b {
-  font-size: 1rem;
 }
 
 /* Friends: a stories-style strip; each card keeps its own inner padding. */
@@ -3903,8 +3896,8 @@ svg {
   height: 40px;
   border-radius: 10px;
   background: var(--rule);
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.375rem;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
 }
 .consequence-strip.is-owed .consequence-strip-mark {

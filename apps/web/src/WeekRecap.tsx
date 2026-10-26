@@ -6,6 +6,8 @@ import { EmojiPicker, quickPicks } from "./Reactions";
 import { Sheet } from "./Sheet";
 
 const day = 24 * 3_600_000;
+// Enough rows to see your result and the crew's; the rest open on request.
+const shownRows = 4;
 const clearsIn = (endsAt: string) => {
   const hours = Math.max(
     1,
@@ -33,6 +35,7 @@ export function WeekRecap({
   onRevoked: () => void;
 }) {
   const [picking, setPicking] = useState<RecapWeek | null>(null);
+  const [showAll, setShowAll] = useState(false);
   // A saved copy can outlive the day; the server drops it on the next load.
   const weeks = extras.recap.filter(
     (week) => Date.parse(week.endsAt) + day > Date.now(),
@@ -90,25 +93,23 @@ export function WeekRecap({
         <span>{clearsIn(weeks[0].endsAt)}</span>
       </header>
       <ul>
-        {weeks.map((week) => {
+        {(showAll ? weeks : weeks.slice(0, shownRows)).map((week) => {
           const who = week.mine ? "You" : week.name;
           return (
             <li
               key={week.memberWeekId}
               className={`recap-row ${week.met ? "recap-met" : "recap-missed"}`}
             >
-              <div className="recap-result">
-                <strong>{who}</strong>
-                <Barbell
-                  count={week.completed}
-                  target={week.target}
-                  size="mini"
-                  activityTypes={week.activityTypes}
-                />
-                <span className="recap-outcome">
-                  {week.met ? "Met" : "Missed"} {week.completed}/{week.target}
-                </span>
-              </div>
+              <strong className="recap-name">{who}</strong>
+              <Barbell
+                count={week.completed}
+                target={week.target}
+                size="mini"
+                activityTypes={week.activityTypes}
+              />
+              <span className="recap-outcome">
+                {week.met ? "Met" : "Missed"} {week.completed}/{week.target}
+              </span>
               <fieldset
                 className="recap-reactions"
                 aria-label={`React to ${week.mine ? "your" : `${week.name}’s`} week`}
@@ -139,8 +140,8 @@ export function WeekRecap({
                 >
                   <svg
                     viewBox="0 0 20 20"
-                    width="18"
-                    height="18"
+                    width="16"
+                    height="16"
                     aria-hidden="true"
                   >
                     <circle
@@ -173,6 +174,16 @@ export function WeekRecap({
           );
         })}
       </ul>
+      {weeks.length > shownRows && (
+        <button
+          type="button"
+          className="text-button recap-more"
+          aria-expanded={showAll}
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? "Show fewer" : `Show all ${weeks.length}`}
+        </button>
+      )}
       <Sheet
         open={picking !== null}
         title={
