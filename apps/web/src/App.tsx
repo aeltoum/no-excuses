@@ -13,6 +13,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
+import { ProfilePhoto } from "./avatars";
 import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import { NotificationBell, NotificationSettings } from "./Notifications";
@@ -1998,14 +1999,29 @@ export function App({
             <div className="account-page">
               {deletionStep === "idle" && <Result notice={notice} />}
               <section className="account-identity" aria-label="Your identity">
-                <span className="account-initials" aria-hidden="true">
-                  {(displayName || session?.user.email || "You")
-                    .split(/\s+|@/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((part) => part[0]?.toUpperCase())
-                    .join("")}
-                </span>
+                {membership && session ? (
+                  <ProfilePhoto
+                    apiBaseUrl={apiBaseUrl}
+                    token={session.access_token}
+                    membershipId={membership.membershipId}
+                    name={(displayName || session?.user.email || "You")
+                      .split(/\s+|@/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")}
+                    onNotice={setNotice}
+                  />
+                ) : (
+                  <span className="account-initials" aria-hidden="true">
+                    {(displayName || session?.user.email || "You")
+                      .split(/\s+|@/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase())
+                      .join("")}
+                  </span>
+                )}
                 <span>
                   <strong>
                     {displayNameScope.current === session?.user.id &&

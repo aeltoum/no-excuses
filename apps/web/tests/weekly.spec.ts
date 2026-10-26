@@ -449,14 +449,10 @@ const weeklyLoop = async (
     0,
   );
   await expect(page.getByText("Maya")).toBeVisible();
-  const legend = page.getByRole("list", { name: "Activity colours" });
-  await expect(legend.getByRole("listitem")).toHaveText([
-    "Strength",
-    "Cardio",
-    "Class",
-    "Sport",
-    "Mixed",
-  ]);
+  // The colour key lives on the target screen, off the Home feed.
+  await expect(
+    page.getByRole("list", { name: "Activity colours" }),
+  ).toHaveCount(0);
   await expect(
     page
       .getByRole("img", { name: "1 of 2 workouts" })
@@ -479,7 +475,7 @@ const weeklyLoop = async (
     dialog.getByRole("button", {
       name: /^(Strength|Cardio|Class|Sport|Mixed)$/,
     }),
-  ).toHaveCount(5);
+  ).toHaveCount(4);
   await expect(
     dialog.getByText("Pick an activity and a time, then take both photos."),
   ).toBeVisible();

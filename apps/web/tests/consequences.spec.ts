@@ -332,11 +332,15 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toContainEqual([60, 80, 60, 80, 140]);
   await dialog.getByRole("button", { name: "Decide later" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
+  // The card sits in a slim strip under the barbells; a friend's claim waiting
+  // on your vote opens it.
+  await expect(
+    page.getByRole("button", { name: /You owe 1 Consequence card/ }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText([
-    "Maya2/3 · owes 2🔥 1 wk1-week streak · 3 workouts since last missNudge",
+    "MAMaya2/3 · owes 2🔥11-week streak · 3 workouts since last missNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
@@ -367,8 +371,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.locator("#consequence-cards")).toBeFocused();
 
   await page.reload();
-  await expect(page.getByText("You owe 1 Consequence card")).toBeVisible();
   await expect(dialog).toHaveCount(0);
+  const strip = page.getByRole("button", {
+    name: /You owe 1 Consequence card/,
+  });
+  await expect(strip).toBeVisible();
+  if ((await strip.getAttribute("aria-expanded")) === "false")
+    await strip.click();
   await page.getByRole("button", { name: "Choose your card" }).click();
   dialog = page.getByRole("dialog", { name: "Choose your punishment" });
 
@@ -386,7 +395,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await dialog.getByRole("button", { name: "Accept penalty" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
-  await expect(page.getByText(/Due in 4[78] hours/)).toBeVisible();
+  await expect(page.getByText(/Due in 4[78] hours\. Miss it/)).toBeVisible();
 
   await logButton.click();
   lock = page.getByRole("dialog", { name: "Bar’s racked" });

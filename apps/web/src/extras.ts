@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, overlappedWrite, writeMark } from "./api-client";
+import { publishAvatars } from "./avatars";
 import { useFreshness } from "./freshness";
 import { persistentMap } from "./persist";
 import { call } from "./proof";
@@ -85,6 +86,8 @@ export type HomeExtras = {
   unreadNotifications: number;
   safety: { conductAccepted: boolean; blocked: string[]; operator?: boolean };
   session: { id: string; startedAt: string } | null;
+  // Signed profile photo URLs by membership id.
+  avatars?: Record<string, string>;
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },
@@ -138,6 +141,7 @@ export function useHomeExtras(
         if (!live || (cache.has(cacheKey) && overlappedWrite(mark))) return;
         const merged = merge(next);
         rememberSafety(merged.safety);
+        if (next.avatars) publishAvatars(next.avatars);
         cache.set(cacheKey, merged);
         setExtras(merged);
       })

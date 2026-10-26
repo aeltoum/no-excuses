@@ -89,15 +89,12 @@ body {
   min-width: 0;
   overflow-x: hidden;
   background-color: var(--rubber);
-  background-image:
-    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.4px),
-    radial-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1.4px);
-  background-position:
-    0 0,
-    4px 6px;
-  background-size:
-    9px 9px,
-    13px 13px;
+  /* A sparse rubber-floor fleck: present, never busy. */
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.035) 1px,
+    transparent 1.4px
+  );
+  background-size: 28px 28px;
 }
 a {
   color: inherit;
@@ -3709,4 +3706,477 @@ svg {
 }
 .recap-reactions .proof-reaction {
   background: var(--ground);
+}
+
+/* Home and feed refresh: barbells on top, feed sooner, Instagram-style posts. */
+.home-header {
+  align-items: center;
+  margin-bottom: 12px;
+}
+.home-header h1 {
+  font-size: clamp(2.25rem, 9vw, 3rem);
+}
+.week-countdown {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.home-header .week-countdown small {
+  color: var(--muted);
+  font-family: Archivo, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.week-countdown.is-close {
+  border-color: var(--error);
+  color: var(--error);
+}
+.week-countdown:empty {
+  display: none;
+}
+.own-progress .barbell-big {
+  width: min(100%, 280px);
+}
+.home-meta {
+  gap: 4px 14px;
+  align-items: center;
+  margin-top: 6px;
+}
+.home-meta .home-count {
+  margin: 0;
+  color: var(--muted);
+  font-family: Archivo, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.home-meta .home-count strong {
+  color: var(--ink);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.streak-flame {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 0.875rem;
+}
+.streak-flame b {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.streak-flame small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.streak-compact .streak-flame {
+  font-size: 0.75rem;
+}
+.streak-compact .streak-flame b {
+  font-size: 1rem;
+}
+
+/* Friends: a stories-style strip; each card keeps its own inner padding. */
+.friend-cards {
+  margin-top: 16px;
+}
+.friend-cards li {
+  flex-basis: 120px;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 12px 10px;
+  text-align: center;
+}
+.friend-cards li .barbell-mini {
+  width: calc(100% - 4px);
+  margin: 2px auto;
+}
+.friend-cards .friend-card-name {
+  max-width: 100%;
+}
+.friend-cards .friend-nudge {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 0.75rem;
+}
+
+/* Profile photos */
+.avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 0.75rem;
+  box-shadow: 0 0 0 2px var(--rule);
+}
+.avatar-md {
+  width: 34px;
+  height: 34px;
+  font-size: 0.75rem;
+}
+.avatar-lg {
+  width: 72px;
+  height: 72px;
+  font-size: 1.25rem;
+}
+.profile-photo {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.profile-photo-pick {
+  position: relative;
+  cursor: pointer;
+}
+.profile-photo-pick input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.profile-photo-pick:focus-within .avatar {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.profile-photo-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ground);
+  border-radius: 50%;
+  background: var(--chalk);
+  color: var(--rubber);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.profile-photo-remove {
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* Consequence cards: one slim strip under the barbells, tap to open. */
+.consequences {
+  gap: 12px;
+  margin-top: 16px;
+}
+.consequence-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+.consequence-strip-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--rule);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.375rem;
+  font-weight: 800;
+}
+.consequence-strip.is-owed .consequence-strip-mark {
+  background: var(--error);
+  color: #fff;
+}
+.consequence-strip-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.consequence-strip-text strong {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.consequence-strip-text small {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.consequence-strip-chevron {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 160ms var(--ease-out);
+}
+.consequence-strip[aria-expanded="true"] .consequence-strip-chevron {
+  transform: rotate(-135deg) translateX(-3px);
+}
+.consequence-body {
+  display: grid;
+  gap: 16px;
+}
+.owed-card {
+  border-top: 0;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+}
+
+/* Feed posts: Instagram-like rhythm; full-width photo, hairline between posts. */
+.proof-list {
+  gap: 0;
+}
+.proof-list > .proof-post {
+  gap: 8px;
+  padding: 16px 0 20px;
+  border-top: 1px solid var(--rule);
+}
+.proof-list > .proof-post:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.proof-byline {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+.proof-byline strong {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proof-byline time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.proof-frame {
+  margin-inline: -20px;
+  border-radius: 0;
+}
+@media (min-width: 600px) {
+  .proof-frame {
+    margin-inline: 0;
+    border-radius: 12px;
+  }
+}
+.proof-reactions .proof-comment {
+  margin-left: auto;
+  padding: 0 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink);
+}
+.post-text {
+  margin-top: 0;
+}
+.post-caption {
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  font-family: Archivo, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+.post-caption strong,
+.post-messages strong {
+  font-weight: 700;
+}
+.post-messages li {
+  font-size: 0.9375rem;
+}
+.post-more {
+  min-height: 28px;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.proof-details {
+  font-size: 0.875rem;
+}
+
+/* Sheets: drag by the handle or header; the close mark sits on the title line. */
+.sheet {
+  transition: transform 160ms var(--ease-out);
+}
+.sheet-drag {
+  margin: -8px -20px 0;
+  padding: 10px 20px 4px;
+  cursor: grab;
+  touch-action: none;
+}
+.sheet-drag:active {
+  cursor: grabbing;
+}
+.sheet-header {
+  min-height: 44px;
+}
+.sheet-header .sheet-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0 -10px 0 0;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 0;
+}
+.sheet-header .sheet-close svg {
+  display: block;
+}
+
+/* Notification settings: on/off switches instead of checkboxes. */
+.switch-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+.switch-label input[role="switch"] {
+  appearance: none;
+  position: relative;
+  order: 2;
+  flex: 0 0 auto;
+  width: 50px;
+  height: 30px;
+  margin: 0;
+  border-radius: 15px;
+  background: var(--empty-slot);
+  transition: background 160ms var(--ease-out);
+}
+.switch-label input[role="switch"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--chalk);
+  transition: transform 160ms var(--ease-out);
+}
+.switch-label input[role="switch"]:checked {
+  background: var(--activity-sport);
+}
+.switch-label input[role="switch"]:checked::after {
+  transform: translateX(20px);
+}
+.switch-label input[role="switch"]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.notification-list li {
+  align-items: start;
+}
+.notification-list strong {
+  font-size: 0.9375rem;
+}
+.notification-list span {
+  font-size: 0.875rem;
+}
+.notification-list time {
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.notification-clear {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Log sheet: intensity slider with effort faces. */
+.legend-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.intensity-slider {
+  display: grid;
+  gap: 8px;
+}
+.intensity-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.intensity-title strong {
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.intensity-slider input[type="range"] {
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  accent-color: var(--chalk);
+  background: transparent;
+}
+.intensity-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.intensity-marks span {
+  opacity: 0.35;
+  transition:
+    opacity 120ms,
+    transform 120ms;
+}
+.intensity-marks span.is-on {
+  opacity: 1;
+  transform: scale(1.2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .switch-label input[role="switch"],
+  .switch-label input[role="switch"]::after,
+  .consequence-strip-chevron,
+  .intensity-marks span {
+    transition: none;
+  }
 }

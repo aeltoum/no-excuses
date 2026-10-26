@@ -16,6 +16,7 @@ import {
   overlappedWrite,
   writeMark,
 } from "./api-client";
+import { Avatar, useAvatars } from "./avatars";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock } from "./Consequences";
 import {
@@ -61,6 +62,74 @@ const weekStreakText = (weeks: number) => `${weeks}-week streak`;
 
 const streakText = (item: CurrentWeekProgressItem) =>
   `${weekStreakText(item.targetStreak)} · ${item.workoutStreak} workout${item.workoutStreak === 1 ? "" : "s"} since last miss`;
+
+const intensityLevels = ["low", "moderate", "high"] as const;
+const intensityLabels = {
+  low: { emoji: "😌", text: "Easy" },
+  moderate: { emoji: "😅", text: "Solid" },
+  high: { emoji: "🥵", text: "Brutal" },
+};
+
+// Flame and count, like a chat streak; the full sentence stays for screen readers.
+function Streak({
+  item,
+  compact = false,
+}: {
+  item: CurrentWeekProgressItem;
+  compact?: boolean;
+}) {
+  return (
+    <span className={`streak${compact ? " streak-compact" : ""}`}>
+      {item.targetStreak > 0 && (
+        <span className="streak-flame" aria-hidden="true">
+          🔥<b>{item.targetStreak}</b>
+          {!compact && (
+            <small>{item.targetStreak === 1 ? "week" : "weeks"}</small>
+          )}
+        </span>
+      )}
+      {!compact && item.workoutStreak > 0 && (
+        <span className="streak-flame" aria-hidden="true">
+          💪<b>{item.workoutStreak}</b>
+          <small>in a row</small>
+        </span>
+      )}
+      <span className="visually-hidden">{streakText(item)}</span>
+    </span>
+  );
+}
+
+// Time left before the week closes, refreshed each minute.
+function WeekCountdown({ endsAt }: { endsAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!endsAt) return <span className="week-countdown" />;
+  const minutes = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 60_000));
+  // The server rolls the week over within a minute or so.
+  if (minutes === 0)
+    return <span className="week-countdown is-close">Week closing</span>;
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const text =
+    days > 0
+      ? `${days}d ${hours}h`
+      : hours > 0
+        ? `${hours}h ${minutes % 60}m`
+        : `${minutes}m`;
+  return (
+    <span
+      className={`week-countdown${minutes < 1440 ? " is-close" : ""}`}
+      title={new Date(endsAt).toLocaleString()}
+    >
+      <span className="visually-hidden">Week ends in </span>
+      {text}
+      <small aria-hidden="true"> left</small>
+    </span>
+  );
+}
 
 type Api = ReturnType<typeof createApiClient>;
 type Route = "/home" | "/target" | "/history";
@@ -286,7 +355,15 @@ export function Weekly({
   );
   const [targetContext, setTargetContext] =
     useState<WeeklyTargetContext | null>(saved?.targetContext ?? null);
-  const [activityType, setActivityType] = useState<Activity | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  // Picking several activities logs one mixed workout.
+  const activityType: Activity | null =
+    activities.length === 0
+      ? null
+      : activities.length === 1
+        ? activities[0]
+        : "mixed";
+  const quickCamera = useRef<HTMLInputElement>(null);
   const [duration, setDuration] = useState("");
   const [otherDuration, setOtherDuration] = useState(false);
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
@@ -300,6 +377,7 @@ export function Weekly({
   const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(emptyDraft);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const shots = useCandidates();
+  const avatars = useAvatars();
   const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
     (entry) => entry.membershipId === membership?.membershipId,
   );
@@ -768,7 +846,7 @@ export function Weekly({
       {home ? (
         <header className="home-header">
           <h1>Our week</h1>
-          <span>Proof required</span>
+          <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
         </header>
       ) : (
         <>
@@ -887,25 +965,14 @@ export function Weekly({
                       activityTypes={own.activityTypes}
                     />
                   </a>
-                  <ul className="activity-legend" aria-label="Activity colours">
-                    {(
-                      ["strength", "cardio", "class", "sport", "mixed"] as const
-                    ).map((activity) => (
-                      <li key={activity}>
-                        <span
-                          className={`activity-swatch activity-${activity}`}
-                        />
-                        {activity[0].toUpperCase() + activity.slice(1)}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="home-count">
-                    {own.completedWorkoutCount} of {own.lockedTarget} this week
-                  </p>
                   <div className="home-meta">
-                    {hasStreaks(own) && (
-                      <span className="home-streaks">{streakText(own)}</span>
-                    )}
+                    <p className="home-count">
+                      <strong>
+                        {own.completedWorkoutCount} of {own.lockedTarget}
+                      </strong>{" "}
+                      this week
+                    </p>
+                    {hasStreaks(own) && <Streak item={own} />}
                     <SeasonChip
                       season={extras.season}
                       onOpen={(event) => onNavigate(event, "/history")}
@@ -976,17 +1043,6 @@ export function Weekly({
                   onRevoked={feedRevoked}
                 />
               )}
-              {own && (
-                <Consequences
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  onRevoked={feedRevoked}
-                  onGroupOwed={setGroupOwed}
-                  onAttention={setCardAttention}
-                  onLogBlock={setLogBlock}
-                  cacheKey={cacheKey}
-                />
-              )}
               {own && progress.length > 1 && (
                 <ul className="friend-cards" aria-label="Friends this week">
                   {progress
@@ -1002,6 +1058,11 @@ export function Weekly({
                             : undefined
                         }
                       >
+                        <Avatar
+                          name={item.displayName}
+                          url={avatars[item.membershipId]}
+                          size="sm"
+                        />
                         <strong className="friend-card-name">
                           {item.displayName}
                         </strong>
@@ -1023,18 +1084,7 @@ export function Weekly({
                               ? " · week off?"
                               : ""}
                         </span>
-                        {hasStreaks(item) && (
-                          <span className="friend-streaks">
-                            {item.targetStreak > 0 && (
-                              <span aria-hidden="true">
-                                🔥 {item.targetStreak} wk
-                              </span>
-                            )}
-                            <span className="visually-hidden">
-                              {streakText(item)}
-                            </span>
-                          </span>
-                        )}
+                        {hasStreaks(item) && <Streak item={item} compact />}
                         {item.completedWorkoutCount < item.lockedTarget &&
                           !excused.has(item.membershipId) && (
                             <button
@@ -1056,6 +1106,17 @@ export function Weekly({
                       </li>
                     ))}
                 </ul>
+              )}
+              {own && (
+                <Consequences
+                  apiBaseUrl={apiBaseUrl}
+                  token={token}
+                  onRevoked={feedRevoked}
+                  onGroupOwed={setGroupOwed}
+                  onAttention={setCardAttention}
+                  onLogBlock={setLogBlock}
+                  cacheKey={cacheKey}
+                />
               )}
               {own && (
                 <Exceptions
@@ -1082,7 +1143,12 @@ export function Weekly({
                     onClick={(event) => {
                       event.currentTarget.focus();
                       if (logBlock) setLockOpen(true);
-                      else setSheetOpen(true);
+                      else {
+                        // The camera opens straight away over the sheet;
+                        // details follow once the photo is in.
+                        setSheetOpen(true);
+                        if (!photos.activity) quickCamera.current?.click();
+                      }
                     }}
                   >
                     {logBlock ? (
@@ -1094,6 +1160,20 @@ export function Weekly({
                     )}{" "}
                     Log
                   </button>
+                  {!logBlock && (
+                    <input
+                      ref={quickCamera}
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      onChange={(event) => {
+                        void choosePhoto("activity")(event);
+                      }}
+                    />
+                  )}
                   <Sheet
                     open={lockOpen}
                     title="Bar’s racked"
@@ -1192,7 +1272,7 @@ export function Weekly({
                         // upload and check-in finish in the background.
                         setOutbox([...outbox, entry]);
                         setSheetOpen(false);
-                        setActivityType(null);
+                        setActivities([]);
                         setDuration("");
                         setOtherDuration(false);
                         setPhotos({});
@@ -1208,23 +1288,30 @@ export function Weekly({
                       }}
                     >
                       <fieldset>
-                        <legend>What did you do?</legend>
+                        <legend>
+                          What did you do?{" "}
+                          <span className="legend-hint">
+                            Pick all that apply
+                          </span>
+                        </legend>
                         <div className="activity-plates">
                           {(
-                            [
-                              "strength",
-                              "cardio",
-                              "class",
-                              "sport",
-                              "mixed",
-                            ] as const
+                            ["strength", "cardio", "class", "sport"] as const
                           ).map((activity) => (
                             <button
                               type="button"
                               key={activity}
                               className={`activity-plate activity-${activity}`}
-                              aria-pressed={activityType === activity}
-                              onClick={() => setActivityType(activity)}
+                              aria-pressed={activities.includes(activity)}
+                              onClick={() =>
+                                setActivities((current) =>
+                                  current.includes(activity)
+                                    ? current.filter(
+                                        (entry) => entry !== activity,
+                                      )
+                                    : [...current, activity],
+                                )
+                              }
                             >
                               {activity[0].toUpperCase() + activity.slice(1)}
                             </button>
@@ -1276,23 +1363,38 @@ export function Weekly({
                           />
                         </label>
                       )}
-                      <fieldset>
-                        <legend>How hard did it feel?</legend>
-                        <div className="intensity-control">
-                          {(["low", "moderate", "high"] as const).map(
-                            (level) => (
-                              <button
-                                type="button"
-                                key={level}
-                                aria-pressed={intensity === level}
-                                onClick={() => setIntensity(level)}
-                              >
-                                {level[0].toUpperCase() + level.slice(1)}
-                              </button>
-                            ),
-                          )}
-                        </div>
-                      </fieldset>
+                      <label className="intensity-slider">
+                        <span className="intensity-title">
+                          How hard did it feel?
+                          <strong>{intensityLabels[intensity].text}</strong>
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="1"
+                          value={intensityLevels.indexOf(intensity)}
+                          aria-valuetext={intensityLabels[intensity].text}
+                          onChange={(event) =>
+                            setIntensity(
+                              intensityLevels[Number(event.target.value)] ??
+                                "moderate",
+                            )
+                          }
+                        />
+                        <span className="intensity-marks" aria-hidden="true">
+                          {intensityLevels.map((level) => (
+                            <span
+                              key={level}
+                              className={
+                                intensity === level ? "is-on" : undefined
+                              }
+                            >
+                              {intensityLabels[level].emoji}
+                            </span>
+                          ))}
+                        </span>
+                      </label>
                       <DetailsFields
                         activity={activityType}
                         draft={detailsDraft}
@@ -1416,9 +1518,10 @@ export function Weekly({
                   {sending.map((entry) => (
                     <li className="proof-post" key={entry.id}>
                       <header>
-                        <span className="proof-avatar" aria-hidden="true">
-                          YO
-                        </span>
+                        <Avatar
+                          name="You"
+                          url={avatars[membership.membershipId]}
+                        />
                         <strong>You</strong>
                         <span
                           className={`proof-status ${entry.status === "failed" ? "proof-questioned" : "proof-pending"}`}
@@ -1532,6 +1635,16 @@ export function Weekly({
           )}
           {route === "/target" && (
             <>
+              <ul className="activity-legend" aria-label="Activity colours">
+                {(
+                  ["strength", "cardio", "class", "sport", "mixed"] as const
+                ).map((activity) => (
+                  <li key={activity}>
+                    <span className={`activity-swatch activity-${activity}`} />
+                    {activity[0].toUpperCase() + activity.slice(1)}
+                  </li>
+                ))}
+              </ul>
               <p className="target-lock-copy">
                 {targetContext?.memberCount === 1
                   ? "Your week starts when a friend joins. This becomes your first target."
@@ -1824,9 +1937,16 @@ export async function loadWeekly(
     ]);
     next.progress = progressResponse.data;
     next.targetContext = targetResponse.data as WeeklyTargetContext;
-  } else
-    next.progress = (await api.progress(token, groupId))
-      .data as CurrentWeekProgressItem[];
+  } else {
+    // Home also reads the week's end for its countdown; that part may fail alone.
+    const [progressResponse, targetResponse] = await Promise.all([
+      api.progress(token, groupId),
+      api.target(token).catch(() => null),
+    ]);
+    next.progress = progressResponse.data as CurrentWeekProgressItem[];
+    if (targetResponse)
+      next.targetContext = targetResponse.data as WeeklyTargetContext;
+  }
   return next;
 }
 

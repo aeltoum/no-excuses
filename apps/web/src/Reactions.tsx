@@ -1,5 +1,11 @@
 import emojiData from "emoji-picker-element-data/en/emojibase/data.json?url";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { type ReactionCount, type Reactor, reactionLimit } from "./proof";
 import { Sheet } from "./Sheet";
 
@@ -94,6 +100,8 @@ type Props = {
   onToggle: (emoji: string, on: boolean) => void;
   loadReactors: () => Promise<Reactor[]>;
   cachedReactors: () => Reactor[] | undefined;
+  // Extra controls at the end of the row, like the comment button.
+  trailing?: ReactNode;
 };
 
 type Who =
@@ -316,6 +324,7 @@ export function Reactions({
   onToggle,
   loadReactors,
   cachedReactors,
+  trailing,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -392,6 +401,7 @@ export function Reactions({
             </svg>
           </button>
         )}
+        {trailing}
       </fieldset>
       <Sheet open={open} title="React" onDismiss={() => setOpen(false)}>
         <fieldset className="reaction-quick" aria-label="Gym favorites">

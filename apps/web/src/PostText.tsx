@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
 import {
   type ProofItem,
@@ -47,6 +47,8 @@ export const captionStarters = (item: ProofItem): string[] => {
 // A post's caption and messages, with the inputs to add them.
 export function PostText({
   item,
+  authorName,
+  askComment = 0,
   apiBaseUrl,
   token,
   ensureConduct,
@@ -55,6 +57,9 @@ export function PostText({
   onReportPhotos,
 }: {
   item: ProofItem;
+  authorName: string;
+  // Bumped by the comment icon beside the reactions.
+  askComment?: number;
   apiBaseUrl: string;
   token: string;
   ensureConduct: () => Promise<boolean>;
@@ -94,6 +99,11 @@ export function PostText({
     setDraft("");
     setWriting(mode);
   };
+  const openRef = useRef(open);
+  openRef.current = open;
+  useEffect(() => {
+    if (askComment > 0) void openRef.current("message");
+  }, [askComment]);
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const text = draft.trim();
@@ -135,8 +145,8 @@ export function PostText({
   return (
     <div className="post-text">
       {shownCaption && (
-        <p className={`post-caption activity-${item.activityType}`}>
-          {shownCaption}
+        <p className="post-caption">
+          <strong>{authorName}</strong> {shownCaption}
         </p>
       )}
       {all.length > 3 && !showAll && (
@@ -145,11 +155,11 @@ export function PostText({
           className="text-button post-more"
           onClick={() => setShowAll(true)}
         >
-          Show all {all.length} messages
+          View all {all.length} comments
         </button>
       )}
       {visible.length > 0 && (
-        <ul className="post-messages" aria-label="Messages">
+        <ul className="post-messages" aria-label="Comments">
           {visible.map((message) => (
             <li key={message.id}>
               <strong>{message.mine ? "You" : message.name}</strong>{" "}
@@ -238,8 +248,8 @@ export function PostText({
       ) : writing ? (
         <form className="post-compose" onSubmit={submit}>
           <input
-            aria-label="Message"
-            placeholder="Say something…"
+            aria-label="Comment"
+            placeholder="Add a comment…"
             maxLength={200}
             value={draft}
             // biome-ignore lint/a11y/noAutofocus: the field opens on request.
@@ -247,7 +257,7 @@ export function PostText({
             onChange={(event) => setDraft(event.target.value)}
           />
           <button type="submit" disabled={!draft.trim()}>
-            Send
+            Post
           </button>
           <button
             type="button"
@@ -266,15 +276,6 @@ export function PostText({
               onClick={() => void open("caption")}
             >
               Add caption
-            </button>
-          )}
-          {!item.hidden && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => void open("message")}
-            >
-              Message
             </button>
           )}
           {onReportPhotos && (

@@ -195,6 +195,8 @@ export function Consequences({
   const fresh = useFreshness();
   const [picking, setPicking] = useState(false);
   const [recording, setRecording] = useState(false);
+  // Slim by default; friends' cards waiting on a vote open it until toggled.
+  const [toggled, setExpanded] = useState<boolean | null>(null);
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
 
@@ -255,6 +257,15 @@ export function Consequences({
     if (home) onGroupOwed(home.groupOwed);
   }, [home, onGroupOwed]);
 
+  // Once friends' cards open the strip, it stays open until the member closes it.
+  useEffect(() => {
+    if (
+      home?.reviews.some((review) => review.myResponse === null) ||
+      home?.pauseReviews.some((review) => review.myVote === null)
+    )
+      setExpanded((current) => current ?? true);
+  }, [home]);
+
   // With `change`, the outcome shows at once and a failure undoes only that
   // change; without it, only this control waits for the server.
   const act = async (
@@ -306,6 +317,10 @@ export function Consequences({
   )
     return null;
   const { offer, attempt } = home;
+  const waiting =
+    home.reviews.filter((review) => review.myResponse === null).length +
+    home.pauseReviews.filter((review) => review.myVote === null).length;
+  const expanded = toggled ?? waiting > 0;
 
   return (
     <section
@@ -313,297 +328,344 @@ export function Consequences({
       className="consequences"
       aria-label="Consequence cards"
       tabIndex={-1}
+      // The log lock sends focus here to show the card.
+      onFocus={(event) => {
+        if (event.target === event.currentTarget) setExpanded(true);
+      }}
     >
       {!(offer && picking) && <Result notice={notice} />}
       {confirmSheet}
-      {home.owed > 0 && (
-        <div className="owed-card">
-          <p className="owed-count">
-            You owe {home.owed} Consequence {home.owed === 1 ? "card" : "cards"}
-          </p>
-          <DebtMeter owed={home.owed} />
-          {offer && (
-            <button type="button" onClick={() => setPicking(true)}>
-              Choose your card
-            </button>
-          )}
-          {attempt?.status === "active" && (
-            <>
-              <h2>{attempt.title}</h2>
-              <p>{attempt.instructions}</p>
-              <p className="owed-deadline">
-                Due in {hoursLeft(attempt.expiresAt)}. Miss it and you owe
-                another.
+      <button
+        type="button"
+        className={`consequence-strip${home.owed > 0 ? " is-owed" : ""}`}
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="consequence-strip-mark" aria-hidden="true">
+          {home.owed > 0 ? home.owed : "✓"}
+        </span>
+        <span className="consequence-strip-text">
+          <strong>
+            {home.owed > 0
+              ? attempt?.status === "active"
+                ? attempt.title
+                : `You owe ${home.owed} Consequence ${home.owed === 1 ? "card" : "cards"}`
+              : "Consequence cards"}
+          </strong>
+          <small>
+            {attempt?.status === "active"
+              ? `Due in ${hoursLeft(attempt.expiresAt)}`
+              : offer
+                ? "Tap to pick a card"
+                : waiting > 0
+                  ? `${waiting} waiting on you`
+                  : "Friends’ cards in review"}
+          </small>
+        </span>
+        <span className="consequence-strip-chevron" aria-hidden="true" />
+      </button>
+      {expanded && (
+        <div className="consequence-body">
+          {home.owed > 0 && (
+            <div className="owed-card">
+              <p className="owed-count">
+                You owe {home.owed} Consequence{" "}
+                {home.owed === 1 ? "card" : "cards"}
               </p>
-              <p className="clip-heads-up">
-                Proof must be a video recorded in the app right now. Uploads
-                from your camera roll aren’t accepted. Record a quick clip (up
-                to {maxClipSeconds}s) showing the code, then doing the card.
-              </p>
-              <div className="proof-actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Earlier toasts would sit over the recorder.
-                    setNotice(null);
-                    setRecording(true);
-                  }}
-                >
-                  Record proof
+              <DebtMeter owed={home.owed} />
+              {offer && (
+                <button type="button" onClick={() => setPicking(true)}>
+                  Choose your card
                 </button>
-                {!attempt.pauseRequest && (
+              )}
+              {attempt?.status === "active" && (
+                <>
+                  <h2>{attempt.title}</h2>
+                  <p>{attempt.instructions}</p>
+                  <p className="owed-deadline">
+                    Due in {hoursLeft(attempt.expiresAt)}. Miss it and you owe
+                    another.
+                  </p>
+                  <p className="clip-heads-up">
+                    Proof must be a video recorded in the app right now. Uploads
+                    from your camera roll aren’t accepted. Record a quick clip
+                    (up to {maxClipSeconds}s) showing the code, then doing the
+                    card.
+                  </p>
+                  <div className="proof-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Earlier toasts would sit over the recorder.
+                        setNotice(null);
+                        setRecording(true);
+                      }}
+                    >
+                      Record proof
+                    </button>
+                    {!attempt.pauseRequest && (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={busy(`request_pause:${attempt.attemptId}`)}
+                        onClick={async () => {
+                          if (
+                            await ask({
+                              title: "Request a pause?",
+                              body: "Your Group votes on it. Two friends must approve before the card pauses. The deadline keeps running until then.",
+                              confirm: "Request pause",
+                            })
+                          )
+                            void act(
+                              "request_pause",
+                              attempt.attemptId,
+                              "",
+                              "Pause requested. Waiting for friends to approve.",
+                              {
+                                apply: (current) => ({
+                                  ...current,
+                                  attempt: current.attempt && {
+                                    ...current.attempt,
+                                    pauseRequest: {
+                                      approvals: 0,
+                                      rejections: 0,
+                                      approvalsNeeded: 2,
+                                    },
+                                  },
+                                }),
+                                undo: (current) => ({
+                                  ...current,
+                                  attempt: current.attempt && {
+                                    ...current.attempt,
+                                    pauseRequest: null,
+                                  },
+                                }),
+                              },
+                            );
+                        }}
+                      >
+                        Request a pause
+                      </button>
+                    )}
+                  </div>
+                  {attempt.pauseRequest && (
+                    <p className="owed-deadline">
+                      Pause requested: {attempt.pauseRequest.approvals} of{" "}
+                      {attempt.pauseRequest.approvalsNeeded} approvals. The
+                      deadline keeps running until it’s approved.
+                    </p>
+                  )}
+                </>
+              )}
+              {attempt?.status === "safety_paused" && (
+                <>
+                  <h2>{attempt.title}</h2>
+                  <p className="owed-deadline">
+                    Paused with your Group’s approval. When you’re ready you’ll
+                    get a fresh pick.
+                  </p>
                   <button
                     type="button"
-                    className="secondary-button"
-                    disabled={busy(`request_pause:${attempt.attemptId}`)}
-                    onClick={async () => {
-                      if (
-                        await ask({
-                          title: "Request a pause?",
-                          body: "Your Group votes on it. Two friends must approve before the card pauses. The deadline keeps running until then.",
-                          confirm: "Request pause",
-                        })
+                    disabled={busy(`resume:${attempt.attemptId}`)}
+                    onClick={() =>
+                      void act(
+                        "resume",
+                        attempt.attemptId,
+                        "",
+                        "Ready. Pick a fresh card.",
+                        {
+                          // The fresh hand comes from the server.
+                          apply: (current) => ({ ...current, attempt: null }),
+                          undo: (current) =>
+                            current.attempt ? current : { ...current, attempt },
+                        },
                       )
-                        void act(
-                          "request_pause",
-                          attempt.attemptId,
-                          "",
-                          "Pause requested. Waiting for friends to approve.",
-                          {
-                            apply: (current) => ({
-                              ...current,
-                              attempt: current.attempt && {
-                                ...current.attempt,
-                                pauseRequest: {
-                                  approvals: 0,
-                                  rejections: 0,
-                                  approvalsNeeded: 2,
-                                },
-                              },
-                            }),
-                            undo: (current) => ({
-                              ...current,
-                              attempt: current.attempt && {
-                                ...current.attempt,
-                                pauseRequest: null,
-                              },
-                            }),
-                          },
-                        );
-                    }}
+                    }
                   >
-                    Request a pause
+                    I’m ready
                   </button>
-                )}
-              </div>
-              {attempt.pauseRequest && (
-                <p className="owed-deadline">
-                  Pause requested: {attempt.pauseRequest.approvals} of{" "}
-                  {attempt.pauseRequest.approvalsNeeded} approvals. The deadline
-                  keeps running until it’s approved.
-                </p>
+                </>
               )}
-            </>
-          )}
-          {attempt?.status === "safety_paused" && (
-            <>
-              <h2>{attempt.title}</h2>
-              <p className="owed-deadline">
-                Paused with your Group’s approval. When you’re ready you’ll get
-                a fresh pick.
-              </p>
-              <button
-                type="button"
-                disabled={busy(`resume:${attempt.attemptId}`)}
-                onClick={() =>
-                  void act(
-                    "resume",
-                    attempt.attemptId,
-                    "",
-                    "Ready. Pick a fresh card.",
-                    {
-                      // The fresh hand comes from the server.
-                      apply: (current) => ({ ...current, attempt: null }),
-                      undo: (current) =>
-                        current.attempt ? current : { ...current, attempt },
-                    },
-                  )
-                }
-              >
-                I’m ready
-              </button>
-            </>
-          )}
-          {attempt?.status === "review" && (
-            <>
-              <h2>{attempt.title}</h2>
-              <p className="owed-deadline">
-                Waiting for friends: {attempt.approvals} of{" "}
-                {attempt.approvalsNeeded} approvals. With no rejections it
-                counts as done when the review ends.
-              </p>
-              {home.owed > 1 && (
-                <p className="owed-deadline">
-                  {home.owed - 1} more{" "}
-                  {home.owed === 2 ? "card is" : "cards are"} queued. The next
-                  is dealt once this one is done.
-                </p>
+              {attempt?.status === "review" && (
+                <>
+                  <h2>{attempt.title}</h2>
+                  <p className="owed-deadline">
+                    Waiting for friends: {attempt.approvals} of{" "}
+                    {attempt.approvalsNeeded} approvals. With no rejections it
+                    counts as done when the review ends.
+                  </p>
+                  {home.owed > 1 && (
+                    <p className="owed-deadline">
+                      {home.owed - 1} more{" "}
+                      {home.owed === 2 ? "card is" : "cards are"} queued. The
+                      next is dealt once this one is done.
+                    </p>
+                  )}
+                  <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
+                </>
               )}
-              <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
-            </>
+            </div>
+          )}
+          {home.reviews.length > 0 && (
+            <ul
+              className="card-reviews"
+              aria-label="Consequence cards to approve"
+            >
+              {home.reviews.map((review) =>
+                review.myResponse ? (
+                  // Voted: a one-line receipt replaces the clip and the buttons.
+                  <li key={review.claimId} className="verdict-receipt">
+                    <span
+                      className={`verdict-mark verdict-${review.myResponse}`}
+                      aria-hidden="true"
+                    >
+                      {verdictMark[review.myResponse] ?? "?"}
+                    </span>
+                    <p role="status">
+                      {verdictText[review.myResponse] ?? "You voted on"}{" "}
+                      <strong>{review.memberName}</strong>’s {review.title}.
+                    </p>
+                  </li>
+                ) : (
+                  <li key={review.claimId} className="verdict">
+                    <p className="verdict-who">
+                      <strong>{review.memberName}</strong> says they did their
+                      card
+                    </p>
+                    <h3 className="verdict-title">{review.title}</h3>
+                    <p className="verdict-rules">{review.instructions}</p>
+                    <ClipPlayer
+                      url={review.clipUrl}
+                      label={`${review.memberName}’s proof clip`}
+                    />
+                    <fieldset
+                      className="verdict-choices"
+                      aria-label={`Your vote on ${review.memberName}’s card`}
+                    >
+                      {(
+                        [
+                          ["approve", "Approve"],
+                          ["reject", "Reject"],
+                          ["cannot_assess", "Can’t tell"],
+                        ] as const
+                      ).map(([choice, text]) => (
+                        <button
+                          type="button"
+                          key={choice}
+                          className={`verdict-${choice}`}
+                          onClick={() =>
+                            void act(
+                              "respond",
+                              review.claimId,
+                              choice,
+                              "Vote saved.",
+                              {
+                                apply: (current) => ({
+                                  ...current,
+                                  reviews: current.reviews.map((entry) =>
+                                    entry.claimId === review.claimId
+                                      ? { ...entry, myResponse: choice }
+                                      : entry,
+                                  ),
+                                }),
+                                undo: (current) => ({
+                                  ...current,
+                                  reviews: current.reviews.map((entry) =>
+                                    entry.claimId === review.claimId
+                                      ? { ...entry, myResponse: null }
+                                      : entry,
+                                  ),
+                                }),
+                              },
+                            )
+                          }
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </fieldset>
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+          {home.pauseReviews.length > 0 && (
+            <ul className="card-reviews" aria-label="Pause requests to approve">
+              {home.pauseReviews.map((review) =>
+                review.myVote ? (
+                  <li key={review.pauseRequestId} className="verdict-receipt">
+                    <span
+                      className={`verdict-mark verdict-${review.myVote}`}
+                      aria-hidden="true"
+                    >
+                      {verdictMark[review.myVote]}
+                    </span>
+                    <p role="status">
+                      You {review.myVote === "approve" ? "approved" : "denied"}{" "}
+                      <strong>{review.memberName}</strong>’s pause.
+                    </p>
+                  </li>
+                ) : (
+                  <li key={review.pauseRequestId} className="verdict">
+                    <p className="verdict-who">
+                      <strong>{review.memberName}</strong> asked to pause
+                    </p>
+                    <h3 className="verdict-title">{review.title}</h3>
+                    <fieldset
+                      className="verdict-choices"
+                      aria-label={`Your vote on ${review.memberName}’s pause`}
+                    >
+                      {(
+                        [
+                          ["approve", "Approve pause"],
+                          ["reject", "Deny"],
+                        ] as const
+                      ).map(([choice, text]) => (
+                        <button
+                          type="button"
+                          key={choice}
+                          className={`verdict-${choice}`}
+                          onClick={() =>
+                            void act(
+                              "vote_pause",
+                              review.pauseRequestId,
+                              choice,
+                              "Vote saved.",
+                              {
+                                apply: (current) => ({
+                                  ...current,
+                                  pauseReviews: current.pauseReviews.map(
+                                    (entry) =>
+                                      entry.pauseRequestId ===
+                                      review.pauseRequestId
+                                        ? { ...entry, myVote: choice }
+                                        : entry,
+                                  ),
+                                }),
+                                undo: (current) => ({
+                                  ...current,
+                                  pauseReviews: current.pauseReviews.map(
+                                    (entry) =>
+                                      entry.pauseRequestId ===
+                                      review.pauseRequestId
+                                        ? { ...entry, myVote: null }
+                                        : entry,
+                                  ),
+                                }),
+                              },
+                            )
+                          }
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </fieldset>
+                  </li>
+                ),
+              )}
+            </ul>
           )}
         </div>
-      )}
-      {home.reviews.length > 0 && (
-        <ul className="card-reviews" aria-label="Consequence cards to approve">
-          {home.reviews.map((review) =>
-            review.myResponse ? (
-              // Voted: a one-line receipt replaces the clip and the buttons.
-              <li key={review.claimId} className="verdict-receipt">
-                <span
-                  className={`verdict-mark verdict-${review.myResponse}`}
-                  aria-hidden="true"
-                >
-                  {verdictMark[review.myResponse] ?? "?"}
-                </span>
-                <p role="status">
-                  {verdictText[review.myResponse] ?? "You voted on"}{" "}
-                  <strong>{review.memberName}</strong>’s {review.title}.
-                </p>
-              </li>
-            ) : (
-              <li key={review.claimId} className="verdict">
-                <p className="verdict-who">
-                  <strong>{review.memberName}</strong> says they did their card
-                </p>
-                <h3 className="verdict-title">{review.title}</h3>
-                <p className="verdict-rules">{review.instructions}</p>
-                <ClipPlayer
-                  url={review.clipUrl}
-                  label={`${review.memberName}’s proof clip`}
-                />
-                <fieldset
-                  className="verdict-choices"
-                  aria-label={`Your vote on ${review.memberName}’s card`}
-                >
-                  {(
-                    [
-                      ["approve", "Approve"],
-                      ["reject", "Reject"],
-                      ["cannot_assess", "Can’t tell"],
-                    ] as const
-                  ).map(([choice, text]) => (
-                    <button
-                      type="button"
-                      key={choice}
-                      className={`verdict-${choice}`}
-                      onClick={() =>
-                        void act(
-                          "respond",
-                          review.claimId,
-                          choice,
-                          "Vote saved.",
-                          {
-                            apply: (current) => ({
-                              ...current,
-                              reviews: current.reviews.map((entry) =>
-                                entry.claimId === review.claimId
-                                  ? { ...entry, myResponse: choice }
-                                  : entry,
-                              ),
-                            }),
-                            undo: (current) => ({
-                              ...current,
-                              reviews: current.reviews.map((entry) =>
-                                entry.claimId === review.claimId
-                                  ? { ...entry, myResponse: null }
-                                  : entry,
-                              ),
-                            }),
-                          },
-                        )
-                      }
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </fieldset>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
-      {home.pauseReviews.length > 0 && (
-        <ul className="card-reviews" aria-label="Pause requests to approve">
-          {home.pauseReviews.map((review) =>
-            review.myVote ? (
-              <li key={review.pauseRequestId} className="verdict-receipt">
-                <span
-                  className={`verdict-mark verdict-${review.myVote}`}
-                  aria-hidden="true"
-                >
-                  {verdictMark[review.myVote]}
-                </span>
-                <p role="status">
-                  You {review.myVote === "approve" ? "approved" : "denied"}{" "}
-                  <strong>{review.memberName}</strong>’s pause.
-                </p>
-              </li>
-            ) : (
-              <li key={review.pauseRequestId} className="verdict">
-                <p className="verdict-who">
-                  <strong>{review.memberName}</strong> asked to pause
-                </p>
-                <h3 className="verdict-title">{review.title}</h3>
-                <fieldset
-                  className="verdict-choices"
-                  aria-label={`Your vote on ${review.memberName}’s pause`}
-                >
-                  {(
-                    [
-                      ["approve", "Approve pause"],
-                      ["reject", "Deny"],
-                    ] as const
-                  ).map(([choice, text]) => (
-                    <button
-                      type="button"
-                      key={choice}
-                      className={`verdict-${choice}`}
-                      onClick={() =>
-                        void act(
-                          "vote_pause",
-                          review.pauseRequestId,
-                          choice,
-                          "Vote saved.",
-                          {
-                            apply: (current) => ({
-                              ...current,
-                              pauseReviews: current.pauseReviews.map((entry) =>
-                                entry.pauseRequestId === review.pauseRequestId
-                                  ? { ...entry, myVote: choice }
-                                  : entry,
-                              ),
-                            }),
-                            undo: (current) => ({
-                              ...current,
-                              pauseReviews: current.pauseReviews.map((entry) =>
-                                entry.pauseRequestId === review.pauseRequestId
-                                  ? { ...entry, myVote: null }
-                                  : entry,
-                              ),
-                            }),
-                          },
-                        )
-                      }
-                    >
-                      {text}
-                    </button>
-                  ))}
-                </fieldset>
-              </li>
-            ),
-          )}
-        </ul>
       )}
       {recording && attempt?.status === "active" && (
         <ProofClip

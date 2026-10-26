@@ -33,23 +33,35 @@ test("the bell lists notifications at once and marks them seen", async ({
       return homeExtras({ unreadNotifications: 1 });
     if (path === "/v1/notifications") return center;
     if (path === "/v1/notifications/seen") return { seen: true };
+    if (path === "/v1/notifications/clear") return { cleared: true };
   });
   const bell = page.getByRole("button", { name: "Notifications, 1 new" });
   await expect(bell).toBeVisible();
+  // New activity loads the list ahead of the tap, so it opens already filled.
+  await expect
+    .poll(() => calls.some((c) => c.path === "/v1/notifications"))
+    .toBe(true);
   await delayRoute(page, "**/v1/notifications", 1000);
   const shown = await msUntilVisible(
     page,
     () => bell.click(),
-    page
-      .getByRole("dialog", { name: "Notifications" })
-      .locator(".skeleton")
-      .first(),
+    page.getByText("Maya nudged you"),
   );
   expect(shown).toBeLessThanOrEqual(100);
-  await expect(page.getByText("Maya nudged you")).toBeVisible();
   await expect(page.getByText("5m")).toBeVisible();
   await expect
     .poll(() => calls.some((c) => c.path === "/v1/notifications/seen"))
+    .toBe(true);
+  // Clear all empties the list at once.
+  await delayRoute(page, "**/v1/notifications/clear", 1000);
+  const cleared = await msUntilVisible(
+    page,
+    () => page.getByRole("button", { name: "Clear all" }).click(),
+    page.getByText("Nothing yet. Activity from your crew shows here."),
+  );
+  expect(cleared).toBeLessThanOrEqual(100);
+  await expect
+    .poll(() => calls.some((c) => c.path === "/v1/notifications/clear"))
     .toBe(true);
   await page.keyboard.press("Escape");
   await expect(
