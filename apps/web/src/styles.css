@@ -3113,27 +3113,13 @@ textarea:focus-visible {
   margin-top: 8px;
 }
 .post-caption {
-  --caption-bar: var(--mixed);
   margin: 4px 0 8px;
   padding-left: 10px;
-  border-left: 3px solid var(--caption-bar);
   font-family: "Big Shoulders Display", Archivo, sans-serif;
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.1;
   overflow-wrap: anywhere;
-}
-.post-caption.activity-strength {
-  --caption-bar: var(--strength);
-}
-.post-caption.activity-cardio {
-  --caption-bar: var(--cardio);
-}
-.post-caption.activity-class {
-  --caption-bar: var(--class);
-}
-.post-caption.activity-sport {
-  --caption-bar: var(--sport);
 }
 .caption-compose {
   display: grid;

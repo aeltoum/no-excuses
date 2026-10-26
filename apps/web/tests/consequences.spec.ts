@@ -212,8 +212,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
             clipUrl:
               "http://127.0.0.1:54321/storage/v1/object/sign/consequence-clips/mine.webm?token=m",
           },
-          // A card owed meanwhile waits behind the one in review.
+          // A card owed meanwhile is dealt at once, while friends review this one.
           owed: 2,
+          offer: {
+            offerId: "next-offer",
+            canRedraw: true,
+            cards: cards.slice(0, 2).concat(extra),
+          },
           logBlocked: false,
         };
       if (action === "respond")
@@ -512,9 +517,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(
     page.getByText("Waiting for friends: 0 of 2 approvals."),
   ).toBeVisible();
+  // The next card pops up right away; it can wait.
+  const nextHand = page.getByRole("dialog", { name: "Choose your punishment" });
+  await expect(nextHand).toBeVisible();
+  await nextHand.getByRole("button", { name: "Decide later" }).click();
   await expect(
     page.getByText(
-      "1 more card is queued. The next is dealt once this one is done.",
+      "Your next card is ready. Start it now; friends keep reviewing this one.",
     ),
   ).toBeVisible();
   await expect(page.getByLabel("Your proof clip")).toHaveAttribute(

@@ -13,7 +13,7 @@ const post = {
   authorMembershipId: friendId,
   authorName: "Maya",
   mine: false,
-  activityType: "strength",
+  activityType: "mixed",
   durationMinutes: 45,
   perceivedIntensity: "high",
   completedAt: new Date(Date.now() - 3_600_000).toISOString(),
@@ -65,6 +65,12 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
 
   const card = page.locator(".proof-post").filter({ hasText: "Leg day" });
   await expect(card.locator(".post-caption")).toHaveText("Maya Leg day");
+  // A mixed workout's caption once took the chalk plate colour behind chalk text.
+  await expect(card.locator(".post-caption")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await expect(card.getByRole("button", { name: "Message" })).toHaveCount(0);
   await expect(card.locator(".avatar img")).toHaveAttribute("src", photo);
   await delayRoute(page, "**/v1/proof/*/message", 1000);
   const opened = await msUntilVisible(
@@ -175,5 +181,28 @@ test("sheets drag down to close; notification settings use switches", async ({
     await page.mouse.up();
   }
   await expect(sheet).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a nudge from yesterday clears at the day change, even if the refresh fails", async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date("2026-10-27T23:58:00Z") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  let failNudges = false;
+  const { errors } = await signIn(page, ({ path, method }) => {
+    if (path === "/v1/nudges" && method === "GET") return failNudges ? 503 : [];
+    if (path === "/v1/nudges") return { membershipId: friendId };
+  });
+  const friends = page.getByRole("list", { name: "Friends this week" });
+  await friends.getByRole("button", { name: "Nudge Maya" }).click();
+  await expect(
+    friends.getByRole("button", { name: "Nudged Maya today" }),
+  ).toBeDisabled();
+  failNudges = true;
+  await page.clock.fastForward("03:00");
+  await expect(
+    friends.getByRole("button", { name: "Nudge Maya" }),
+  ).toBeEnabled();
   expect(errors).toEqual([]);
 });

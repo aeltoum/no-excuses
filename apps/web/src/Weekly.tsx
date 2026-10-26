@@ -63,6 +63,8 @@ const weekStreakText = (weeks: number) => `${weeks}-week streak`;
 const streakText = (item: CurrentWeekProgressItem) =>
   `${weekStreakText(item.targetStreak)} · ${item.workoutStreak} workout${item.workoutStreak === 1 ? "" : "s"} since last miss`;
 
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
 const intensityLevels = ["low", "moderate", "high"] as const;
 const intensityLabels = {
   low: { emoji: "😌", text: "Easy" },
@@ -346,7 +348,14 @@ export function Weekly({
   // Only the refresh buttons wait on a request; everything else is instant.
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useNotice();
-  const [nudged, setNudged] = useState<ReadonlySet<string>>(new Set());
+  // Nudges reset each UTC day, like the server; each entry keeps its day so a
+  // long-open app or a failed refresh never shows yesterday's nudge.
+  const [nudgedOn, setNudgedOn] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  );
+  const nudged = new Set(
+    [...nudgedOn].filter(([, day]) => day === utcDay()).map(([id]) => id),
+  );
   const [refreshWarning, setRefreshWarning] = useState(false);
   const [retry, setRetry] = useState(0);
   const fresh = useFreshness();
@@ -659,22 +668,25 @@ export function Weekly({
     if (route !== "/home" || !groupId || !nudgeable) return;
     let active = true;
     loadNudged(apiBaseUrl, token)
-      .then((ids) => active && setNudged(new Set(ids)))
+      .then(
+        (ids) =>
+          active && setNudgedOn(new Map(ids.map((id) => [id, utcDay()]))),
+      )
       .catch(() => undefined);
     return () => {
       active = false;
     };
   }, [apiBaseUrl, token, route, groupId, nudgeable, fresh]);
   const nudge = async (membershipId: string) => {
-    setNudged((ids) => new Set(ids).add(membershipId));
+    setNudgedOn((ids) => new Map(ids).set(membershipId, utcDay()));
     try {
       await nudgeMember(apiBaseUrl, token, membershipId);
       setNotice({ kind: "success", text: "Nudge sent." });
     } catch (error) {
       // Already nudged today (409) still counts as sent.
       if (error instanceof ApiError && error.kind === "conflict") return;
-      setNudged((ids) => {
-        const next = new Set(ids);
+      setNudgedOn((ids) => {
+        const next = new Map(ids);
         next.delete(membershipId);
         return next;
       });

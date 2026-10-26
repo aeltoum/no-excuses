@@ -48,6 +48,14 @@ export type ConsequenceHome = {
   }[];
   logBlocked: boolean;
   groupOwed: Record<string, number>;
+  // Your own cards with proof sent, still waiting on friends.
+  inReview?: {
+    attemptId: string;
+    title: string;
+    claimReviewEndsAt: string;
+    approvals: number;
+    approvalsNeeded: number;
+  }[];
 };
 type Action =
   | "redraw"
@@ -295,6 +303,12 @@ export function Consequences({
       homeCache.set(cacheKey, next);
       setHome(next);
       if (!change) setNotice({ kind: "success", text: done });
+      // Sending proof deals the next owed card; show it straight away.
+      const offerId = next.offer?.offerId;
+      if (action === "claim" && offerId && readSeen() !== offerId) {
+        writeSeen(offerId);
+        setPicking(true);
+      }
       return true;
     } catch (error) {
       if (change) setHome((current) => current && change.undo(current));
@@ -355,11 +369,15 @@ export function Consequences({
           <small>
             {attempt?.status === "active"
               ? `Due in ${hoursLeft(attempt.expiresAt)}`
-              : offer
-                ? "Tap to pick a card"
-                : waiting > 0
-                  ? `${waiting} waiting on you`
-                  : "Friends’ cards in review"}
+              : attempt?.status === "review"
+                ? offer
+                  ? "Proof in review · next card ready"
+                  : "Proof in review"
+                : offer
+                  ? "Tap to pick a card"
+                  : waiting > 0
+                    ? `${waiting} waiting on you`
+                    : "Friends’ cards in review"}
           </small>
         </span>
         <span className="consequence-strip-chevron" aria-hidden="true" />
@@ -486,6 +504,15 @@ export function Consequences({
                   </button>
                 </>
               )}
+              {(home.inReview ?? [])
+                .filter((card) => card.attemptId !== attempt?.attemptId)
+                .map((card) => (
+                  <p className="owed-deadline in-review" key={card.attemptId}>
+                    <strong>{card.title}</strong> in review: {card.approvals} of{" "}
+                    {card.approvalsNeeded} approvals. Counts as done in{" "}
+                    {hoursLeft(card.claimReviewEndsAt)} if nobody rejects it.
+                  </p>
+                ))}
               {attempt?.status === "review" && (
                 <>
                   <h2>{attempt.title}</h2>
@@ -494,11 +521,10 @@ export function Consequences({
                     {attempt.approvalsNeeded} approvals. With no rejections it
                     counts as done when the review ends.
                   </p>
-                  {home.owed > 1 && (
+                  {offer && (
                     <p className="owed-deadline">
-                      {home.owed - 1} more{" "}
-                      {home.owed === 2 ? "card is" : "cards are"} queued. The
-                      next is dealt once this one is done.
+                      Your next card is ready. Start it now; friends keep
+                      reviewing this one.
                     </p>
                   )}
                   <ClipPlayer url={attempt.clipUrl} label="Your proof clip" />
