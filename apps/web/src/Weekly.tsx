@@ -454,6 +454,7 @@ export function Weekly({
       }
     };
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [logBlock, setLogBlock] = useState<LogBlock>(null);
   const [lockOpen, setLockOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
@@ -836,6 +837,23 @@ export function Weekly({
     Number(duration) >= 1 &&
     photos.activity !== undefined &&
     photos.presence !== undefined;
+  const sessionCard = (onStart?: () => void) => (
+    <SessionCard
+      onStart={onStart}
+      apiBaseUrl={apiBaseUrl}
+      token={token}
+      extras={extras}
+      apply={applyExtras}
+      onNotice={setNotice}
+      onFinish={(id, minutes) => {
+        setSessionId(id);
+        setDuration(String(minutes));
+        setOtherDuration(![20, 30, 45, 60, 90].includes(minutes));
+        if (logBlock) setLockOpen(true);
+        else setSheetOpen(true);
+      }}
+    />
+  );
   return (
     <section
       className={`hero${home ? " home" : ""}${saved ? " data-cached" : ""}${changed ? " data-updated" : ""}`}
@@ -844,6 +862,27 @@ export function Weekly({
         <header className="home-header">
           <h1>Our week</h1>
           <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
+          {own && (
+            <button
+              type="button"
+              className="week-tools-button"
+              aria-haspopup="dialog"
+              aria-label="Week options"
+              onClick={() => setToolsOpen(true)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+          )}
         </header>
       ) : (
         <>
@@ -975,41 +1014,61 @@ export function Weekly({
                     />
                   </div>
                   <UnlockNote unlocks={extras.unlocks} />
-                  <div className="home-actions">
-                    <a
-                      className="home-target-link"
-                      href="/target"
-                      onClick={(event) => onNavigate(event, "/target")}
-                    >
-                      Change target
-                    </a>
-                    <SessionCard
-                      apiBaseUrl={apiBaseUrl}
-                      token={token}
-                      extras={extras}
-                      apply={applyExtras}
-                      onNotice={setNotice}
-                      onFinish={(id, minutes) => {
-                        setSessionId(id);
-                        setDuration(String(minutes));
-                        setOtherDuration(
-                          ![20, 30, 45, 60, 90].includes(minutes),
-                        );
-                        if (logBlock) setLockOpen(true);
-                        else setSheetOpen(true);
-                      }}
-                    />
-                    <Exceptions
-                      part="own"
-                      apiBaseUrl={apiBaseUrl}
-                      token={token}
-                      extras={extras}
-                      apply={applyExtras}
-                      reload={reloadExtras}
-                      onNotice={setNotice}
-                      onRevoked={feedRevoked}
-                    />
-                  </div>
+                  {(extras.session || extras.exceptions.mine.length > 0) && (
+                    <div className="home-actions">
+                      {extras.session && sessionCard()}
+                      <Exceptions
+                        part="own-status"
+                        apiBaseUrl={apiBaseUrl}
+                        token={token}
+                        extras={extras}
+                        apply={applyExtras}
+                        reload={reloadExtras}
+                        onNotice={setNotice}
+                        onRevoked={feedRevoked}
+                      />
+                    </div>
+                  )}
+                  <Sheet
+                    open={toolsOpen}
+                    title="This week"
+                    onDismiss={() => setToolsOpen(false)}
+                  >
+                    <div className="week-tools">
+                      <a
+                        href="/target"
+                        onClick={(event) => {
+                          setToolsOpen(false);
+                          onNavigate(event, "/target");
+                        }}
+                      >
+                        <strong>Change target</strong>
+                        <span>
+                          {own.lockedTarget} a week now. Changes start next
+                          week.
+                        </span>
+                      </a>
+                      {!extras.session && (
+                        <div className="week-tools-row">
+                          {sessionCard(() => setToolsOpen(false))}
+                          <span>Time it now, log it when you finish.</span>
+                        </div>
+                      )}
+                      <div className="week-tools-row">
+                        <Exceptions
+                          part="own"
+                          apiBaseUrl={apiBaseUrl}
+                          token={token}
+                          extras={extras}
+                          apply={applyExtras}
+                          reload={reloadExtras}
+                          onNotice={setNotice}
+                          onRevoked={feedRevoked}
+                        />
+                        <span>Ask your crew to excuse a week.</span>
+                      </div>
+                    </div>
+                  </Sheet>
                 </div>
               ) : (
                 <div className="solo-week">
@@ -1029,7 +1088,13 @@ export function Weekly({
                 </div>
               )}
               {own && progress.length > 1 && (
-                <ul className="friend-cards" aria-label="Friends this week">
+                <ul
+                  className="friend-cards"
+                  aria-label="Friends this week"
+                  // Scrolls sideways; keyboard users reach it even when every nudge is spent.
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
+                  tabIndex={0}
+                >
                   {progress
                     .filter(
                       (item) => item.membershipId !== membership.membershipId,
@@ -1048,28 +1113,33 @@ export function Weekly({
                           url={avatars[item.membershipId]}
                           size="sm"
                         />
-                        <strong className="friend-card-name">
-                          {item.displayName}
-                        </strong>
-                        <Barbell
-                          count={item.completedWorkoutCount}
-                          target={item.lockedTarget}
-                          size="mini"
-                          activityTypes={item.activityTypes}
-                        />
-                        <span>
-                          {item.completedWorkoutCount}/{item.lockedTarget}
-                          {groupOwed[item.membershipId]
-                            ? ` · owes ${groupOwed[item.membershipId]}`
-                            : ""}
-                          {awaitingReview.has(item.membershipId) && " · review"}
-                          {excused.has(item.membershipId)
-                            ? " · excused"
-                            : weekOffPending.has(item.membershipId)
-                              ? " · week off?"
-                              : ""}
-                          {hasStreaks(item) && item.targetStreak > 0 && " "}
-                          {hasStreaks(item) && <Streak item={item} />}
+                        <span className="friend-card-body">
+                          <strong className="friend-card-name">
+                            {item.displayName}
+                          </strong>
+                          <span className="friend-card-line">
+                            <Barbell
+                              count={item.completedWorkoutCount}
+                              target={item.lockedTarget}
+                              size="mini"
+                              activityTypes={item.activityTypes}
+                            />
+                            <span>
+                              {item.completedWorkoutCount}/{item.lockedTarget}
+                              {groupOwed[item.membershipId]
+                                ? ` · owes ${groupOwed[item.membershipId]}`
+                                : ""}
+                              {awaitingReview.has(item.membershipId) &&
+                                " · review"}
+                              {excused.has(item.membershipId)
+                                ? " · excused"
+                                : weekOffPending.has(item.membershipId)
+                                  ? " · week off?"
+                                  : ""}
+                              {hasStreaks(item) && item.targetStreak > 0 && " "}
+                              {hasStreaks(item) && <Streak item={item} />}
+                            </span>
+                          </span>
                         </span>
                         {item.completedWorkoutCount < item.lockedTarget &&
                           !excused.has(item.membershipId) && (
@@ -1113,6 +1183,7 @@ export function Weekly({
                   reload={reloadExtras}
                   onError={(text) => setNotice({ kind: "error", text })}
                   onRevoked={feedRevoked}
+                  onHistory={(event) => onNavigate(event, "/history")}
                 />
               )}
               {own && (
@@ -1221,25 +1292,6 @@ export function Weekly({
                     title="Log a workout"
                     onDismiss={() => setSheetOpen(false)}
                   >
-                    <div className="sheet-preview">
-                      <Barbell
-                        count={
-                          own.completedWorkoutCount + (activityType ? 1 : 0)
-                        }
-                        target={own.lockedTarget}
-                        size="big"
-                        activityTypes={
-                          activityType
-                            ? [...own.activityTypes, activityType]
-                            : own.activityTypes
-                        }
-                      />
-                      <p>
-                        {activityType
-                          ? `This one makes ${own.completedWorkoutCount + 1} of ${own.lockedTarget}.`
-                          : "Pick what you did to load a plate."}
-                      </p>
-                    </div>
                     <form
                       className="log-sheet-form"
                       onSubmit={(event) => {
@@ -1284,119 +1336,6 @@ export function Weekly({
                         );
                       }}
                     >
-                      <fieldset>
-                        <legend>
-                          What did you do?{" "}
-                          <span className="legend-hint">
-                            Pick all that apply
-                          </span>
-                        </legend>
-                        <div className="activity-plates">
-                          {(
-                            ["strength", "cardio", "class", "sport"] as const
-                          ).map((activity) => (
-                            <button
-                              type="button"
-                              key={activity}
-                              className={`activity-plate activity-${activity}`}
-                              aria-pressed={activities.includes(activity)}
-                              onClick={() =>
-                                setActivities((current) =>
-                                  current.includes(activity)
-                                    ? current.filter(
-                                        (entry) => entry !== activity,
-                                      )
-                                    : [...current, activity],
-                                )
-                              }
-                            >
-                              {activity[0].toUpperCase() + activity.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                      </fieldset>
-                      <fieldset>
-                        <legend>How long?</legend>
-                        <div className="choice-chips">
-                          {[20, 30, 45, 60, 90].map((minutes) => (
-                            <button
-                              type="button"
-                              key={minutes}
-                              aria-pressed={
-                                !otherDuration && duration === String(minutes)
-                              }
-                              onClick={() => {
-                                setOtherDuration(false);
-                                setDuration(String(minutes));
-                              }}
-                            >
-                              {minutes} min
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            aria-pressed={otherDuration}
-                            onClick={() => {
-                              setOtherDuration(true);
-                              setDuration("");
-                            }}
-                          >
-                            Other
-                          </button>
-                        </div>
-                      </fieldset>
-                      {otherDuration && (
-                        <label>
-                          Duration in minutes
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min="1"
-                            step="1"
-                            value={duration}
-                            onChange={(event) =>
-                              setDuration(event.target.value)
-                            }
-                          />
-                        </label>
-                      )}
-                      <label className="intensity-slider">
-                        <span className="intensity-title">
-                          How hard did it feel?
-                          <strong>{intensityLabels[intensity].text}</strong>
-                        </span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="2"
-                          step="1"
-                          value={intensityLevels.indexOf(intensity)}
-                          aria-valuetext={intensityLabels[intensity].text}
-                          onChange={(event) =>
-                            setIntensity(
-                              intensityLevels[Number(event.target.value)] ??
-                                "moderate",
-                            )
-                          }
-                        />
-                        <span className="intensity-marks" aria-hidden="true">
-                          {intensityLevels.map((level) => (
-                            <span
-                              key={level}
-                              className={
-                                intensity === level ? "is-on" : undefined
-                              }
-                            >
-                              {intensityLabels[level].emoji}
-                            </span>
-                          ))}
-                        </span>
-                      </label>
-                      <DetailsFields
-                        activity={activityType}
-                        draft={detailsDraft}
-                        onChange={setDetailsDraft}
-                      />
                       <fieldset>
                         <legend>Proof photos</legend>
                         <div className="proof-capture">
@@ -1485,6 +1424,139 @@ export function Weekly({
                           </p>
                         )}
                       </fieldset>
+                      <div className="sheet-preview">
+                        <Barbell
+                          count={
+                            own.completedWorkoutCount + (activityType ? 1 : 0)
+                          }
+                          target={own.lockedTarget}
+                          size="big"
+                          activityTypes={
+                            activityType
+                              ? [...own.activityTypes, activityType]
+                              : own.activityTypes
+                          }
+                        />
+                        <p>
+                          {activityType
+                            ? `This one makes ${own.completedWorkoutCount + 1} of ${own.lockedTarget}.`
+                            : "Pick what you did to load a plate."}
+                        </p>
+                      </div>
+                      <fieldset>
+                        <legend>
+                          What did you do?{" "}
+                          <span className="legend-hint">
+                            Pick all that apply
+                          </span>
+                        </legend>
+                        <div className="activity-plates">
+                          {(
+                            ["strength", "cardio", "class", "sport"] as const
+                          ).map((activity) => (
+                            <button
+                              type="button"
+                              key={activity}
+                              className={`activity-plate activity-${activity}`}
+                              aria-pressed={activities.includes(activity)}
+                              onClick={() =>
+                                setActivities((current) =>
+                                  current.includes(activity)
+                                    ? current.filter(
+                                        (entry) => entry !== activity,
+                                      )
+                                    : [...current, activity],
+                                )
+                              }
+                            >
+                              {activity[0].toUpperCase() + activity.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                      </fieldset>
+                      <fieldset>
+                        <legend>How long?</legend>
+                        <div className="duration-track">
+                          {[20, 30, 45, 60, 90].map((minutes) => (
+                            <button
+                              type="button"
+                              key={minutes}
+                              aria-pressed={
+                                !otherDuration && duration === String(minutes)
+                              }
+                              onClick={() => {
+                                setOtherDuration(false);
+                                setDuration(String(minutes));
+                              }}
+                            >
+                              {minutes}
+                              <small> min</small>
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            aria-pressed={otherDuration}
+                            onClick={() => {
+                              setOtherDuration(true);
+                              setDuration("");
+                            }}
+                          >
+                            Other
+                          </button>
+                        </div>
+                      </fieldset>
+                      {otherDuration && (
+                        <label>
+                          Duration in minutes
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            step="1"
+                            value={duration}
+                            onChange={(event) =>
+                              setDuration(event.target.value)
+                            }
+                          />
+                        </label>
+                      )}
+                      <label className="intensity-slider">
+                        <span className="intensity-title">
+                          How hard did it feel?
+                          <strong>{intensityLabels[intensity].text}</strong>
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="1"
+                          value={intensityLevels.indexOf(intensity)}
+                          aria-valuetext={intensityLabels[intensity].text}
+                          onChange={(event) =>
+                            setIntensity(
+                              intensityLevels[Number(event.target.value)] ??
+                                "moderate",
+                            )
+                          }
+                        />
+                        <span className="intensity-marks" aria-hidden="true">
+                          {intensityLevels.map((level) => (
+                            <span
+                              key={level}
+                              className={
+                                intensity === level ? "is-on" : undefined
+                              }
+                            >
+                              {intensityLabels[level].emoji}
+                            </span>
+                          ))}
+                        </span>
+                      </label>
+                      <DetailsFields
+                        activity={activityType}
+                        draft={detailsDraft}
+                        onChange={setDetailsDraft}
+                      />
                       <button type="submit" disabled={!logReady}>
                         Log workout
                       </button>

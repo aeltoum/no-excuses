@@ -74,4 +74,33 @@ describe("Profile photos", { timeout: 30_000 }, () => {
     );
     expect(center.items).toEqual([]);
   });
+
+  it("dismisses one notification once its subject is viewed", async () => {
+    const db = await database();
+    await db.query(
+      "insert into app_private.web_push_outbox (account_id, dedupe_key, title, body, created_at) values ($1, 'workout:abc:x', 'Logged', 'One', '2026-03-06T09:00Z'), ($1, 'reminder:def', 'Left', 'Two', '2026-03-06T09:01Z')",
+      [accounts[0]],
+    );
+    const before = await data<{
+      items: { id: number; kind: string; ref: string }[];
+    }>(
+      db,
+      0,
+      "select app_private.notification_center('2026-03-06T11:00Z') as data",
+    );
+    const workout = before.items.find((item) => item.kind === "workout");
+    expect(workout?.ref).toBe("abc");
+    await data(
+      db,
+      0,
+      "select app_private.dismiss_notifications($1::bigint[],$2) as data",
+      [[workout?.id], "2026-03-06T10:00Z"],
+    );
+    const after = await data<{ items: { kind: string }[] }>(
+      db,
+      0,
+      "select app_private.notification_center('2026-03-06T11:00Z') as data",
+    );
+    expect(after.items.map((item) => item.kind)).toEqual(["reminder"]);
+  });
 });

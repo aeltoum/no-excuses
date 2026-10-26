@@ -16,7 +16,12 @@ import {
 import { ProfilePhoto } from "./avatars";
 import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
-import { NotificationBell, NotificationSettings } from "./Notifications";
+import {
+  markViewed,
+  NotificationBell,
+  NotificationSettings,
+  viewedPage,
+} from "./Notifications";
 import { OperatorConsole } from "./OperatorConsole";
 import { PushToggle, unsubscribePush } from "./PushToggle";
 import { clearPersisted, persistentMap } from "./persist";
@@ -367,6 +372,24 @@ export function App({
     setNotice(null);
     window.scrollTo(0, 0);
   };
+  // A notification opens its subject: the page, then the post once the feed shows it.
+  const openNotification = (target: { path: string; post?: string }) => {
+    if (target.path !== path) go(target.path);
+    if (!target.post) return;
+    const until = Date.now() + 4000;
+    const find = () => {
+      const post = document.querySelector(`[data-post="${target.post}"]`);
+      if (post) post.scrollIntoView({ block: "center" });
+      else if (Date.now() < until) window.setTimeout(find, 100);
+    };
+    find();
+  };
+  // Being on Home or History clears the notifications that point there.
+  useEffect(() => {
+    if (access !== "signed-in" || (path !== "/home" && path !== "/history"))
+      return;
+    return markViewed(viewedPage(path));
+  }, [access, path]);
   // Start a tab's data request on hover/press so it is in flight before click.
   const warmTab = (destination: string) => {
     if (
@@ -898,6 +921,7 @@ export function App({
             token={session.access_token}
             unread={unread}
             onSeen={() => setUnread(0)}
+            onOpenItem={openNotification}
             onRevoked={recheckAccess}
           />
         )}

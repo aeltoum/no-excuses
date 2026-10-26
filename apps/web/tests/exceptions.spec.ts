@@ -89,6 +89,8 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
   );
   expect(voted).toBeLessThanOrEqual(100);
 
+  // Week off lives under Week options in the header.
+  await page.getByRole("button", { name: "Week options" }).click();
   const opened = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Week off" }).click(),

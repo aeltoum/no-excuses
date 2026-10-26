@@ -11,6 +11,7 @@ type Item = {
   at: string;
   unread: boolean;
   kind: string;
+  ref?: string;
 };
 type Prefs = { socialPush: boolean; digest: boolean; digestHour: number };
 type Center = { items: Item[]; prefs: Prefs };
@@ -27,6 +28,57 @@ const keep = (center: Center | null) => {
 onClearPersisted(() => {
   centerCache = null;
 });
+
+// What each notification points at: a feed post, Home, or History.
+const postKinds = new Set(["workout", "questioned", "proof-outcome"]);
+const historyKinds = new Set(["result", "crown", "missed-response"]);
+export const notificationTarget = (item: Pick<Item, "kind" | "ref">) =>
+  postKinds.has(item.kind) && item.ref
+    ? { path: "/home", post: item.ref }
+    : historyKinds.has(item.kind)
+      ? { path: "/history" }
+      : { path: "/home" };
+export const viewedPost = (id: string) => (item: Item) =>
+  postKinds.has(item.kind) && item.ref === id;
+export const viewedPage = (path: string) => (item: Item) =>
+  !postKinds.has(item.kind) && notificationTarget(item).path === path;
+
+// Seeing a notification's subject removes it from the list. Views noted before
+// the list loads apply once it does.
+let account: { apiBaseUrl: string; token: string } | null = null;
+const viewing = new Set<(item: Item) => boolean>();
+const listeners = new Set<(center: Center | null) => void>();
+const dismissViewed = () => {
+  if (!account || !centerCache) return;
+  const gone = centerCache.items.filter((item) =>
+    [...viewing].some((match) => match(item)),
+  );
+  if (gone.length === 0) return;
+  const previous = centerCache;
+  const ids = new Set(gone.map((item) => item.id));
+  const next = {
+    ...previous,
+    items: previous.items.filter((item) => !ids.has(item.id)),
+  };
+  keep(next);
+  for (const listener of listeners) listener(next);
+  call(account.apiBaseUrl, account.token, "/v1/notifications/dismiss", {
+    method: "POST",
+    body: { ids: [...ids] },
+  }).catch(() => {
+    if (centerCache !== next) return;
+    keep(previous);
+    for (const listener of listeners) listener(previous);
+  });
+};
+// A page stays "viewed" while it is shown; a post once it has been seen.
+export function markViewed(match: (item: Item) => boolean) {
+  viewing.add(match);
+  dismissViewed();
+  return () => {
+    viewing.delete(match);
+  };
+}
 
 const ago = (iso: string) => {
   const minutes = Math.max(
@@ -46,7 +98,8 @@ const loadCenter = (apiBaseUrl: string, token: string) =>
       if (!Array.isArray(center?.items) || !center.prefs)
         throw new ApiError("failure", "Unexpected notifications response.");
       keep(center);
-      return center;
+      dismissViewed();
+      return centerCache ?? center;
     },
   );
 
@@ -56,12 +109,14 @@ export function NotificationBell({
   token,
   unread,
   onSeen,
+  onOpenItem,
   onRevoked,
 }: {
   apiBaseUrl: string;
   token: string;
   unread: number;
   onSeen: () => void;
+  onOpenItem: (target: { path: string; post?: string }) => void;
   onRevoked: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -70,6 +125,31 @@ export function NotificationBell({
   const [clearFailed, setClearFailed] = useState(false);
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
+  account = { apiBaseUrl, token };
+  useEffect(() => {
+    listeners.add(setCenter);
+    dismissViewed();
+    return () => {
+      listeners.delete(setCenter);
+    };
+  }, []);
+  const clearAll = () => {
+    if (!center) return;
+    // Optimistic: the list empties now; a failure brings it back.
+    const previous = center;
+    setClearFailed(false);
+    const cleared = { ...center, items: [] };
+    setCenter(cleared);
+    keep(cleared);
+    call(apiBaseUrl, token, "/v1/notifications/clear", {
+      method: "POST",
+      body: {},
+    }).catch(() => {
+      setCenter(previous);
+      keep(previous);
+      setClearFailed(true);
+    });
+  };
   // New activity refreshes the list in the background before the bell is tapped.
   useEffect(() => {
     if (unread === 0) return;
@@ -155,45 +235,47 @@ export function NotificationBell({
           </p>
         ) : (
           <>
+            <div className="notification-bar">
+              <span>
+                {center.items.length}{" "}
+                {center.items.length === 1 ? "notification" : "notifications"}
+              </span>
+              <button
+                type="button"
+                className="notification-clear"
+                onClick={clearAll}
+              >
+                Clear all
+              </button>
+            </div>
+            {clearFailed && (
+              <p className="result error" role="alert">
+                Couldn’t clear notifications. Try again.
+              </p>
+            )}
             <ul className="notification-list">
               {center.items.map((item) => (
                 <li
                   key={item.id}
                   className={item.unread ? "unread" : undefined}
                 >
-                  <strong>{item.title}</strong>
-                  <span>{item.body}</span>
-                  <time dateTime={item.at}>{ago(item.at)}</time>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = notificationTarget(item);
+                      // Opening one counts as viewing it.
+                      markViewed((entry) => entry.id === item.id);
+                      setOpen(false);
+                      onOpenItem(target);
+                    }}
+                  >
+                    <strong>{item.title}</strong>
+                    <span>{item.body}</span>
+                    <time dateTime={item.at}>{ago(item.at)}</time>
+                  </button>
                 </li>
               ))}
             </ul>
-            {clearFailed && (
-              <p className="result error" role="alert">
-                Couldn’t clear notifications. Try again.
-              </p>
-            )}
-            <button
-              type="button"
-              className="secondary-button notification-clear"
-              onClick={() => {
-                // Optimistic: the list empties now; a failure brings it back.
-                const previous = center;
-                setClearFailed(false);
-                const cleared = { ...center, items: [] };
-                setCenter(cleared);
-                keep(cleared);
-                call(apiBaseUrl, token, "/v1/notifications/clear", {
-                  method: "POST",
-                  body: {},
-                }).catch(() => {
-                  setCenter(previous);
-                  keep(previous);
-                  setClearFailed(true);
-                });
-              }}
-            >
-              Clear all
-            </button>
           </>
         )}
       </Sheet>

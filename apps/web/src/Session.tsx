@@ -47,6 +47,7 @@ export function SessionCard({
   apply,
   onFinish,
   onNotice,
+  onStart,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -54,6 +55,7 @@ export function SessionCard({
   apply: (next: HomeExtras) => void;
   onFinish: (sessionId: string, minutes: number) => void;
   onNotice: (notice: Notice) => void;
+  onStart?: () => void;
 }) {
   const session = extras.session;
   const [now, setNow] = useState(Date.now);
@@ -76,6 +78,7 @@ export function SessionCard({
     const id = crypto.randomUUID();
     // Optimistic: the timer runs at once.
     apply({ ...extras, session: { id, startedAt: new Date().toISOString() } });
+    onStart?.();
     setNow(Date.now());
     call(apiBaseUrl, token, `/v1/sessions/${id}/start`, {
       method: "POST",

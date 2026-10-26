@@ -42,7 +42,7 @@ export function Exceptions({
   part,
 }: {
   // "own": the member's status and request sheet; "ballots": requests to vote on.
-  part: "own" | "ballots";
+  part: "own" | "own-status" | "ballots";
   apiBaseUrl: string;
   token: string;
   extras: HomeExtras;
@@ -198,32 +198,33 @@ export function Exceptions({
         </ul>
       </section>
     ) : null;
+  if (part === "own-status")
+    return mine.map((item) => (
+      <p
+        key={item.id}
+        className={`exception-status exception-${item.status}`}
+        role="status"
+      >
+        <span>
+          {item.status === "approved"
+            ? `Excused ${weekLabel(item.week)}. Streaks hold.`
+            : item.status === "denied"
+              ? `Exception for ${weekLabel(item.week)} denied. Target stands.`
+              : `Exception for ${weekLabel(item.week)} pending · ${hoursLeft(item.closesAt)}`}
+        </span>
+        {item.status === "pending" && (
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => withdraw(item.id)}
+          >
+            Withdraw
+          </button>
+        )}
+      </p>
+    ));
   return (
     <>
-      {mine.map((item) => (
-        <p
-          key={item.id}
-          className={`exception-status exception-${item.status}`}
-          role="status"
-        >
-          <span>
-            {item.status === "approved"
-              ? `Excused ${weekLabel(item.week)}. Streaks hold.`
-              : item.status === "denied"
-                ? `Exception for ${weekLabel(item.week)} denied. Target stands.`
-                : `Exception for ${weekLabel(item.week)} pending · ${hoursLeft(item.closesAt)}`}
-          </span>
-          {item.status === "pending" && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => withdraw(item.id)}
-            >
-              Withdraw
-            </button>
-          )}
-        </p>
-      ))}
       {taken.size < 2 && (
         <button
           type="button"

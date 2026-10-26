@@ -489,9 +489,10 @@ const weeklyLoop = async (
       ["serious", "critical"].includes(item.impact ?? ""),
     ),
   ).toEqual([]);
-  await page.keyboard.press("Shift+Tab");
-  // With Log workout disabled, focus wraps to the last photo slot.
-  await expect(dialog.locator('input[type="file"]').nth(1)).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  // Proof photos lead the sheet, right under its close button.
+  await expect(dialog.locator('input[type="file"]').first()).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
