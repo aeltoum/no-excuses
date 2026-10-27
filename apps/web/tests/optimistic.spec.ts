@@ -328,7 +328,7 @@ async function timed(
 
 async function fillWorkout(page: Page) {
   await page.getByRole("button", { name: "Log workout" }).click();
-  const dialog = page.getByRole("dialog", { name: "Log a workout" });
+  const dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Strength" }).click();
   await dialog.getByRole("button", { name: "45 min" }).click();
   const inputs = dialog.locator('input[type="file"]');
@@ -373,9 +373,7 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
   ).toBeVisible();
   // The rest of Home stays usable while the workout uploads.
   await page.getByRole("button", { name: "Log workout" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Log a workout" }),
-  ).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Log workout" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sending.getByText("Uploading…")).toBeVisible();
   await page.screenshot({
@@ -566,7 +564,6 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   await page.setViewportSize({ width: 390, height: 844 });
   const errors = watchErrors(page);
   const server = await mockServer(page);
-  page.on("dialog", (dialog) => void dialog.accept());
   await signIn(page);
   await expect(
     page.getByText("2 of 4 this week", { exact: true }),
@@ -600,15 +597,17 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   await page.getByRole("button", { name: "Manage" }).click();
   server.fail.add("revoke");
   await page.getByRole("button", { name: "Revoke" }).click();
+  await page.getByRole("button", { name: "Revoke invitation" }).click();
   await expect(page.getByText("friend@example.test")).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveText("Action failed. Try again.");
   await expect(page.getByText("friend@example.test")).toBeVisible();
   server.fail.delete("revoke");
+  await page.getByRole("button", { name: "Revoke" }).click();
   await timed(
     page,
     testInfo,
     "revoke invite",
-    () => page.getByRole("button", { name: "Revoke" }).click(),
+    () => page.getByRole("button", { name: "Revoke invitation" }).click(),
     page.getByText("Invitation revoked."),
   );
   await expect(page.getByText("friend@example.test")).toHaveCount(0);

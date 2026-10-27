@@ -747,13 +747,16 @@ test("Group roster, invitation card, and creator Manage use row actions without 
     page.getByText("Make another member an admin before you can leave."),
   ).toBeVisible();
 
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Remove" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Remove / })
+    .click();
   await expect(
     page.getByText("Member removed.", { exact: true }),
   ).toBeVisible();
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Revoke" }).click();
+  await page.getByRole("button", { name: "Revoke invitation" }).click();
   await expect(
     page.getByText("Invitation revoked.", { exact: true }),
   ).toBeVisible();
@@ -819,8 +822,8 @@ test("Group members can leave without creator Manage controls", async ({
   await expect(
     page.getByRole("button", { name: "Leave 6AM Crew" }),
   ).toBeVisible();
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Leave 6AM Crew" }).click();
+  await page.getByRole("button", { name: /^(Leave|Close) group$/ }).click();
   await expect(
     page.getByText("You left 6AM Crew.", { exact: true }),
   ).toBeVisible();

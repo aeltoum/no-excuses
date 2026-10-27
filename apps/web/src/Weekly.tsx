@@ -357,7 +357,6 @@ export function Weekly({
       : activities.length === 1
         ? activities[0]
         : "mixed";
-  const quickCamera = useRef<HTMLInputElement>(null);
   const [duration, setDuration] = useState("");
   const [otherDuration, setOtherDuration] = useState(false);
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
@@ -837,6 +836,13 @@ export function Weekly({
     Number(duration) >= 1 &&
     photos.activity !== undefined &&
     photos.presence !== undefined;
+  const missingRequirement = !photos.activity
+    ? "Add your activity photo."
+    : !photos.presence
+      ? "Add your presence photo."
+      : activityType === null
+        ? "Pick an activity."
+        : "Pick how long you trained.";
   const sessionCard = (onStart?: () => void) => (
     <SessionCard
       onStart={onStart}
@@ -886,6 +892,15 @@ export function Weekly({
         </header>
       ) : (
         <>
+          {route === "/target" && (
+            <a
+              className="back-home"
+              href="/home"
+              onClick={(event) => onNavigate(event, "/home")}
+            >
+              <span aria-hidden="true">←</span> Back to Home
+            </a>
+          )}
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
             {route === "/target"
@@ -1211,12 +1226,8 @@ export function Weekly({
                     onClick={(event) => {
                       event.currentTarget.focus();
                       if (logBlock) setLockOpen(true);
-                      else {
-                        // The camera opens straight away over the sheet;
-                        // details follow once the photo is in.
-                        setSheetOpen(true);
-                        if (!photos.activity) quickCamera.current?.click();
-                      }
+                      // The editor opens first; the camera waits for a capture action.
+                      else setSheetOpen(true);
                     }}
                   >
                     {logBlock ? (
@@ -1226,22 +1237,8 @@ export function Weekly({
                         +
                       </span>
                     )}{" "}
-                    Log
+                    Log workout
                   </button>
-                  {!logBlock && (
-                    <input
-                      ref={quickCamera}
-                      className="visually-hidden"
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      onChange={(event) => {
-                        void choosePhoto("activity")(event);
-                      }}
-                    />
-                  )}
                   <Sheet
                     open={lockOpen}
                     title="Bar’s racked"
@@ -1289,7 +1286,7 @@ export function Weekly({
                   </Sheet>
                   <Sheet
                     open={sheetOpen}
-                    title="Log a workout"
+                    title="Log workout"
                     onDismiss={() => setSheetOpen(false)}
                   >
                     <form
@@ -1338,6 +1335,10 @@ export function Weekly({
                     >
                       <fieldset>
                         <legend>Proof photos</legend>
+                        <p className="sheet-hint proof-capture-rule">
+                          Two photos required: the workout, and you at it. The
+                          camera opens when you tap one.
+                        </p>
                         <div className="proof-capture">
                           {(
                             [
@@ -1377,7 +1378,7 @@ export function Weekly({
                                 <strong>
                                   {photos[kind]
                                     ? `Retake ${title.toLowerCase()}`
-                                    : title}
+                                    : `Take ${title.toLowerCase()}`}
                                 </strong>
                                 <small>{hint}</small>
                                 <input
@@ -1561,9 +1562,7 @@ export function Weekly({
                         Log workout
                       </button>
                       {!logReady && (
-                        <p className="sheet-hint">
-                          Pick an activity and a time, then take both photos.
-                        </p>
+                        <p className="sheet-hint">{missingRequirement}</p>
                       )}
                     </form>
                   </Sheet>

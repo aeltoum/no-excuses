@@ -3484,9 +3484,16 @@ body {
   overscroll-behavior-x: none;
 }
 body {
+  -webkit-touch-callout: none;
+}
+/* Only control chrome and drag handles resist selection; text stays copyable. */
+button,
+nav,
+[role="tab"],
+.sheet-drag,
+.home-log-button {
   -webkit-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;
 }
 input,
 textarea,
@@ -4406,4 +4413,92 @@ svg {
 }
 .duration-track button[aria-pressed="true"] small {
   color: var(--rubber);
+}
+
+/* Target is a Home subpage: explicit way back. */
+.back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  margin-bottom: 0.25rem;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Errors stay until dismissed, so their dismiss control takes pointer input. */
+.result.event-notice.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.result-dismiss {
+  flex: none;
+  width: 48px;
+  min-height: 48px;
+  margin: -12px -12px -12px auto;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+/* Glyph in CSS keeps the alert's text the message alone. */
+.result-dismiss::before {
+  content: "×";
+}
+
+/* 48px touch floor: compact icons keep their look, hit boxes grow. */
+.post-more,
+.profile-photo-remove {
+  min-height: 48px;
+  min-width: 48px;
+}
+.sheet-header .sheet-close,
+.week-tools-button {
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+}
+.friend-cards .friend-nudge {
+  min-height: 48px;
+}
+
+/* Proof that has not loaded is named, never silently blank. */
+.proof-frame img.is-failed {
+  visibility: hidden;
+}
+.proof-photo-note {
+  position: absolute;
+  inset: auto 12px 48px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+.proof-photo-retry {
+  min-height: 48px;
+  margin-left: auto;
+  padding: 0 16px;
+}
+.proof-decide-hint {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.proof-capture-rule {
+  margin: 0 0 12px;
+}
+.proof-decide {
+  flex-wrap: wrap;
+}
+.proof-decide-hint {
+  padding: 0 12px 12px;
 }

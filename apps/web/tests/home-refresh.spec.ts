@@ -112,7 +112,7 @@ test("Log opens the camera with the sheet; several activities log as mixed with 
   const shown = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Log workout" }).click(),
-    page.getByRole("dialog", { name: "Log a workout" }),
+    page.getByRole("dialog", { name: "Log workout" }),
   );
   expect(shown).toBeLessThanOrEqual(100);
   await (await camera).setFiles({
@@ -120,7 +120,7 @@ test("Log opens the camera with the sheet; several activities log as mixed with 
     mimeType: "image/png",
     buffer: proofPng,
   });
-  const dialog = page.getByRole("dialog", { name: "Log a workout" });
+  const dialog = page.getByRole("dialog", { name: "Log workout" });
   await expect(
     dialog.getByRole("img", { name: "Activity preview" }),
   ).toBeVisible();

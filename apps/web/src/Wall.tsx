@@ -71,16 +71,7 @@ const cachedFeed = (cacheKey: string) => {
   }));
 };
 
-// A photo the cache missed under an expired URL stays hidden until the feed
-// brings a fresh one.
-const photoEvents = {
-  onLoad: (event: { currentTarget: HTMLImageElement }) => {
-    event.currentTarget.style.visibility = "";
-  },
-  onError: (event: { currentTarget: HTMLImageElement }) => {
-    event.currentTarget.style.visibility = "hidden";
-  },
-};
+type PhotoState = "loaded" | "failed";
 
 // Feeds cached before custom reactions held a preset-keyed object.
 const reactionList = (item: ProofItem) =>
@@ -152,6 +143,9 @@ export function ProofFeed({
   // Posts the viewer just acted on; their buttons hide before the refetch lands.
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
+  // Per-photo load state; a review can only verify proof the viewer has seen.
+  const [photoState, setPhotoState] = useState<Record<string, PhotoState>>({});
+  const [photoRetry, setPhotoRetry] = useState<Record<string, number>>({});
   const avatars = useAvatars();
   // The comment icon asks that post's text block to open its composer.
   const [commenting, setCommenting] = useState({ id: "", count: 0 });
@@ -436,6 +430,64 @@ export function ProofFeed({
   const post = (item: ProofItem) => {
     const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
+    const id = item.workoutCheckinId;
+    const urls = {
+      activity: item.activityPhotoUrl,
+      presence: item.presencePhotoUrl,
+    };
+    const stateOf = (kind: keyof typeof urls) =>
+      urls[kind] ? photoState[`${id}:${kind}`] : undefined;
+    const photosSeen =
+      stateOf("activity") === "loaded" && stateOf("presence") === "loaded";
+    const photoFailed =
+      stateOf("activity") === "failed" || stateOf("presence") === "failed";
+    const photoMissing = !urls.activity || !urls.presence;
+    const photoNote = photoMissing
+      ? "Proof photos aren’t available for this post."
+      : photoFailed
+        ? "A proof photo didn’t load."
+        : null;
+    const retryPhotos = () => {
+      setPhotoState((current) => {
+        const next = { ...current };
+        delete next[`${id}:activity`];
+        delete next[`${id}:presence`];
+        return next;
+      });
+      setPhotoRetry((current) => ({
+        ...current,
+        [id]: (current[id] ?? 0) + 1,
+      }));
+    };
+    const photo = (
+      kind: keyof typeof urls,
+      url: string | null,
+      className: string,
+      alt: string,
+    ) =>
+      url ? (
+        <img
+          key={`${kind}:${photoRetry[id] ?? 0}`}
+          className={`${className}${stateOf(kind) === "failed" ? " is-failed" : ""}`}
+          src={url}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          crossOrigin="anonymous"
+          onLoad={() =>
+            setPhotoState((current) => ({
+              ...current,
+              [`${id}:${kind}`]: "loaded",
+            }))
+          }
+          onError={() =>
+            setPhotoState((current) => ({
+              ...current,
+              [`${id}:${kind}`]: "failed",
+            }))
+          }
+        />
+      ) : null;
     return (
       <li
         className="proof-post"
@@ -461,27 +513,31 @@ export function ProofFeed({
           </span>
         </header>
         <div className="proof-frame">
-          {item.activityPhotoUrl && (
-            <img
-              className="proof-main"
-              src={item.activityPhotoUrl}
-              alt={`${item.mine ? "Your" : `${item.authorName}'s`} workout activity`}
-              loading="lazy"
-              decoding="async"
-              crossOrigin="anonymous"
-              {...photoEvents}
-            />
+          {photo(
+            "activity",
+            item.activityPhotoUrl,
+            "proof-main",
+            `${item.mine ? "Your" : `${item.authorName}'s`} workout activity`,
           )}
-          {item.presencePhotoUrl && (
-            <img
-              className="proof-inset"
-              src={item.presencePhotoUrl}
-              alt={`${who} at the workout`}
-              loading="lazy"
-              decoding="async"
-              crossOrigin="anonymous"
-              {...photoEvents}
-            />
+          {photo(
+            "presence",
+            item.presencePhotoUrl,
+            "proof-inset",
+            `${who} at the workout`,
+          )}
+          {!photosSeen && photoNote && (
+            <p className="proof-photo-note" role="status">
+              {photoNote}
+              {photoFailed && (
+                <button
+                  type="button"
+                  className="proof-photo-retry"
+                  onClick={retryPhotos}
+                >
+                  Retry
+                </button>
+              )}
+            </p>
           )}
           <span className="proof-tag">
             <i className={`activity-swatch activity-${item.activityType}`} />
@@ -506,15 +562,15 @@ export function ProofFeed({
             <button
               type="button"
               className="lamp-good"
-              disabled={disabled}
+              disabled={disabled || !photosSeen}
               onClick={() =>
                 void (needsReview(item)
-                  ? act(item, "review", "verify", "Good lift. Verified.")
-                  : act(item, "vote", "accept", "Good lift. Vote saved."))
+                  ? act(item, "review", "verify", "Workout verified.")
+                  : act(item, "vote", "accept", "Vote saved: accept."))
               }
             >
               <span className="lamp" aria-hidden="true" />
-              Good lift
+              {needsReview(item) ? "Verify workout" : "Accept workout"}
             </button>
             <button
               type="button"
@@ -526,14 +582,23 @@ export function ProofFeed({
                       item,
                       "review",
                       "question",
-                      "No lift. The Group votes for 48 hours.",
+                      "Workout questioned. The Group votes for 48 hours.",
                     )
-                  : act(item, "vote", "reject", "No lift. Vote saved."))
+                  : act(item, "vote", "reject", "Vote saved: reject."))
               }
             >
               <span className="lamp" aria-hidden="true" />
-              No lift
+              {needsReview(item) ? "Question workout" : "Reject workout"}
             </button>
+            <p className="proof-decide-hint">
+              {!photosSeen
+                ? needsReview(item)
+                  ? "Verify unlocks once both photos load. Question it if you can’t see the proof."
+                  : "Accept unlocks once both photos load."
+                : needsReview(item)
+                  ? "Questioning opens a 48-hour Group vote."
+                  : "The Group settles this by vote."}
+            </p>
           </fieldset>
         )}
         {needsVote(item) && (
@@ -546,11 +611,11 @@ export function ProofFeed({
                 item,
                 "vote",
                 "cannot_assess",
-                "Marked can’t tell. You won’t be reminded again.",
+                "Marked can’t assess. You won’t be reminded again.",
               )
             }
           >
-            Can’t tell from these photos
+            Can’t assess
           </button>
         )}
         {!item.hidden && (

@@ -73,9 +73,7 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
   await expect(page.getByText("2 of 3 this week")).toBeVisible();
 
   // Only the vote's own status changes; "Can't tell" hides the ballot.
-  await page
-    .getByRole("button", { name: "Can’t tell from these photos" })
-    .click();
+  await page.getByRole("button", { name: "Can’t assess" }).click();
   await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(0);
   expect(calls.find((c) => c.path.endsWith("/vote"))?.body).toEqual({
     choice: "cannot_assess",
@@ -108,8 +106,8 @@ test("Account removes every shared proof photo after confirming", async ({
       path === "/v1/proof/remove-all" ? { removed: 3 } : undefined,
     "/account",
   );
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Remove my proof photos" }).click();
+  await page.getByRole("button", { name: "Delete photos" }).click();
   await expect(page.getByText("3 posts’ photos removed.")).toBeVisible();
   expect(calls.some((c) => c.path === "/v1/proof/remove-all")).toBe(true);
 });

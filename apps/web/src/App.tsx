@@ -14,6 +14,7 @@ import {
   WebAuthError,
 } from "./auth";
 import { ProfilePhoto } from "./avatars";
+import { useConfirm } from "./Confirm";
 import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import {
@@ -243,6 +244,7 @@ export function App({
   };
   const savedDisplayName = useRef("");
   const [notice, setNotice] = useNotice();
+  const [confirmSheet, ask] = useConfirm();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLaunching(false), 700);
@@ -876,6 +878,8 @@ export function App({
   ).includes(path)
     ? (path as Route)
     : null;
+  // Target is a Home subpage: Home stays the selected tab.
+  const tabRoute = route === "/target" ? "/home" : route;
   const currentMemberIsAdmin = Boolean(
     membership &&
       groupRoster?.members.some(
@@ -1755,11 +1759,14 @@ export function App({
                                   disabled={busy(
                                     `remove:${member.membershipId}`,
                                   )}
-                                  onClick={() => {
+                                  onClick={async () => {
                                     if (
-                                      !window.confirm(
-                                        `Remove ${member.displayName} from ${groupRoster.groupName}?`,
-                                      )
+                                      !(await ask({
+                                        title: `Remove ${member.displayName}?`,
+                                        body: `${member.displayName} leaves ${groupRoster.groupName} and stops counting toward its weeks.`,
+                                        confirm: `Remove ${member.displayName}`,
+                                        tone: "danger",
+                                      }))
                                     )
                                       return;
                                     void act(
@@ -1809,11 +1816,14 @@ export function App({
                                   <button
                                     className="row-action"
                                     type="button"
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (
-                                        !window.confirm(
-                                          `Revoke invitation for ${invitation.email}?`,
-                                        )
+                                        !(await ask({
+                                          title: "Revoke invitation?",
+                                          body: `${invitation.email} can no longer use this invitation to join.`,
+                                          confirm: "Revoke invitation",
+                                          tone: "danger",
+                                        }))
                                       )
                                         return;
                                       const id = invitation.invitationId;
@@ -1973,14 +1983,21 @@ export function App({
                           className="danger-outline leave-group"
                           type="button"
                           disabled={busy("leave")}
-                          onClick={() => {
+                          onClick={async () => {
                             const closing = groupRoster.members.length === 1;
                             if (
-                              !window.confirm(
-                                closing
-                                  ? `Close ${groupRoster.groupName}? You are its last member, so it ends for good.`
+                              !(await ask({
+                                title: closing
+                                  ? `Close ${groupRoster.groupName}?`
                                   : `Leave ${groupRoster.groupName}?`,
-                              )
+                                body: closing
+                                  ? "You are its last member, so the group ends for good."
+                                  : "You stop counting toward this group’s weeks. Rejoining needs a new invitation.",
+                                confirm: closing
+                                  ? "Close group"
+                                  : "Leave group",
+                                tone: "danger",
+                              }))
                             )
                               return;
                             void act("leave", async () => {
@@ -2248,11 +2265,14 @@ export function App({
                 className="account-row"
                 type="button"
                 disabled={busy("remove-photos")}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    !window.confirm(
-                      "Delete every proof photo you’ve shared? Your workout counts and finished weeks stay. This can’t be undone.",
-                    )
+                    !(await ask({
+                      title: "Delete all proof photos?",
+                      body: "Every proof photo you’ve shared is deleted. Your workout counts and finished weeks stay. This can’t be undone.",
+                      confirm: "Delete photos",
+                      tone: "danger",
+                    }))
                   )
                     return;
                   void act("remove-photos", async () => {
@@ -2532,12 +2552,19 @@ export function App({
             }}
           />
         )}
+        {confirmSheet}
       </main>
       {access === "signed-in" && (
         <nav aria-label="Member destinations" className="member-nav">
           {memberRoutes.map(([destination, label]) => (
             <a
-              aria-current={route === destination ? "page" : undefined}
+              aria-current={
+                route === destination
+                  ? "page"
+                  : tabRoute === destination
+                    ? "true"
+                    : undefined
+              }
               href={destination}
               key={destination}
               onClick={(e) => navigate(e, destination)}
@@ -2563,7 +2590,7 @@ export function App({
                 Math.max(
                   0,
                   memberRoutes.findIndex(
-                    ([destination]) => destination === route,
+                    ([destination]) => destination === tabRoute,
                   ),
                 ) * 100
               }%)`,

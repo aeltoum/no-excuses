@@ -359,7 +359,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await logButton.click();
   let lock = page.getByRole("dialog", { name: "Bar’s racked" });
   await expect(lock).toContainText("Pick your card");
-  await expect(page.getByRole("dialog", { name: "Log a workout" })).toHaveCount(
+  await expect(page.getByRole("dialog", { name: "Log workout" })).toHaveCount(
     0,
   );
   await page.waitForTimeout(400);

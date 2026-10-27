@@ -52,7 +52,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
   // No photo leaves the phone during the session.
   expect(uploads).toBe(0);
   await card.getByRole("button", { name: "Finish" }).click();
-  const dialog = page.getByRole("dialog", { name: "Log a workout" });
+  const dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Strength" }).click();
   await expect(dialog.getByLabel("Duration in minutes")).toHaveValue("1");
   await dialog
