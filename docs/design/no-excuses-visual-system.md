@@ -159,6 +159,16 @@ floor.
   definition of each component reworked in the UI audit. New component styles extend that layer
   instead of appending another override.
 
+## Proof post
+
+- The proof photo and its review base are one object: the base continues the photo's frame
+  (same width, border and corner radius) with a dashed seam between them.
+- Both take their width from `--proof-bleed` and their corners from `--proof-radius`. Any change
+  to the photo's size or side margin goes through those tokens, so the review buttons always
+  match the photo.
+- Verify and Accept are the chalk primary; Question and Reject are a red outline. Both meet the
+  `48px` target floor.
+
 ## Vocabulary
 
 One visible noun per concept: **Group** for the shared space (friends in supporting prose),
