@@ -149,9 +149,16 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
       };
     });
   expect(await overflow()).toEqual({ scroll: 0, wide: [] });
+  // Control chrome resists selection; text stays copyable.
+  expect(
+    await page.evaluate(
+      () =>
+        getComputedStyle(document.querySelector("nav") as Element).userSelect,
+    ),
+  ).toBe("none");
   expect(
     await page.evaluate(() => getComputedStyle(document.body).userSelect),
-  ).toBe("none");
+  ).not.toBe("none");
 
   // The colour key moved to the target screen; the count sits under the bar.
   const bar = await page.locator(".own-progress .barbell-big").boundingBox();

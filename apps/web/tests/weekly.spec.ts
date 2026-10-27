@@ -630,7 +630,10 @@ const weeklyLoop = async (
     page.viewportSize()?.height ?? 0,
   );
 
+  // Errors stay until dismissed.
   await page.clock.runFor(3000);
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(

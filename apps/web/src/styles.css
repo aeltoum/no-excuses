@@ -4433,6 +4433,8 @@ svg {
   align-items: center;
   gap: 8px;
   pointer-events: auto;
+  /* Persistent, so it sits under any sheet opened later instead of blocking it. */
+  z-index: 15;
 }
 .result-dismiss {
   flex: none;
@@ -4501,4 +4503,9 @@ svg {
 }
 .proof-decide-hint {
   padding: 0 12px 12px;
+}
+/* Two-word decision labels stay on one line at 320px. */
+.proof-decide button {
+  white-space: nowrap;
+  font-size: 0.9375rem;
 }
