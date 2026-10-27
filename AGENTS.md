@@ -19,6 +19,7 @@ This repository is in project-setup phase. Product scope and technology stack re
 - Keep a pending state, on the acting control only, for auth, server-generated results (codes, invites, previews), irreversible or destructive actions, account deletion, random draws, and OS permission prompts.
 - Meet the speed budgets in `docs/agents/implementation-loop.md` (Speed) for any added or changed UI.
 - Use the `frontend-design` skill for every UI change, and review the result with screenshots before handing off.
+- Whenever a feed proof photo's size or side margin changes, resize its review buttons to match: both read `--proof-bleed` and `--proof-radius` in `apps/web/src/styles.css`, so change those tokens rather than one element, and check a pending-review post in a screenshot.
 
 ## Communication
 

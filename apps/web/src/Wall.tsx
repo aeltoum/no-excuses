@@ -675,7 +675,7 @@ export function ProofFeed({
           <p className="proof-details">{detailLine(item.details)}</p>
         )}
         {(needsReview(item) || needsVote(item)) && (
-          // Referee light box: the photo sits on a base holding white and red lamps.
+          // Review base: continues the photo frame; Verify in chalk, Question in red.
           <fieldset
             className="proof-decide"
             aria-label={needsReview(item) ? "Review" : "Your vote"}

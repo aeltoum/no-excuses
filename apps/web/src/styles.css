@@ -1587,13 +1587,7 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   border-color: var(--error);
   color: var(--error);
 }
-.proof-frame {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 4 / 5;
-  border-radius: 16px;
-  background: var(--surface);
-}
+
 .proof-main {
   width: 100%;
   height: 100%;
@@ -1647,75 +1641,7 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   padding: 0;
   border: 0;
 }
-/* Review choices: a referee light box. The photo sits on a steel base holding a
-   white (good lift) and red (no lift) lamp; lamps glow on press and the base
-   disappears the instant a call is made. */
-.proof-frame:has(+ .proof-decide) {
-  border-radius: 16px 16px 0 0;
-}
-.proof-decide {
-  display: flex;
-  /* Cancels the post's grid gap so the base meets the photo. */
-  margin: -10px 0 0;
-  padding: 0;
-  border: 0;
-  border-top: 1px solid var(--empty-slot);
-  border-radius: 0 0 16px 16px;
-  background: linear-gradient(#2b2d30, #222326);
-  overflow: hidden;
-}
-.proof-decide button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: var(--chalk);
-  font-weight: 800;
-}
-.proof-decide button + button {
-  border-left: 1px solid var(--rule);
-}
-.proof-decide button:disabled {
-  opacity: 0.5;
-}
-.lamp {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  box-shadow: inset 0 2px 3px rgb(0 0 0 / 50%);
-  transition:
-    background 0.2s ease-out,
-    box-shadow 0.2s ease-out;
-}
-.lamp-good .lamp {
-  background: var(--empty-slot);
-}
-.lamp-no .lamp {
-  background: #5a3537;
-}
-.lamp-good:is(:hover, :active):not(:disabled) .lamp {
-  background: var(--chalk);
-  box-shadow:
-    0 0 0 4px rgb(242 242 238 / 12%),
-    0 0 16px rgb(242 242 238 / 60%);
-}
-.lamp-no:is(:hover, :active):not(:disabled) .lamp {
-  background: var(--error);
-  box-shadow:
-    0 0 0 4px rgb(229 72 77 / 16%),
-    0 0 16px rgb(229 72 77 / 60%);
-}
-@media (prefers-reduced-motion: reduce) {
-  .lamp {
-    transition: none;
-  }
-}
+
 .proof-actions legend {
   margin-bottom: 6px;
 }
@@ -3823,16 +3749,7 @@ svg {
   color: var(--muted);
   font-size: 0.75rem;
 }
-.proof-frame {
-  margin-inline: -20px;
-  border-radius: 0;
-}
-@media (min-width: 600px) {
-  .proof-frame {
-    margin-inline: 0;
-    border-radius: 12px;
-  }
-}
+
 .proof-reactions .proof-comment {
   margin-left: auto;
   padding: 0 10px;
@@ -4281,25 +4198,9 @@ svg {
   margin-left: auto;
   padding: 0 16px;
 }
-.proof-decide-hint {
-  flex-basis: 100%;
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
+
 .proof-capture-rule {
   margin: 0 0 12px;
-}
-.proof-decide {
-  flex-wrap: wrap;
-}
-.proof-decide-hint {
-  padding: 0 12px 12px;
-}
-/* Two-word decision labels stay on one line at 320px. */
-.proof-decide button {
-  white-space: nowrap;
-  font-size: 0.9375rem;
 }
 
 /* Member rows: names wrap; actions live in the member sheet. */
@@ -4602,17 +4503,6 @@ h1 {
   color: var(--error);
 }
 
-/* Feed photos sit inside the column with a visible edge, never cut by the screen. */
-.proof-frame {
-  margin-inline: -12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-}
-@media (min-width: 600px) {
-  .proof-frame {
-    margin-inline: 0;
-  }
-}
 .proof-reactions .proof-comment {
   margin-right: -10px;
 }
@@ -4717,4 +4607,84 @@ h1 {
 .post-menu-list button:hover,
 .post-menu-list button:focus-visible {
   background: var(--surface);
+}
+
+/* Proof photo and its review base share one width.
+   RULE: whenever the photo's size or side margin changes, change
+   --proof-bleed (and nothing else) so the review buttons keep matching it. */
+:root {
+  --proof-bleed: 12px;
+  --proof-radius: 12px;
+}
+@media (min-width: 600px) {
+  :root {
+    --proof-bleed: 0px;
+  }
+}
+.proof-frame,
+.proof-decide {
+  margin-inline: calc(-1 * var(--proof-bleed));
+}
+.proof-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--proof-radius);
+  background: var(--surface);
+}
+.proof-frame:has(+ .proof-decide) {
+  border-bottom: 0;
+  border-radius: var(--proof-radius) var(--proof-radius) 0 0;
+}
+
+/* Review base: continues the photo's frame, like the floor under a rack.
+   Verify is the chalk primary; Question is a red outline. */
+.proof-decide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  /* Cancels the post's grid gap so the base meets the photo. */
+  margin-top: -10px;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-top: 1px dashed var(--empty-slot);
+  border-radius: 0 0 var(--proof-radius) var(--proof-radius);
+  background: var(--surface);
+}
+.proof-decide button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.proof-decide .lamp-good {
+  border: 1px solid var(--chalk);
+  background: var(--chalk);
+  color: var(--rubber);
+}
+.proof-decide .lamp-no {
+  border: 1px solid var(--error);
+  background: transparent;
+  color: #ff6b6f;
+}
+.proof-decide button:disabled {
+  opacity: 0.45;
+}
+/* The old referee lamps stay in markup for tests; the label carries the call. */
+.proof-decide .lamp {
+  display: none;
+}
+.proof-decide-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-secondary);
 }
