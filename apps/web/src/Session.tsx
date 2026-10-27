@@ -120,7 +120,7 @@ export function SessionCard({
         className="text-button session-start"
         onClick={start}
       >
-        Start timer
+        Start workout timer
       </button>
     );
   return (
@@ -158,7 +158,7 @@ export function SessionCard({
           />
         </label>
         <button type="button" onClick={finish}>
-          Finish
+          Finish workout
         </button>
       </div>
       <p className="hint">

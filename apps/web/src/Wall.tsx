@@ -808,7 +808,7 @@ export function ProofFeed({
       ) : (
         <>
           {toReview.length > 0 && (
-            <section aria-labelledby="feed-review-heading">
+            <section id="needs-review" aria-labelledby="feed-review-heading">
               <h2 id="feed-review-heading" className="feed-day">
                 Needs your review
                 <span className="feed-badge">{toReview.length}</span>

@@ -3,11 +3,14 @@ export function Barbell({
   target,
   size,
   activityTypes = [],
+  provisional = 0,
 }: {
   count: number;
   target: number;
   size: "big" | "mini";
   activityTypes?: ("strength" | "cardio" | "class" | "sport" | "mixed")[];
+  // The last `provisional` filled plates are not settled yet: drawn faint.
+  provisional?: number;
 }) {
   const big = size === "big";
   const width = big ? 350 : 170;
@@ -31,7 +34,9 @@ export function Barbell({
       className={`barbell barbell-${size}`}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`${count} of ${target} workouts`}
+      aria-label={`${count} of ${target} workouts${
+        provisional > 0 ? `, ${Math.min(provisional, count)} not settled` : ""
+      }`}
     >
       <rect
         x="0"
@@ -69,6 +74,7 @@ export function Barbell({
                   ? platesStart - offset - plateWidth
                   : platesStart + offset;
               const filled = index < count;
+              const pending = filled && index >= count - provisional;
               return (
                 <rect
                   key={x}
@@ -77,6 +83,7 @@ export function Barbell({
                   width={plateWidth}
                   height={plateHeight}
                   rx={big ? 3 : 1.5}
+                  opacity={pending ? 0.45 : undefined}
                   fill={
                     filled
                       ? activityTypes[index]

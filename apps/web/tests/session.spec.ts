@@ -31,10 +31,10 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
       return { workoutCheckinId: body?.workoutCheckinId, currentWeekCount: 2 };
   });
   await delayRoute(page, "**/v1/sessions/**", 1000);
-  await page.getByRole("button", { name: "Week options" }).click();
+  // The timer sits on Home beside progress, not in Week options.
   const started = await msUntilVisible(
     page,
-    () => page.getByRole("button", { name: "Start timer" }).click(),
+    () => page.getByRole("button", { name: "Start workout timer" }).click(),
     page.getByRole("timer"),
   );
   expect(started).toBeLessThanOrEqual(100);
@@ -51,7 +51,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
   await expect(card.getByRole("img")).toHaveCount(3);
   // No photo leaves the phone during the session.
   expect(uploads).toBe(0);
-  await card.getByRole("button", { name: "Finish" }).click();
+  await card.getByRole("button", { name: "Finish workout" }).click();
   const dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Strength" }).click();
   await expect(dialog.getByLabel("Duration in minutes")).toHaveValue("1");
@@ -60,7 +60,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
     .getByRole("button", { name: "Session photo 1" })
     .click();
   await dialog
-    .getByRole("group", { name: "Use a session photo as you at the workout" })
+    .getByRole("group", { name: "Use a session photo as presence photo" })
     .getByRole("button", { name: "Session photo 3" })
     .click();
   await dialog.getByRole("button", { name: "Log workout" }).click();

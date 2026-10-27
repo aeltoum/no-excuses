@@ -735,9 +735,9 @@ test("Group roster, invitation card, and creator Manage use row actions without 
   await expect(page.getByLabel("Friend email")).toHaveValue("");
   expect(mutations).toEqual(mutationsBeforeReset);
 
-  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
   await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^Manage / })).toHaveCount(1);
   await expect(page.getByText("pending@example.test")).toBeVisible();
   await expect(page.getByRole("button", { name: "Revoke" })).toBeVisible();
   await expect(
@@ -747,10 +747,11 @@ test("Group roster, invitation card, and creator Manage use row actions without 
     page.getByText("Make another member an admin before you can leave."),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Remove" }).click();
+  await page.getByRole("button", { name: /^Manage / }).click();
+  await page.getByRole("button", { name: "Remove from group" }).click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /^Remove / })
+    .getByRole("button", { name: /^Remove (?!from)/ })
     .click();
   await expect(
     page.getByText("Member removed.", { exact: true }),
@@ -814,7 +815,9 @@ test("Group members can leave without creator Manage controls", async ({
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.getByRole("link", { name: "Group" }).click();
 
-  await expect(page.getByRole("button", { name: "Manage" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Manage", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Friend email")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Invite a friend" }),

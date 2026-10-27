@@ -13,7 +13,7 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
-import { ProfilePhoto } from "./avatars";
+import { Avatar, ProfilePhoto, useAvatars } from "./avatars";
 import { useConfirm } from "./Confirm";
 import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
@@ -198,6 +198,8 @@ export function App({
   const pendingUser = useRef(hint?.userId ?? null);
   const [launching, setLaunching] = useState(!hint);
   const [path, setPath] = useState(currentPath);
+  const pathRef = useRef(path);
+  pathRef.current = path;
   const [access, setAccess] = useState<Access>(hint ? "signed-in" : "checking");
   const [accessRevision, setAccessRevision] = useState(0);
   const lastUnauthorizedToken = useRef<string | null>(null);
@@ -245,6 +247,8 @@ export function App({
   const savedDisplayName = useRef("");
   const [notice, setNotice] = useNotice();
   const [confirmSheet, ask] = useConfirm();
+  const [managedMemberId, setManagedMemberId] = useState<string | null>(null);
+  const avatars = useAvatars();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLaunching(false), 700);
@@ -429,7 +433,10 @@ export function App({
 
   useEffect(() => {
     const onPopState = () => {
-      setPath(currentPath());
+      // A sheet's own history entry keeps the path; only real moves clear notices.
+      const next = currentPath();
+      if (next === pathRef.current) return;
+      setPath(next);
       setNotice(null);
     };
     window.addEventListener("popstate", onPopState);
@@ -1685,14 +1692,10 @@ export function App({
                       <ul className="group-roster">
                         {groupRoster.members.map((member) => (
                           <li key={member.membershipId}>
-                            <span className="group-avatar" aria-hidden="true">
-                              {member.displayName
-                                .split(/\s+/)
-                                .slice(0, 2)
-                                .map((part) => part[0])
-                                .join("")
-                                .toUpperCase()}
-                            </span>
+                            <Avatar
+                              name={member.displayName}
+                              url={avatars[member.membershipId]}
+                            />
                             <span className="group-member-copy">
                               <strong>{member.displayName}</strong>
                               <span>
@@ -1716,85 +1719,124 @@ export function App({
                               member.membershipId !==
                                 membership.membershipId && (
                                 <button
-                                  className="row-action"
+                                  className="row-action row-more"
                                   type="button"
-                                  disabled={busy(
-                                    `admin:${member.membershipId}`,
-                                  )}
-                                  onClick={() => {
-                                    const admin = !member.creator;
-                                    setMemberAdmin(member.membershipId, admin);
-                                    optimistic(
-                                      `admin:${member.membershipId}`,
-                                      admin
-                                        ? `${member.displayName} is now an admin.`
-                                        : `${member.displayName} is no longer an admin.`,
-                                      () =>
-                                        setGroupAdmin(
-                                          apiBaseUrl,
-                                          token(),
-                                          member.membershipId,
-                                          admin,
-                                        ),
-                                      () =>
-                                        setMemberAdmin(
-                                          member.membershipId,
-                                          !admin,
-                                        ),
-                                    );
-                                  }}
+                                  aria-label={`Manage ${member.displayName}`}
+                                  onClick={() =>
+                                    setManagedMemberId(member.membershipId)
+                                  }
                                 >
-                                  {member.creator
-                                    ? "Remove admin"
-                                    : "Make admin"}
-                                </button>
-                              )}
-                            {manageGroup &&
-                              !member.creator &&
-                              member.membershipId !==
-                                membership.membershipId && (
-                                <button
-                                  className="row-action danger-text"
-                                  type="button"
-                                  disabled={busy(
-                                    `remove:${member.membershipId}`,
-                                  )}
-                                  onClick={async () => {
-                                    if (
-                                      !(await ask({
-                                        title: `Remove ${member.displayName}?`,
-                                        body: `${member.displayName} leaves ${groupRoster.groupName} and stops counting toward its weeks.`,
-                                        confirm: `Remove ${member.displayName}`,
-                                        tone: "danger",
-                                      }))
-                                    )
-                                      return;
-                                    void act(
-                                      `remove:${member.membershipId}`,
-                                      async () => {
-                                        const draft = commandDraft(
-                                          "remove",
-                                          member.membershipId,
-                                        );
-                                        await api.remove(
-                                          token(),
-                                          membership.groupId,
-                                          member.membershipId,
-                                          draft.key,
-                                        );
-                                        commandDrafts.current.delete("remove");
-                                        setGroupRevision((value) => value + 1);
-                                        return "Member removed.";
-                                      },
-                                    );
-                                  }}
-                                >
-                                  Remove
+                                  ⋯
                                 </button>
                               )}
                           </li>
                         ))}
                       </ul>
+                      {(() => {
+                        const member = groupRoster.members.find(
+                          (entry) => entry.membershipId === managedMemberId,
+                        );
+                        return (
+                          <Sheet
+                            open={Boolean(member && manageGroup)}
+                            title={member?.displayName ?? ""}
+                            onDismiss={() => setManagedMemberId(null)}
+                          >
+                            {member && (
+                              <div className="member-actions">
+                                {manageGroup &&
+                                  member.membershipId !==
+                                    membership.membershipId && (
+                                    <button
+                                      className="row-action"
+                                      type="button"
+                                      disabled={busy(
+                                        `admin:${member.membershipId}`,
+                                      )}
+                                      onClick={() => {
+                                        const admin = !member.creator;
+                                        setMemberAdmin(
+                                          member.membershipId,
+                                          admin,
+                                        );
+                                        optimistic(
+                                          `admin:${member.membershipId}`,
+                                          admin
+                                            ? `${member.displayName} is now an admin.`
+                                            : `${member.displayName} is no longer an admin.`,
+                                          () =>
+                                            setGroupAdmin(
+                                              apiBaseUrl,
+                                              token(),
+                                              member.membershipId,
+                                              admin,
+                                            ),
+                                          () =>
+                                            setMemberAdmin(
+                                              member.membershipId,
+                                              !admin,
+                                            ),
+                                        );
+                                      }}
+                                    >
+                                      {member.creator
+                                        ? "Remove admin"
+                                        : "Make admin"}
+                                    </button>
+                                  )}
+                                {manageGroup &&
+                                  !member.creator &&
+                                  member.membershipId !==
+                                    membership.membershipId && (
+                                    <button
+                                      className="row-action danger-text"
+                                      type="button"
+                                      disabled={busy(
+                                        `remove:${member.membershipId}`,
+                                      )}
+                                      onClick={async () => {
+                                        if (
+                                          !(await ask({
+                                            title: `Remove ${member.displayName}?`,
+                                            body: `${member.displayName} leaves ${groupRoster.groupName} and stops counting toward its weeks.`,
+                                            confirm: `Remove ${member.displayName}`,
+                                            tone: "danger",
+                                          }))
+                                        )
+                                          return;
+                                        setManagedMemberId(null);
+                                        void act(
+                                          `remove:${member.membershipId}`,
+                                          async () => {
+                                            const draft = commandDraft(
+                                              "remove",
+                                              member.membershipId,
+                                            );
+                                            await api.remove(
+                                              token(),
+                                              membership.groupId,
+                                              member.membershipId,
+                                              draft.key,
+                                            );
+                                            commandDrafts.current.delete(
+                                              "remove",
+                                            );
+                                            setGroupRevision(
+                                              (value) => value + 1,
+                                            );
+                                            return "Member removed.";
+                                          },
+                                        );
+                                      }}
+                                    >
+                                      Remove from group
+                                    </button>
+                                  )}
+                              </div>
+                            )}
+                          </Sheet>
+                        );
+                      })()}
                       {manageGroup ? (
                         <section className="pending-invitations">
                           <h3>Invited, not joined yet</h3>

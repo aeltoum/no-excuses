@@ -570,7 +570,7 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   ).toBeVisible();
   await page.getByRole("link", { name: "Group" }).click();
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
-  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
   await expect(page.getByText("friend@example.test")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
 
@@ -580,7 +580,7 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible({
     timeout: 1000,
   });
-  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
   await expect(page.getByText("friend@example.test")).toBeVisible({
     timeout: 1000,
   });
@@ -594,7 +594,7 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   await expect(
     page.getByRole("button", { name: "Creating invite…" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
   server.fail.add("revoke");
   await page.getByRole("button", { name: "Revoke" }).click();
   await page.getByRole("button", { name: "Revoke invitation" }).click();

@@ -89,7 +89,7 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
   expect(errors).toEqual([]);
 });
 
-test("Log opens the camera with the sheet; several activities log as mixed with a slider effort", async ({
+test("Log opens the editor before the camera; several activities log as mixed with a slider effort", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -108,18 +108,24 @@ test("Log opens the camera with the sheet; several activities log as mixed with 
     if (path === "/v1/workout-check-ins")
       return { workoutCheckinId: body?.workoutCheckinId, currentWeekCount: 2 };
   });
-  const camera = page.waitForEvent("filechooser");
   const shown = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Log workout" }).click(),
     page.getByRole("dialog", { name: "Log workout" }),
   );
   expect(shown).toBeLessThanOrEqual(100);
-  await (await camera).setFiles({
-    name: "activity.png",
-    mimeType: "image/png",
-    buffer: proofPng,
-  });
+  // The editor opens first; the camera waits for a capture action.
+  await expect(
+    page.getByText("Two photos required", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole("dialog", { name: "Log workout" })
+    .getByLabel(/Take activity photo/)
+    .setInputFiles({
+      name: "activity.png",
+      mimeType: "image/png",
+      buffer: proofPng,
+    });
   const dialog = page.getByRole("dialog", { name: "Log workout" });
   await expect(
     dialog.getByRole("img", { name: "Activity preview" }),
@@ -204,5 +210,45 @@ test("a nudge from yesterday clears at the day change, even if the refresh fails
   await expect(
     friends.getByRole("button", { name: "Nudge Maya" }),
   ).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
+test("phone Back closes the log sheet first and the draft survives until discarded", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 760 });
+  const { errors } = await signIn(page, () => undefined);
+  const opener = page.getByRole("button", { name: "Log workout" });
+  await opener.click();
+  let dialog = page.getByRole("dialog", { name: "Log workout" });
+  await dialog.getByRole("button", { name: "Strength" }).click();
+  await expect(dialog.getByText("Add your activity photo.")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("log-sheet.png") });
+
+  // Back closes the sheet and stays on Home.
+  await page.goBack();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/home$/);
+
+  // The draft returns with the sheet, across a tab switch too.
+  await page.getByRole("link", { name: "History", exact: true }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await opener.click();
+  dialog = page.getByRole("dialog", { name: "Log workout" });
+  await expect(
+    dialog.getByRole("button", { name: "Strength" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await dialog.getByRole("button", { name: "Discard draft" }).click();
+  await expect(dialog).toHaveCount(0);
+  await opener.click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Log workout" })
+      .getByRole("button", { name: "Strength" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath("home-after.png"),
+  });
   expect(errors).toEqual([]);
 });

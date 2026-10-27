@@ -51,7 +51,7 @@ test("admins rename the crew, manage admins and the schedule; everyone sees acti
   );
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   await delayRoute(page, "http://127.0.0.1:8787/v1/group/**", 1000);
-  await page.getByRole("button", { name: "Manage" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
 
   // Rename shows at once on a slow API.
   await page.getByLabel("Crew name").fill("Dawn Patrol");
@@ -67,20 +67,25 @@ test("admins rename the crew, manage admins and the schedule; everyone sees acti
 
   // A failed promotion rolls back only that change; the retry sticks.
   const maya = page.getByRole("listitem").filter({ hasText: "Maya" });
-  await maya.getByRole("button", { name: "Make admin" }).click();
+  // Member actions live in a labelled member sheet.
+  await maya.getByRole("button", { name: "Manage Maya" }).click();
+  const sheet = page.getByRole("dialog", { name: "Maya" });
+  await sheet.getByRole("button", { name: "Make admin" }).click();
   await expect(maya).toContainText("Admin");
   await expect(
     page.getByText("Something went wrong. Try again."),
   ).toBeVisible();
-  await expect(maya.getByRole("button", { name: "Make admin" })).toBeVisible();
-  await maya.getByRole("button", { name: "Make admin" }).click();
+  await expect(sheet.getByRole("button", { name: "Make admin" })).toBeVisible();
+  await sheet.getByRole("button", { name: "Make admin" }).click();
   await expect(
-    maya.getByRole("button", { name: "Remove admin" }),
+    sheet.getByRole("button", { name: "Remove admin" }),
   ).toBeVisible();
   // Admins cannot be removed until demoted.
   await expect(
-    maya.getByRole("button", { name: "Remove", exact: true }),
+    sheet.getByRole("button", { name: "Remove from group" }),
   ).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(sheet).toHaveCount(0);
 
   await page.getByLabel("Start day").selectOption("3");
   await page.getByRole("button", { name: "Save schedule" }).click();

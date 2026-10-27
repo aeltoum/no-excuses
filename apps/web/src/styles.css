@@ -4509,3 +4509,96 @@ svg {
   white-space: nowrap;
   font-size: 0.9375rem;
 }
+
+/* Member rows: names wrap; actions live in the member sheet. */
+.group-roster .group-member-copy strong {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.row-more {
+  min-width: 48px;
+  min-height: 48px;
+}
+.member-actions {
+  display: grid;
+  gap: 12px;
+}
+.member-actions .row-action {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* Provisional workouts: qualified, never shown as settled. */
+.own-progress .home-settle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* One task summary above progress details. */
+.needs-you {
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--safety);
+  border-radius: 12px;
+}
+.needs-you h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.needs-you ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.needs-you a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.needs-you a + a,
+.needs-you li + li a {
+  border-top: 1px solid var(--rule);
+}
+.needs-you strong {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--safety);
+  color: var(--ground);
+  text-align: center;
+}
+.needs-anchor {
+  scroll-margin-top: 80px;
+}
+#needs-review {
+  scroll-margin-top: 80px;
+}
+
+/* Log sheet: submission stays reachable while the form scrolls. */
+.log-sheet-footer {
+  position: sticky;
+  /* Sits over the sheet's bottom padding so nothing scrolls beneath it. */
+  bottom: calc(-20px - env(safe-area-inset-bottom));
+  margin-bottom: calc(-20px - env(safe-area-inset-bottom));
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin-inline: -20px;
+  padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+}
+.log-sheet-footer .sheet-hint {
+  margin: 0;
+}
+.log-discard {
+  justify-self: center;
+  min-height: 48px;
+}

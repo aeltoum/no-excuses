@@ -3,6 +3,10 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
 const focusable =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// Phone Back closes the sheet before it leaves the page: an open sheet owns
+// one history entry, popped by Back or unwound when the sheet closes itself.
+const unwinding = new Map<string, number>();
+
 export function Sheet({
   children,
   dismissible = true,
@@ -73,6 +77,55 @@ export function Sheet({
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
       openerRef.current?.focus();
+    };
+  }, [open]);
+
+  // Runs once per opening: a re-run would unwind and re-push mid-navigation.
+  useEffect(() => {
+    if (!open) return;
+    // A sheet reopening in the same tick (StrictMode, a quick swap) takes over
+    // the entry a closing sheet was about to unwind.
+    const current = window.history.state?.sheet;
+    const adopted = typeof current === "string" && unwinding.get(current);
+    let id: string;
+    if (adopted) {
+      window.clearTimeout(adopted);
+      unwinding.delete(current);
+      id = current;
+    } else {
+      id = crypto.randomUUID();
+      window.history.pushState(
+        { ...window.history.state, sheet: id },
+        "",
+        window.location.href,
+      );
+    }
+    let popped = false;
+    const onPopState = () => {
+      if (window.history.state?.sheet === id) return;
+      if (!dismissibleRef.current) {
+        // A sheet that cannot close keeps its entry.
+        window.history.pushState(
+          { ...window.history.state, sheet: id },
+          "",
+          window.location.href,
+        );
+        return;
+      }
+      popped = true;
+      dismissRef.current();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      if (popped || window.history.state?.sheet !== id) return;
+      unwinding.set(
+        id,
+        window.setTimeout(() => {
+          if (!unwinding.delete(id)) return;
+          if (window.history.state?.sheet === id) window.history.back();
+        }, 0),
+      );
     };
   }, [open]);
 

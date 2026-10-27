@@ -37,7 +37,7 @@ test("a cardio workout carries optional distance and time details", async ({
   const dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Cardio" }).click();
   await dialog.getByRole("button", { name: "30 min" }).click();
-  await dialog.getByText("Add details (optional)").click();
+  await dialog.getByText("Add workout details").click();
   await dialog.getByLabel("Cardio type").selectOption("run");
   await dialog.getByLabel("Distance (km)").fill("5");
   await dialog.getByLabel("Time (mm:ss)").fill("25:30");

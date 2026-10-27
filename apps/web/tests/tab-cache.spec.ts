@@ -118,21 +118,23 @@ test("member tabs retain data while background refresh resolves", async ({
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Home" }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("status", { name: "Loading weekly progress" }),
   ).toHaveCount(0);
   await expect.poll(() => targetGets).toBeGreaterThanOrEqual(4);
-  await page.getByRole("link", { name: "Home" }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByRole("link", { name: "Change target" }).click();
   await expect(page.getByText("3", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Home" }).focus();
+  await page.getByRole("link", { name: "Home", exact: true }).focus();
   releaseChange();
   await expect(page.getByText("4", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Home" })).toBeFocused();
-  await page.getByRole("link", { name: "Home" }).click();
+  await expect(
+    page.getByRole("link", { name: "Home", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByRole("link", { name: "Change target" }).click();
   await expect(
     page.getByText("Showing saved data", { exact: true }),

@@ -152,6 +152,16 @@ type Outgoing = {
   count?: number;
 };
 let outbox: Outgoing[] = [];
+type LogDraft = {
+  membershipId: string;
+  activities: Activity[];
+  duration: string;
+  otherDuration: boolean;
+  intensity: "low" | "moderate" | "high";
+  photos: { activity?: ProofPhoto; presence?: ProofPhoto };
+  details: DetailsDraft;
+};
+let logDraft: LogDraft | null = null;
 const outboxListeners = new Set<() => void>();
 // Mirrors the queue to IndexedDB: unsent workouts are kept, sent or refused ones go.
 const persistOutbox = (previous: Outgoing[], next: Outgoing[]) => {
@@ -202,6 +212,7 @@ const dropOutgoing = (id: string) => {
   setOutbox(outbox.filter((entry) => entry.id !== id));
 };
 onClearPersisted(() => {
+  logDraft = null;
   for (const entry of outbox) dropOutgoing(entry.id);
   void clearWorkouts();
   restored = false;
@@ -349,7 +360,12 @@ export function Weekly({
   );
   const [targetContext, setTargetContext] =
     useState<WeeklyTargetContext | null>(saved?.targetContext ?? null);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  // An unsent workout survives tab switches and sheet closes for this member.
+  const draft =
+    logDraft?.membershipId === membership?.membershipId ? logDraft : null;
+  const [activities, setActivities] = useState<Activity[]>(
+    draft?.activities ?? [],
+  );
   // Picking several activities logs one mixed workout.
   const activityType: Activity | null =
     activities.length === 0
@@ -357,17 +373,58 @@ export function Weekly({
       : activities.length === 1
         ? activities[0]
         : "mixed";
-  const [duration, setDuration] = useState("");
-  const [otherDuration, setOtherDuration] = useState(false);
+  const [duration, setDuration] = useState(draft?.duration ?? "");
+  const [otherDuration, setOtherDuration] = useState(
+    draft?.otherDuration ?? false,
+  );
   const [intensity, setIntensity] = useState<"low" | "moderate" | "high">(
-    "moderate",
+    draft?.intensity ?? "moderate",
   );
   const [photos, setPhotos] = useState<{
     activity?: ProofPhoto;
     presence?: ProofPhoto;
-  }>({});
+  }>(draft?.photos ?? {});
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(emptyDraft);
+  const [detailsDraft, setDetailsDraft] = useState<DetailsDraft>(
+    draft?.details ?? emptyDraft,
+  );
+  const draftStarted =
+    activities.length > 0 ||
+    duration !== "" ||
+    photos.activity !== undefined ||
+    photos.presence !== undefined;
+  useEffect(() => {
+    logDraft =
+      membership && draftStarted
+        ? {
+            membershipId: membership.membershipId,
+            activities,
+            duration,
+            otherDuration,
+            intensity,
+            photos,
+            details: detailsDraft,
+          }
+        : null;
+  }, [
+    membership,
+    draftStarted,
+    activities,
+    duration,
+    otherDuration,
+    intensity,
+    photos,
+    detailsDraft,
+  ]);
+  const resetDraft = () => {
+    setActivities([]);
+    setDuration("");
+    setOtherDuration(false);
+    setIntensity("moderate");
+    setPhotos({});
+    setDetailsDraft(emptyDraft());
+    logDraft = null;
+  };
   const [sessionId, setSessionId] = useState<string | null>(null);
   const shots = useCandidates();
   const avatars = useAvatars();
@@ -381,6 +438,8 @@ export function Weekly({
   const [docked, setDocked] = useState(false);
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const [feedAttention, setFeedAttention] = useState(0);
+  const [feedTasks, setFeedTasks] = useState({ reviews: 0, votes: 0 });
+  const [ownAwaiting, setOwnAwaiting] = useState(0);
   const [cardAttention, setCardAttention] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
@@ -411,6 +470,16 @@ export function Weekly({
       (item) => item.canReview || (item.canVote && !item.myVote),
     );
     setFeedAttention(waiting.length);
+    setFeedTasks({
+      reviews: items.filter((item) => item.canReview).length,
+      votes: items.filter(
+        (item) => !item.canReview && item.canVote && !item.myVote,
+      ).length,
+    });
+    setOwnAwaiting(
+      items.filter((item) => item.mine && item.reviewStatus === "pending")
+        .length,
+    );
     setAwaitingReview(new Set(waiting.map((item) => item.authorMembershipId)));
   }, []);
   // The big barbell docks into a slim header once it scrolls out of view.
@@ -740,6 +809,41 @@ export function Weekly({
       ...counted.map((entry) => entry.activityType),
     ],
   };
+  const uploading = counted.filter(
+    (entry) => entry.status === "sending",
+  ).length;
+  const provisional = uploading + ownAwaiting;
+  const settleLine = own
+    ? [
+        `${Math.max(0, own.completedWorkoutCount - provisional)} settled`,
+        uploading > 0 && `${uploading} uploading`,
+        ownAwaiting > 0 && `${ownAwaiting} awaiting review`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+  const needsYou = [
+    cardAttention > 0 && {
+      href: "#needs-consequences",
+      text: `Consequence card${cardAttention === 1 ? "" : "s"} to settle`,
+      count: cardAttention,
+    },
+    feedTasks.reviews > 0 && {
+      href: "#needs-review",
+      text: `Workout${feedTasks.reviews === 1 ? "" : "s"} to review`,
+      count: feedTasks.reviews,
+    },
+    feedTasks.votes > 0 && {
+      href: "#needs-review",
+      text: `Disputed workout${feedTasks.votes === 1 ? "" : "s"} to vote on`,
+      count: feedTasks.votes,
+    },
+    ballotAttention > 0 && {
+      href: "#needs-ballots",
+      text: `Week-off request${ballotAttention === 1 ? "" : "s"} to decide`,
+      count: ballotAttention,
+    },
+  ].filter(Boolean) as { href: string; text: string; count: number }[];
   const home = route === "/home";
   const boundary = targetContext?.nextWeekStartsAt
     ? new Date(targetContext.nextWeekStartsAt)
@@ -1014,11 +1118,15 @@ export function Weekly({
                       target={own.lockedTarget}
                       size="big"
                       activityTypes={own.activityTypes}
+                      provisional={provisional}
                     />
                   </a>
                   <p className="home-count">
                     {own.completedWorkoutCount} of {own.lockedTarget} this week
                   </p>
+                  {provisional > 0 && (
+                    <p className="home-settle">{settleLine}</p>
+                  )}
                   <div className="home-meta">
                     {hasStreaks(own) && (
                       <span className="home-streaks">{streakText(own)}</span>
@@ -1029,9 +1137,24 @@ export function Weekly({
                     />
                   </div>
                   <UnlockNote unlocks={extras.unlocks} />
-                  {(extras.session || extras.exceptions.mine.length > 0) && (
+                  {needsYou.length > 0 && (
+                    <nav className="needs-you" aria-label="Needs you">
+                      <h2>Needs you</h2>
+                      <ul>
+                        {needsYou.map((task) => (
+                          <li key={task.text}>
+                            <a href={task.href}>
+                              <span>{task.text}</span>
+                              <strong>{task.count}</strong>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </nav>
+                  )}
+                  {
                     <div className="home-actions">
-                      {extras.session && sessionCard()}
+                      {sessionCard()}
                       <Exceptions
                         part="own-status"
                         apiBaseUrl={apiBaseUrl}
@@ -1043,7 +1166,7 @@ export function Weekly({
                         onRevoked={feedRevoked}
                       />
                     </div>
-                  )}
+                  }
                   <Sheet
                     open={toolsOpen}
                     title="This week"
@@ -1063,12 +1186,6 @@ export function Weekly({
                           week.
                         </span>
                       </a>
-                      {!extras.session && (
-                        <div className="week-tools-row">
-                          {sessionCard(() => setToolsOpen(false))}
-                          <span>Time it now, log it when you finish.</span>
-                        </div>
-                      )}
                       <div className="week-tools-row">
                         <Exceptions
                           part="own"
@@ -1179,15 +1296,17 @@ export function Weekly({
                 </ul>
               )}
               {own && (
-                <Consequences
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  onRevoked={feedRevoked}
-                  onGroupOwed={setGroupOwed}
-                  onAttention={setCardAttention}
-                  onLogBlock={setLogBlock}
-                  cacheKey={cacheKey}
-                />
+                <div id="needs-consequences" className="needs-anchor">
+                  <Consequences
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                    onRevoked={feedRevoked}
+                    onGroupOwed={setGroupOwed}
+                    onAttention={setCardAttention}
+                    onLogBlock={setLogBlock}
+                    cacheKey={cacheKey}
+                  />
+                </div>
               )}
               {own && (
                 <WeekRecap
@@ -1202,16 +1321,18 @@ export function Weekly({
                 />
               )}
               {own && (
-                <Exceptions
-                  part="ballots"
-                  apiBaseUrl={apiBaseUrl}
-                  token={token}
-                  extras={extras}
-                  apply={applyExtras}
-                  reload={reloadExtras}
-                  onNotice={setNotice}
-                  onRevoked={feedRevoked}
-                />
+                <div id="needs-ballots" className="needs-anchor">
+                  <Exceptions
+                    part="ballots"
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                    extras={extras}
+                    apply={applyExtras}
+                    reload={reloadExtras}
+                    onNotice={setNotice}
+                    onRevoked={feedRevoked}
+                  />
+                </div>
               )}
               {own && (
                 <>
@@ -1318,11 +1439,7 @@ export function Weekly({
                         // upload and check-in finish in the background.
                         setOutbox([...outbox, entry]);
                         setSheetOpen(false);
-                        setActivities([]);
-                        setDuration("");
-                        setOtherDuration(false);
-                        setPhotos({});
-                        setDetailsDraft(emptyDraft());
+                        resetDraft();
                         setSessionId(null);
                         clearCandidates([
                           photos.activity.id,
@@ -1350,7 +1467,7 @@ export function Weekly({
                               ],
                               [
                                 "presence",
-                                "You at the workout",
+                                "Presence photo",
                                 "user",
                                 "Any part of you. Your call how much.",
                               ],
@@ -1425,25 +1542,6 @@ export function Weekly({
                           </p>
                         )}
                       </fieldset>
-                      <div className="sheet-preview">
-                        <Barbell
-                          count={
-                            own.completedWorkoutCount + (activityType ? 1 : 0)
-                          }
-                          target={own.lockedTarget}
-                          size="big"
-                          activityTypes={
-                            activityType
-                              ? [...own.activityTypes, activityType]
-                              : own.activityTypes
-                          }
-                        />
-                        <p>
-                          {activityType
-                            ? `This one makes ${own.completedWorkoutCount + 1} of ${own.lockedTarget}.`
-                            : "Pick what you did to load a plate."}
-                        </p>
-                      </div>
                       <fieldset>
                         <legend>
                           What did you do?{" "}
@@ -1558,12 +1656,45 @@ export function Weekly({
                         draft={detailsDraft}
                         onChange={setDetailsDraft}
                       />
-                      <button type="submit" disabled={!logReady}>
-                        Log workout
-                      </button>
-                      {!logReady && (
-                        <p className="sheet-hint">{missingRequirement}</p>
-                      )}
+                      <div className="sheet-preview">
+                        <Barbell
+                          count={
+                            own.completedWorkoutCount + (activityType ? 1 : 0)
+                          }
+                          target={own.lockedTarget}
+                          size="big"
+                          activityTypes={
+                            activityType
+                              ? [...own.activityTypes, activityType]
+                              : own.activityTypes
+                          }
+                        />
+                        <p>
+                          {activityType
+                            ? `This one makes ${own.completedWorkoutCount + 1} of ${own.lockedTarget}.`
+                            : "Pick what you did to load a plate."}
+                        </p>
+                      </div>
+                      <div className="log-sheet-footer">
+                        {!logReady && (
+                          <p className="sheet-hint">{missingRequirement}</p>
+                        )}
+                        <button type="submit" disabled={!logReady}>
+                          Log workout
+                        </button>
+                        {draftStarted && (
+                          <button
+                            type="button"
+                            className="text-button log-discard"
+                            onClick={() => {
+                              resetDraft();
+                              setSheetOpen(false);
+                            }}
+                          >
+                            Discard draft
+                          </button>
+                        )}
+                      </div>
                     </form>
                   </Sheet>
                 </>
