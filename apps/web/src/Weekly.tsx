@@ -72,20 +72,6 @@ const intensityLabels = {
   high: { emoji: "🥵", text: "Brutal" },
 };
 
-// Friend cards: flame and week count; the full sentence stays for screen readers.
-function Streak({ item }: { item: CurrentWeekProgressItem }) {
-  return (
-    <span className="streak">
-      {item.targetStreak > 0 && (
-        <span className="streak-flame" aria-hidden="true">
-          🔥<b>{item.targetStreak}</b>
-        </span>
-      )}
-      <span className="visually-hidden">{streakText(item)}</span>
-    </span>
-  );
-}
-
 // Time left before the week closes, refreshed each minute.
 function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
@@ -1197,7 +1183,7 @@ export function Weekly({
                           onNotice={setNotice}
                           onRevoked={feedRevoked}
                         />
-                        <span>Ask your crew to excuse a week.</span>
+                        <span>Ask your Group to excuse a week.</span>
                       </div>
                     </div>
                   </Sheet>
@@ -1249,29 +1235,27 @@ export function Weekly({
                           <strong className="friend-card-name">
                             {item.displayName}
                           </strong>
-                          <span className="friend-card-line">
-                            <Barbell
-                              count={item.completedWorkoutCount}
-                              target={item.lockedTarget}
-                              size="mini"
-                              activityTypes={item.activityTypes}
-                            />
-                            <span>
-                              {item.completedWorkoutCount}/{item.lockedTarget}
-                              {groupOwed[item.membershipId]
-                                ? ` · owes ${groupOwed[item.membershipId]}`
-                                : ""}
-                              {awaitingReview.has(item.membershipId) &&
-                                " · review"}
-                              {excused.has(item.membershipId)
-                                ? " · excused"
-                                : weekOffPending.has(item.membershipId)
-                                  ? " · week off?"
-                                  : ""}
-                              {hasStreaks(item) && item.targetStreak > 0 && " "}
-                              {hasStreaks(item) && <Streak item={item} />}
-                            </span>
+                          <span className="friend-card-count">
+                            {item.completedWorkoutCount} of {item.lockedTarget}{" "}
+                            workouts
                           </span>
+                          {(() => {
+                            // One urgent status at most; the rest lives in member detail.
+                            const status = groupOwed[item.membershipId]
+                              ? `Owes ${groupOwed[item.membershipId]} card${groupOwed[item.membershipId] === 1 ? "" : "s"}`
+                              : awaitingReview.has(item.membershipId)
+                                ? "Needs your review"
+                                : weekOffPending.has(item.membershipId)
+                                  ? "Week off requested"
+                                  : excused.has(item.membershipId)
+                                    ? "Excused this week"
+                                    : null;
+                            return status ? (
+                              <span className="friend-card-status">
+                                {status}
+                              </span>
+                            ) : null;
+                          })()}
                         </span>
                         {item.completedWorkoutCount < item.lockedTarget &&
                           !excused.has(item.membershipId) && (

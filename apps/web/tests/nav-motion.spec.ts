@@ -117,7 +117,7 @@ test("four icon tabs use one sliding indicator and fade only incoming content", 
   }
 
   const home = page.getByRole("link", { name: "Home" });
-  const group = page.getByRole("link", { name: "Group" });
+  const group = page.getByRole("link", { name: "Group", exact: true });
   await expect(home).toHaveAttribute("aria-current", "page");
   await expect(group).not.toHaveAttribute("aria-current");
   expect(await home.evaluate((node) => getComputedStyle(node).color)).toBe(

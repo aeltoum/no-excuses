@@ -344,9 +344,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText([
-    "MAMaya2/3 · owes 2 🔥11-week streak · 3 workouts since last missNudge",
-  ]);
+  ).toHaveText(["MAMaya2 of 3 workoutsOwes 2 cardsNudge"]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
   ).toContainText("1/5");

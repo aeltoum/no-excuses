@@ -238,13 +238,15 @@ test("Account Name row loads and confirms a saved edit", async ({
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.getByRole("link", { name: "Account" }).click();
-  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Account", exact: true }),
+  ).toBeVisible();
   await expect(page.getByLabel("Your identity")).toContainText("Akrum");
   await expect(page.getByLabel("Your identity")).toContainText(
     "member@example.test",
   );
   await expect(
-    page.getByRole("link", { name: /Crew.*6AM Crew/ }),
+    page.getByRole("link", { name: /^Group.*6AM Crew/ }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Weekly target.*4 a week/ }),
@@ -333,13 +335,13 @@ test("Account crew load failure is honest and retryable", async ({ page }) => {
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.goto("/account");
-  await expect(page.getByText("Couldn’t load your crew.")).toBeVisible();
+  await expect(page.getByText("Couldn’t load your Group.")).toBeVisible();
   await expect(page.getByText("Loading…")).toHaveCount(0);
   failRoster = false;
   findings.get(page)?.console.splice(0);
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(
-    page.getByRole("link", { name: /Crew.*6AM Crew/ }),
+    page.getByRole("link", { name: /^Group.*6AM Crew/ }),
   ).toBeVisible();
   findings.get(page)?.console.splice(0);
   findings.get(page)?.page.splice(0);
@@ -544,18 +546,18 @@ test("no-Group onboarding saves About you then starts a crew", async ({
   await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
   const continueButton = page.getByRole("button", { name: "Continue" });
   await expect(continueButton).toBeDisabled();
-  await page.getByLabel("What should your crew call you?").fill("Akrum");
+  await page.getByLabel("What should your Group call you?").fill("Akrum");
   await page.getByLabel("I’m 18 or older").check();
   await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await continueButton.click();
-  await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
+  await expect(page.getByText("Step 2 of 3 · Your Group")).toBeVisible();
   await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Start a crew" }),
+    page.getByRole("button", { name: "Start a Group" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Invitation code")).toHaveCount(0);
-  await page.getByLabel("Crew name").fill("6AM Crew");
+  await page.getByLabel("Group name").fill("6AM Crew");
   // Naming a new crew is local; step 3 opens without a wait.
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("Step 3 of 3 · Your target")).toBeVisible();
@@ -612,7 +614,7 @@ test("invited OTP preserves its code into no-Group onboarding", async ({
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
+  await expect(page.getByText("Step 2 of 3 · Your Group")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "I have a code" }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -713,7 +715,7 @@ test("Group roster, invitation card, and creator Manage use row actions without 
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   await expect(page.getByText("2 members")).toBeVisible();
@@ -813,7 +815,7 @@ test("Group members can leave without creator Manage controls", async ({
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
 
   await expect(
     page.getByRole("button", { name: "Manage", exact: true }),
@@ -863,7 +865,7 @@ test("sole Group admin can leave but multi-member sole admin must add another ad
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
 
   await expect(
     page.getByRole("button", { name: "Leave 6AM Crew" }),
@@ -936,8 +938,8 @@ test("failed Group load retries into ten-member scroll above tab bar", async ({
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await page.getByRole("link", { name: "Group" }).click();
-  await expect(page.getByText("Couldn’t load your crew.")).toBeVisible();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
+  await expect(page.getByText("Couldn’t load your Group.")).toBeVisible();
   findings.get(page)?.console.splice(0);
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByText("10 members")).toBeVisible();
@@ -1028,7 +1030,9 @@ test("Account deletion failure keeps account and exact retry guidance", async ({
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
   await page.goto("/account");
-  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Account", exact: true }),
+  ).toBeVisible();
   findings.get(page)?.console.splice(0);
   findings.get(page)?.page.splice(0);
   findings.get(page)?.network.splice(0);
@@ -1048,7 +1052,9 @@ test("Account deletion failure keeps account and exact retry guidance", async ({
   findings.get(page)?.console.splice(0);
   findings.get(page)?.network.splice(0);
   await page.getByRole("button", { name: "Keep my account" }).click();
-  await expect(page.getByRole("heading", { name: "You" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Account", exact: true }),
+  ).toBeVisible();
 });
 
 test("pending Auth deletion still ends browser access", async ({ page }) => {
@@ -1173,7 +1179,7 @@ test("Group conflict retains draft and retries same idempotency key", async ({
   await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Crew name").fill("Morning crew");
+  await page.getByLabel("Group name").fill("Morning crew");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Increase weekly target" }).click();
   await page.getByRole("button", { name: "Start Morning crew" }).click();

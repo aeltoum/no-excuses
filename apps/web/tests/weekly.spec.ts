@@ -434,9 +434,7 @@ const weeklyLoop = async (
   await expect(
     page.getByText("2-week streak · 5 workouts since last miss"),
   ).toBeVisible();
-  await expect(
-    page.getByText("1-week streak · 3 workouts since last miss"),
-  ).toBeAttached();
+  // Friend chips carry count and one urgent status; streaks stay on History.
   await page.goto("/");
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
@@ -453,11 +451,10 @@ const weeklyLoop = async (
   await expect(
     page.getByRole("list", { name: "Activity colours" }),
   ).toHaveCount(0);
+  // Friend chips lead with a readable count, not a tiny barbell.
   await expect(
-    page
-      .getByRole("img", { name: "1 of 2 workouts" })
-      .locator('rect[fill="var(--activity-cardio)"]'),
-  ).toHaveCount(2);
+    page.getByRole("list", { name: "Friends this week" }),
+  ).toContainText("1 of 2 workouts");
   await expect(
     page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
   ).toHaveCount(0);

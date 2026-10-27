@@ -125,17 +125,46 @@ and account deletion:
 - Keep forms and lists unboxed inside the sheet. Use grouped controls and row rules, preserve
   entered choices on retryable failure, and keep status/error messages perceivable.
 
-## Five-tab bar
+## Tab bar
 
-Authenticated member navigation has exactly five destinations in this order:
+Authenticated member navigation has exactly four destinations in this order:
 
-`Home | Group | Target | History | Account`
+`Home | Group | History | Account`
 
-Each tab uses its approved inline icon and sentence-case label. The bar is fixed to the screen
-flow at the bottom, respects the bottom safe area, and retains usable labels at compact widths.
-The current tab uses chalk icon/text plus a single `3px` chalk indicator. Other tabs use muted
-icon/text. Expose the current destination semantically (`aria-current="page"` on web); never
-use colour or the moving indicator as its only cue. Every tab meets the `48×48px` target floor.
+Target is a Home subpage, reached from the Home barbell and Week options. On Target, Home stays
+the selected tab and the screen shows a visible "Back to Home" link.
+
+Each tab uses its approved inline icon and sentence-case label, never smaller than `12px`. The
+bar is fixed to the screen flow at the bottom, respects the bottom safe area, and aligns its
+tabs to the member content column. The current tab uses chalk icon/text plus a single `3px`
+chalk indicator. Other tabs use muted icon/text. Expose the current destination semantically
+(`aria-current="page"` on web; `aria-current="true"` on Home while a Home subpage is open);
+never use colour or the moving indicator as its only cue. Every tab meets the `48×48px` target
+floor.
+
+## Member layout
+
+- Member screens share one content column, `--content-width: 600px`, plus `20px` gutters.
+  Feed, progress, headers, tab content, and the Log workout action align to it; wide screens
+  leave the surrounding floor empty instead of stretching portrait proof frames.
+- The Log workout action is labelled "Log workout", anchors to the column's right edge above the
+  tab bar, and the page reserves bottom space so it never covers the last action.
+- Screen titles are sentence case at `40–46px`; sheet titles `32px`; body `16px`; secondary
+  text `14px`; `12px` only for nonessential metadata. Section labels are sentence case, not
+  tracked uppercase.
+- Every interactive control meets the `48×48px` floor; compact icons keep their look and grow
+  only their hit box.
+- `apps/web/src/styles.css` ends with an authoritative layer that defines the shared tokens
+  (`--space-*`, `--radius-*`, `--control-min`, `--type-*`, `--content-width`) and the single
+  definition of each component reworked in the UI audit. New component styles extend that layer
+  instead of appending another override.
+
+## Vocabulary
+
+One visible noun per concept: **Group** for the shared space (friends in supporting prose),
+**Account** for the member's settings destination, **Log workout** for the logging action.
+Review actions are **Verify workout** / **Question workout** on first review and
+**Accept workout** / **Reject workout** / **Can't assess** on a disputed workout.
 
 ## Motion
 
@@ -197,7 +226,7 @@ Before accepting frontend presentation work, verify that it:
 
 - uses the rubber/chalk tokens and exact activity plate meanings above;
 - uses self-hosted Archivo and Big Shoulders Display at the approved hierarchy;
-- follows the radius, row-rule, Barbell, Sheet, and five-tab rules;
+- follows the radius, row-rule, Barbell, Sheet, and four-tab and member-layout rules;
 - preserves authoritative navigation, semantic order, domain language, and status meanings;
 - keeps activity colour supplemental and uses chalk for absent type data;
 - preserves two-photo roles and the media privacy boundary;

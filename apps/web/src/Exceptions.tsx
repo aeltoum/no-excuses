@@ -102,7 +102,7 @@ export function Exceptions({
     setNote("");
     onNotice({
       kind: "success",
-      text: `Asked your crew to excuse ${weekLabel(week)}. They have 48 hours.`,
+      text: `Asked your Group to excuse ${weekLabel(week)}. They have 48 hours.`,
     });
     void send(
       "/v1/exceptions/request",
@@ -244,7 +244,7 @@ export function Exceptions({
       >
         <form className="exception-form" onSubmit={submit}>
           <p className="hint">
-            Your crew votes privately for 48 hours. If approved, there’s no
+            Your Group votes privately for 48 hours. If approved, there’s no
             miss, no card, and your streaks hold. No proof or details needed.
           </p>
           <fieldset className="choice-chips" aria-label="Which week">
@@ -274,7 +274,7 @@ export function Exceptions({
             ))}
           </fieldset>
           <label>
-            Note for your crew (optional)
+            Note for your Group (optional)
             <textarea
               value={note}
               maxLength={280}

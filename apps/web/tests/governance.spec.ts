@@ -54,7 +54,7 @@ test("admins rename the crew, manage admins and the schedule; everyone sees acti
   await page.getByRole("button", { name: "Manage", exact: true }).click();
 
   // Rename shows at once on a slow API.
-  await page.getByLabel("Crew name").fill("Dawn Patrol");
+  await page.getByLabel("Group name").fill("Dawn Patrol");
   const renamed = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Rename" }).click(),
@@ -91,7 +91,7 @@ test("admins rename the crew, manage admins and the schedule; everyone sees acti
   await page.getByRole("button", { name: "Save schedule" }).click();
   await expect(page.getByText(/From Oct 2\d: Wednesday · UTC/)).toBeVisible();
 
-  await page.getByText("Crew activity").click();
+  await page.getByText("Group activity").click();
   await expect(page.getByText("Maya joined")).toBeVisible();
   expect(errors).toEqual([]);
 });

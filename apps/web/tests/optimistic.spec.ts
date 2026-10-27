@@ -568,7 +568,7 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   await expect(
     page.getByText("2 of 4 this week", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   await page.getByRole("button", { name: "Manage", exact: true }).click();
   await expect(page.getByText("friend@example.test")).toBeVisible();
@@ -668,7 +668,7 @@ test("onboarding About you waits for consent and never creates after it fails", 
   await signIn(page);
   await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
   await delayRoute(page, "http://127.0.0.1:8787/v1/**", 1000);
-  await page.getByLabel("What should your crew call you?").fill("Akrum");
+  await page.getByLabel("What should your Group call you?").fill("Akrum");
   await page.getByLabel("I’m 18 or older").check();
   await page.getByLabel("I understand this is an early-access pilot").check();
   await page.getByLabel("I agree to the terms and how my data is used").check();
@@ -683,12 +683,12 @@ test("onboarding About you waits for consent and never creates after it fails", 
   );
   await expect(page.getByRole("alert")).toHaveText("Action failed. Try again.");
   await expect(page.getByText("Step 1 of 3 · About you")).toBeVisible();
-  await expect(page.getByText("Step 2 of 3 · Your crew")).toHaveCount(0);
+  await expect(page.getByText("Step 2 of 3 · Your Group")).toHaveCount(0);
   expect(server.creates).toBe(0);
   server.fail.delete("consent");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText("Step 2 of 3 · Your crew")).toBeVisible();
-  await page.getByLabel("Crew name").fill("6AM Crew");
+  await expect(page.getByText("Step 2 of 3 · Your Group")).toBeVisible();
+  await page.getByLabel("Group name").fill("6AM Crew");
   await timed(
     page,
     testInfo,

@@ -78,7 +78,7 @@ const describe = (event: GroupEvent) => {
     case "account_deleted":
       return `${who} left`;
     case "renamed":
-      return `${event.actor ?? "An admin"} renamed the crew “${event.detail}”`;
+      return `${event.actor ?? "An admin"} renamed the Group “${event.detail}”`;
     case "admin_granted":
       return `${who} became an admin`;
     case "admin_revoked":
@@ -272,7 +272,7 @@ export function GroupAdmin({
         className="group-activity"
         onToggle={(event) => setActivityOpen(event.currentTarget.open)}
       >
-        <summary>Crew activity</summary>
+        <summary>Group activity</summary>
         {activity === null ? (
           <ul className="group-activity-list" aria-busy="true">
             <li className="skeleton skeleton-line" />

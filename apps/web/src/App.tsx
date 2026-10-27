@@ -912,7 +912,7 @@ export function App({
         <div>
           <p className="launch-name">No Excuses</p>
           <p className="launch-status" role="status">
-            Loading your crew
+            Loading your Group
           </p>
         </div>
       </main>
@@ -1178,8 +1178,8 @@ export function App({
                 `${session?.user.id}:${membership.groupId}:${membership.membershipId}`
                 ? `${groupRoster.members.length} members`
                 : membership
-                  ? "Loading your crew."
-                  : "Start a private crew or join one with an invitation code."
+                  ? "Loading your Group."
+                  : "Start a private Group or join one with an invitation code."
             }
           >
             {!membership && (
@@ -1207,7 +1207,7 @@ export function App({
                   {onboardingStep === 1
                     ? "About you"
                     : onboardingStep === 2
-                      ? "Your crew"
+                      ? "Your Group"
                       : "Your target"}
                 </p>
                 {onboardingStep === 1 && (
@@ -1246,9 +1246,9 @@ export function App({
                       });
                     }}
                   >
-                    <h2 id="onboarding-title">Before you join a crew</h2>
+                    <h2 id="onboarding-title">Before you join a Group</h2>
                     <label>
-                      What should your crew call you?
+                      What should your Group call you?
                       <input
                         value={displayName}
                         onChange={(event) => {
@@ -1350,7 +1350,7 @@ export function App({
                         .finally(() => release("preview"));
                     }}
                   >
-                    <h2 id="onboarding-title">Start a crew or join one?</h2>
+                    <h2 id="onboarding-title">Start a Group or join one?</h2>
                     <fieldset className="crew-choice" aria-label="Crew choice">
                       <button
                         className="target-button"
@@ -1358,7 +1358,7 @@ export function App({
                         aria-pressed={crewChoice === "start"}
                         onClick={() => setCrewChoice("start")}
                       >
-                        Start a crew
+                        Start a Group
                       </button>
                       <button
                         className="target-button"
@@ -1371,7 +1371,7 @@ export function App({
                     </fieldset>
                     {crewChoice === "start" ? (
                       <label>
-                        Crew name
+                        Group name
                         <input
                           value={crewName}
                           onChange={(event) => setCrewName(event.target.value)}
@@ -1581,7 +1581,7 @@ export function App({
                   <div
                     className="home-skeleton"
                     role="status"
-                    aria-label="Loading your crew"
+                    aria-label="Loading your Group"
                   >
                     <span className="skeleton skeleton-line" />
                     <span className="skeleton skeleton-row" />
@@ -1593,7 +1593,7 @@ export function App({
                     `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
                     <div className="home-load-error">
                       <div>
-                        <h2>Couldn’t load your crew.</h2>
+                        <h2>Couldn’t load your Group.</h2>
                       </div>
                       <button
                         type="button"
@@ -1657,7 +1657,7 @@ export function App({
                             rename(name);
                             optimistic(
                               "rename",
-                              "Crew renamed.",
+                              "Group renamed.",
                               () => renameGroup(apiBaseUrl, token(), name),
                               () => {
                                 rename(previous);
@@ -1667,7 +1667,7 @@ export function App({
                           }}
                         >
                           <label>
-                            Crew name
+                            Group name
                             <input
                               value={crewNameDraft}
                               onChange={(event) =>
@@ -2078,7 +2078,7 @@ export function App({
             )}
           </Page>
         ) : route === "/account" ? (
-          <Page title="You" lead="Your account and crew settings.">
+          <Page title="Account" lead="Your account and Group settings.">
             <div className="account-page">
               {deletionStep === "idle" && <Result notice={notice} />}
               <section className="account-identity" aria-label="Your identity">
@@ -2188,7 +2188,7 @@ export function App({
               groupScope.current ===
                 `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` ? (
                 <div className="account-load-error" role="alert">
-                  <span>Couldn’t load your crew.</span>
+                  <span>Couldn’t load your Group.</span>
                   <button
                     className="secondary-button"
                     type="button"
@@ -2219,7 +2219,7 @@ export function App({
                     href="/group"
                     onClick={(event) => navigate(event, "/group")}
                   >
-                    <span>Crew</span>
+                    <span>Group</span>
                     <span>
                       {groupLoad === "ready" &&
                       groupScope.current ===
@@ -2407,12 +2407,12 @@ export function App({
                     <h2 tabIndex={-1}>What deleting does</h2>
                     <ul>
                       <li>
-                        You leave {groupRoster?.groupName ?? "your crew"} right
+                        You leave {groupRoster?.groupName ?? "your Group"} right
                         away.
                       </li>
                       <li>You can’t sign in again with this account.</li>
                       <li>
-                        Your finished weeks stay in the crew’s history as
+                        Your finished weeks stay in the Group’s history as
                         “Former member”.
                       </li>
                       <li>This can’t be undone.</li>
