@@ -77,6 +77,8 @@ export function ProofClip({
   const recorder = useRef<MediaRecorder | null>(null);
   const issued = useRef(0);
   const [cameraReady, setCameraReady] = useState(false);
+  // Front camera by default; the member can switch before recording.
+  const [facing, setFacing] = useState<"user" | "environment">("user");
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -134,10 +136,14 @@ export function ProofClip({
     );
     const open = (video: MediaTrackConstraints, audio = true) =>
       media.getUserMedia({ video, audio });
-    open({ width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" })
+    open({
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      facingMode: facing,
+    })
       // Some Android cameras reject the sized request, and a blocked or busy
       // microphone fails the whole request; fall back to camera only.
-      .catch(() => open({ facingMode: "user" }, false))
+      .catch(() => open({ facingMode: facing }, false))
       .then((granted) => {
         window.clearTimeout(stalled);
         if (!live) {
@@ -169,7 +175,7 @@ export function ProofClip({
       for (const track of stream.current?.getTracks() ?? []) track.stop();
       stream.current = null;
     };
-  }, []);
+  }, [facing]);
 
   // A code left on screen too long is swapped for a fresh one before recording starts.
   useEffect(() => {
@@ -362,18 +368,33 @@ export function ProofClip({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              disabled={!cameraReady || !challenge}
-              aria-busy={!cameraReady || !challenge}
-              onClick={start}
-            >
-              {!cameraReady
-                ? "Opening camera…"
-                : challenge
-                  ? "Start recording"
-                  : "Getting code…"}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={!cameraReady || !challenge}
+                aria-busy={!cameraReady || !challenge}
+                onClick={start}
+              >
+                {!cameraReady
+                  ? "Opening camera…"
+                  : challenge
+                    ? "Start recording"
+                    : "Getting code…"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!cameraReady}
+                onClick={() => {
+                  setCameraReady(false);
+                  setFacing((current) =>
+                    current === "user" ? "environment" : "user",
+                  );
+                }}
+              >
+                {facing === "user" ? "Use back camera" : "Use front camera"}
+              </button>
+            </>
           )}
         </div>
         {notice}

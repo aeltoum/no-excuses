@@ -86,7 +86,8 @@ function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   if (seconds === 0)
     return <h1 className="week-countdown-title is-close">Week closing</h1>;
   const pad = (value: number) => String(value).padStart(2, "0");
-  const text = `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
+  // Days:hours:minutes:seconds.
+  const text = `${Math.floor(seconds / 86_400)}:${pad(Math.floor((seconds % 86_400) / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
   return (
     <h1
       className={`week-countdown-title${seconds < 86_400 ? " is-close" : ""}`}

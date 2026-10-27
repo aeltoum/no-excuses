@@ -1,5 +1,8 @@
 import type { CardUnlock, CrownCategory, SeasonState } from "./extras";
 
+// Crowns and Season standings are paused until the feature is revised.
+export const crownsEnabled = false;
+
 const categoryName: Record<CrownCategory, string> = {
   load_progression: "Load Progression",
   cardio_leap: "Cardio Leap",
@@ -13,7 +16,7 @@ export function SeasonChip({
   season: SeasonState | null;
   onOpen: (event: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  if (!season?.season) return null;
+  if (!crownsEnabled || !season?.season) return null;
   const me = season.standings.find((row) => row.mine);
   const top = season.standings[0];
   const leaders = season.standings.filter(
@@ -38,7 +41,7 @@ export function SeasonChip({
 
 // History: standings, last week's Crowns, and past champions.
 export function SeasonCard({ season }: { season: SeasonState | null }) {
-  if (!season?.season) return null;
+  if (!crownsEnabled || !season?.season) return null;
   const categories: CrownCategory[] = ["load_progression", "cardio_leap"];
   return (
     <section className="season-card" aria-labelledby="season-heading">

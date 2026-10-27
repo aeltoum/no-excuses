@@ -451,6 +451,22 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(recorder.locator('input[type="file"]')).toHaveCount(0);
   await expect(recorder.getByText("042")).toBeVisible();
   await expect(recorder.getByText("Hold up 3 fingers")).toBeVisible();
+  // The member picks the camera: front by default, back on request.
+  const facing = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            capture: { constraints: { video: { facingMode: string } } };
+          }
+        ).capture.constraints.video.facingMode,
+    );
+  expect(await facing()).toBe("user");
+  await recorder.getByRole("button", { name: "Use back camera" }).click();
+  await expect(
+    recorder.getByRole("button", { name: "Use front camera" }),
+  ).toBeEnabled();
+  expect(await facing()).toBe("environment");
   timings.recordingFeedback = await msUntilVisible(
     page,
     () => recorder.getByRole("button", { name: "Start recording" }).click(),
@@ -465,7 +481,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
       video: {
         width: { ideal: 1280 },
         height: { ideal: 720 },
-        facingMode: "user",
+        facingMode: "environment",
       },
       audio: true,
     },

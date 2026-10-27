@@ -62,7 +62,7 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
   // The countdown is the Home title, in hours:minutes:seconds, ticking.
   const title = page.getByRole("heading", {
     level: 1,
-    name: /^Week ends in 51:0[01]:\d\d$/,
+    name: /^Week ends in 2:03:0[01]:\d\d$/,
   });
   await expect(title).toBeVisible();
   const first = await title.textContent();

@@ -37,7 +37,7 @@ const season = {
   champions: [{ season: 1, names: ["Akrum", "Maya"], crowns: 3 }],
 };
 
-test("Home shows the Season line and History the standings and Crowns", async ({
+test("Crowns stay hidden on Home and History while the feature is paused", async ({
   page,
 }) => {
   const { errors } = await signIn(page, ({ path }) =>
@@ -55,25 +55,19 @@ test("Home shows the Season line and History the standings and Crowns", async ({
         })
       : undefined,
   );
-  const chip = page.getByRole("link", { name: /Season 2 · Week 3\/4/ });
-  await expect(chip).toContainText("You 1 👑 · Maya leads");
   await expect(
     page.getByText(/2-week streak: you added “1 mile time trial”/),
   ).toBeVisible();
-  await chip.click();
+  await expect(page.getByRole("link", { name: /Season 2/ })).toHaveCount(0);
+  await expect(page.getByText(/👑|Crown/)).toHaveCount(0);
+  await page.getByRole("link", { name: "History", exact: true }).click();
   await expect(page).toHaveURL(/\/history$/);
-  const standings = page.getByRole("list", { name: "Season standings" });
-  await expect(standings.getByRole("listitem")).toHaveText([
-    "1Maya2 👑Crowns",
-    "2You1 👑Crown",
-  ]);
-  await expect(page.getByText("Load Progression: Maya (+7.5%)")).toBeVisible();
-  await expect(
-    page.getByText(/Cardio Leap: No Crown — needs two members/),
-  ).toBeVisible();
-  await expect(page.getByText("Season 1: Akrum & Maya · 3 👑")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Cards you added to the deck" }),
   ).toContainText("1 mile time trial · 2-week streak");
+  await expect(
+    page.getByRole("list", { name: "Season standings" }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/👑|Crown/)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
