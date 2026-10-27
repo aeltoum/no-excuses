@@ -49,6 +49,8 @@ export function PostText({
   item,
   authorName,
   askComment = 0,
+  askCaption = 0,
+  onCaptioned,
   apiBaseUrl,
   token,
   ensureConduct,
@@ -60,6 +62,9 @@ export function PostText({
   authorName: string;
   // Bumped by the comment icon beside the reactions.
   askComment?: number;
+  // Bumped by the author's post menu.
+  askCaption?: number;
+  onCaptioned?: () => void;
   apiBaseUrl: string;
   token: string;
   ensureConduct: () => Promise<boolean>;
@@ -84,10 +89,6 @@ export function PostText({
   const starters = writing === "caption" ? captionStarters(item) : [];
   const left = captionLimit - draft.length;
   const visible = showAll ? all : all.slice(-3);
-  const canCaption =
-    item.mine &&
-    !shownCaption &&
-    Date.now() - Date.parse(item.submittedAt) < 3_600_000;
   const fail = (error: unknown) =>
     onNotice({
       kind: "error",
@@ -104,6 +105,9 @@ export function PostText({
   useEffect(() => {
     if (askComment > 0) void openRef.current("message");
   }, [askComment]);
+  useEffect(() => {
+    if (askCaption > 0) void openRef.current("caption");
+  }, [askCaption]);
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const text = draft.trim();
@@ -113,6 +117,7 @@ export function PostText({
     // Optimistic: the text shows at once; a failure removes it again.
     if (writing === "caption") {
       setLocalCaption(text);
+      onCaptioned?.();
       setCaption(apiBaseUrl, token, item.workoutCheckinId, text).catch(
         (error) => {
           setLocalCaption(null);
@@ -269,15 +274,6 @@ export function PostText({
         </form>
       ) : (
         <div className="post-text-actions">
-          {canCaption && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => void open("caption")}
-            >
-              Add caption
-            </button>
-          )}
           {onReportPhotos && (
             <button
               type="button"

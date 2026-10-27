@@ -78,7 +78,9 @@ test("messages need the conduct rules once, then send instantly; reports hide at
 
   // Own fresh post takes a caption without asking again.
   const mine = page.locator(".proof-post").nth(1);
-  await mine.getByRole("button", { name: "Add caption" }).click();
+  // Caption lives in the author's post menu.
+  await mine.getByRole("button", { name: "Post options" }).click();
+  await mine.getByRole("menuitem", { name: "Add caption" }).click();
   await expect(rules).toHaveCount(0);
   await mine.getByRole("button", { name: "New PR" }).click();
   await expect(mine.getByRole("textbox", { name: "Caption" })).toHaveValue(

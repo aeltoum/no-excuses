@@ -149,6 +149,27 @@ export function ProofFeed({
   const avatars = useAvatars();
   // The comment icon asks that post's text block to open its composer.
   const [commenting, setCommenting] = useState({ id: "", count: 0 });
+  // Own-post menu: which post's menu is open, and which caption composer to open.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [captioning, setCaptioning] = useState({ id: "", count: 0 });
+  const [captioned, setCaptioned] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = (event: Event) => {
+      if (
+        event instanceof KeyboardEvent
+          ? event.key === "Escape"
+          : !(event.target as Element).closest?.(".post-menu")
+      )
+        setMenuFor(null);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [menuFor]);
   const [confirmSheet, ask] = useConfirm();
   const [conductSheet, ensureConduct] = useConduct(apiBaseUrl, token);
   const confirmReport = useCallback(
@@ -427,6 +448,105 @@ export function ProofFeed({
     days.set(key, [...(days.get(key) ?? []), item]);
   }
 
+  // Own posts only: caption and delete live in a menu at the post's top right.
+  const ownMenu = (item: ProofItem, disabled: boolean) => {
+    const id = item.workoutCheckinId;
+    const canCaption =
+      !item.hidden &&
+      !item.caption &&
+      !captioned.has(id) &&
+      Date.now() - Date.parse(item.submittedAt) < 3_600_000;
+    const canRemovePhotos = !item.canDelete && item.reviewStatus === "verified";
+    if (!canCaption && !item.canDelete && !canRemovePhotos) return null;
+    const open = menuFor === id;
+    return (
+      <span className="post-menu">
+        <button
+          type="button"
+          className="post-menu-button"
+          aria-label="Post options"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => setMenuFor(open ? null : id)}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="19" cy="12" r="2" />
+          </svg>
+        </button>
+        {open && (
+          <span className="post-menu-list" role="menu">
+            {canCaption && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuFor(null);
+                  setCaptioning((current) => ({
+                    id,
+                    count: current.count + 1,
+                  }));
+                }}
+              >
+                Add caption
+              </button>
+            )}
+            {item.canDelete && (
+              <button
+                type="button"
+                role="menuitem"
+                className="danger-text"
+                onClick={async () => {
+                  setMenuFor(null);
+                  if (
+                    await ask({
+                      title: "Delete this post?",
+                      body: "It stops counting toward this week and its photos are deleted. You can log a new workout right after.",
+                      confirm: "Delete post",
+                      tone: "danger",
+                    })
+                  )
+                    void remove(item);
+                }}
+              >
+                Delete post
+              </button>
+            )}
+            {canRemovePhotos && (
+              <button
+                type="button"
+                role="menuitem"
+                className="danger-text"
+                onClick={async () => {
+                  setMenuFor(null);
+                  if (
+                    await ask({
+                      title: "Remove these photos?",
+                      body: "The photos are deleted for everyone. The workout stays verified, so your week doesn’t change.",
+                      confirm: "Remove photos",
+                      tone: "danger",
+                    })
+                  )
+                    void takeDown(item);
+                }}
+              >
+                Remove photos
+              </button>
+            )}
+          </span>
+        )}
+      </span>
+    );
+  };
+
   const post = (item: ProofItem) => {
     const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
@@ -511,6 +631,7 @@ export function ProofFeed({
                   ? "Questioned"
                   : "Verified ✓"}
           </span>
+          {item.mine && ownMenu(item, disabled)}
         </header>
         <div className="proof-frame">
           {photo(
@@ -660,6 +781,14 @@ export function ProofFeed({
           <PostText
             item={item}
             authorName={who}
+            askCaption={
+              captioning.id === item.workoutCheckinId ? captioning.count : 0
+            }
+            onCaptioned={() =>
+              setCaptioned(
+                (current) => new Set([...current, item.workoutCheckinId]),
+              )
+            }
             askComment={
               commenting.id === item.workoutCheckinId ? commenting.count : 0
             }
@@ -719,45 +848,10 @@ export function ProofFeed({
             </button>
           </div>
         )}
-        {item.mine && item.canDelete && (
-          <button
-            type="button"
-            className="proof-report"
-            disabled={disabled}
-            onClick={async () => {
-              if (
-                await ask({
-                  title: "Delete this post?",
-                  body: "It stops counting toward this week and its photos are deleted. You can log a new workout right after.",
-                  confirm: "Delete post",
-                  tone: "danger",
-                })
-              )
-                void remove(item);
-            }}
-          >
-            {disabled ? "Deleting…" : "Delete post"}
-          </button>
-        )}
-        {item.mine && !item.canDelete && item.reviewStatus === "verified" && (
-          <button
-            type="button"
-            className="proof-report"
-            disabled={disabled}
-            onClick={async () => {
-              if (
-                await ask({
-                  title: "Remove these photos?",
-                  body: "The photos are deleted for everyone. The workout stays verified, so your week doesn’t change.",
-                  confirm: "Remove photos",
-                  tone: "danger",
-                })
-              )
-                void takeDown(item);
-            }}
-          >
-            {disabled ? "Removing…" : "Remove photos"}
-          </button>
+        {item.mine && disabled && (
+          <p className="proof-tally" role="status">
+            {item.canDelete ? "Deleting…" : "Removing…"}
+          </p>
         )}
       </li>
     );

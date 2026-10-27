@@ -80,18 +80,19 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
   });
 
   await delayRoute(page, "**/v1/proof/*/delete", 1000);
-  await page.getByRole("button", { name: "Delete post" }).click();
+  await page.getByRole("button", { name: "Post options" }).first().click();
+  await page.getByRole("menuitem", { name: "Delete post" }).click();
   const dialog = page.getByRole("dialog", { name: "Delete this post?" });
   // Destructive: the acting control alone waits, and shows it at once.
   const pending = await msUntilVisible(
     page,
     () => dialog.getByRole("button", { name: "Delete post" }).click(),
-    page.getByRole("button", { name: "Deleting…" }),
+    page.getByText("Deleting…"),
   );
   expect(pending).toBeLessThanOrEqual(100);
   await expect(page.getByText("1 of 3 this week")).toBeVisible();
   await expect(page.getByText(/Post deleted/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Delete post" })).toHaveCount(
+  await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
     0,
   );
   expect(errors).toEqual([]);
@@ -128,17 +129,21 @@ test("after its week, a verified post's photos come down and the count stays", a
       return { workoutCheckinId: "70000000-0000-4000-8000-000000000001" };
   });
   await expect(page.getByText("1 of 3 this week")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Delete post" })).toHaveCount(
+  await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
     0,
   );
   await delayRoute(page, "**/v1/proof/*/remove-photos", 1000);
-  await page.getByRole("button", { name: "Remove photos" }).click();
+  await page.getByRole("button", { name: "Post options" }).first().click();
+  await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("menuitem", { name: "Remove photos" }).click();
   const dialog = page.getByRole("dialog", { name: "Remove these photos?" });
   await expect(dialog).toContainText("your week doesn’t change");
   const pending = await msUntilVisible(
     page,
     () => dialog.getByRole("button", { name: "Remove photos" }).click(),
-    page.getByRole("button", { name: "Removing…" }),
+    page.getByText("Removing…"),
   );
   expect(pending).toBeLessThanOrEqual(100);
   await expect(

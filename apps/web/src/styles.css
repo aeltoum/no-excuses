@@ -4594,6 +4594,7 @@ h1 {
 
 /* Home title: the week's countdown in the screen-title role. */
 .week-countdown-title {
+  font-size: clamp(2rem, 9vw, 2.5rem);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -4603,9 +4604,14 @@ h1 {
 
 /* Feed photos sit inside the column with a visible edge, never cut by the screen. */
 .proof-frame {
-  margin-inline: 0;
+  margin-inline: -12px;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
+}
+@media (min-width: 600px) {
+  .proof-frame {
+    margin-inline: 0;
+  }
 }
 .proof-reactions .proof-comment {
   margin-right: -10px;
@@ -4615,33 +4621,41 @@ h1 {
   justify-self: end;
 }
 
-/* Every member's bar this week, on History. */
+/* Every member's bar this week, on History: one compact row each. */
 .group-bars ul {
-  display: grid;
-  gap: 16px;
   margin: 0 0 32px;
   padding: 0;
   list-style: none;
 }
 .group-bars li {
-  display: grid;
-  gap: 8px;
-  padding-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
   border-bottom: 1px solid var(--rule);
 }
 .group-bars-head {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.group-bars-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .group-bars-head span:last-child {
   margin-left: auto;
   color: var(--muted);
   font-size: var(--type-secondary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .group-bars .barbell-mini {
-  width: 100%;
+  flex: 0 0 auto;
+  width: 140px;
   height: auto;
 }
 
@@ -4656,4 +4670,51 @@ h1 {
   color: #fff;
   font-weight: 700;
   text-decoration: none;
+}
+
+/* Own-post menu: top right of the post, after the status. */
+.proof-post > header .post-menu {
+  position: relative;
+  flex: none;
+}
+.post-menu-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  min-height: 48px;
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+.post-menu-list {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-group);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 50%);
+}
+.post-menu-list button {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+}
+.post-menu-list button.danger-text {
+  color: #ff6b6f;
+}
+.post-menu-list button:hover,
+.post-menu-list button:focus-visible {
+  background: var(--surface);
 }

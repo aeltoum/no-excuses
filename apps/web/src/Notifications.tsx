@@ -254,27 +254,30 @@ export function NotificationBell({
               </p>
             )}
             <ul className="notification-list">
-              {center.items.map((item) => (
-                <li
-                  key={item.id}
-                  className={item.unread ? "unread" : undefined}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const target = notificationTarget(item);
-                      // Opening one counts as viewing it.
-                      markViewed((entry) => entry.id === item.id);
-                      setOpen(false);
-                      onOpenItem(target);
-                    }}
+              {/* Crown notifications are paused with the Crowns feature. */}
+              {center.items
+                .filter((item) => item.kind !== "crown")
+                .map((item) => (
+                  <li
+                    key={item.id}
+                    className={item.unread ? "unread" : undefined}
                   >
-                    <strong>{item.title}</strong>
-                    <span>{item.body}</span>
-                    <time dateTime={item.at}>{ago(item.at)}</time>
-                  </button>
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = notificationTarget(item);
+                        // Opening one counts as viewing it.
+                        markViewed((entry) => entry.id === item.id);
+                        setOpen(false);
+                        onOpenItem(target);
+                      }}
+                    >
+                      <strong>{item.title}</strong>
+                      <span>{item.body}</span>
+                      <time dateTime={item.at}>{ago(item.at)}</time>
+                    </button>
+                  </li>
+                ))}
             </ul>
           </>
         )}
