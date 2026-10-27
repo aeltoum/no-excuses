@@ -189,7 +189,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText([
-    "MAMaya2/3 · review 🔥11-week streak · 3 workouts since last missNudge",
+    "MAMaya2 of 3 workoutsNeeds your reviewNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
@@ -220,11 +220,11 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   // Both posts carry a light box: the pending review first, then the vote.
   await expect(page.getByRole("group", { name: "Review" })).toHaveCount(1);
   await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(1);
-  await page.getByRole("button", { name: "Good lift" }).first().click();
+  await page.getByRole("button", { name: "Verify workout" }).first().click();
   // The choice disappears on tap, before the API answers.
   await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
   // Outcome shows at once, while the API is still answering.
-  await expect(page.getByRole("status")).toHaveText("Good lift. Verified.");
+  await expect(page.getByRole("status")).toHaveText("Workout verified.");
   await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
   answerReview();
   // A made choice takes its buttons with it.
@@ -232,14 +232,16 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   // A failed vote rolls back: the buttons and counts return with an error.
-  await page.getByRole("button", { name: "No lift" }).click();
+  await page.getByRole("button", { name: "Reject workout" }).click();
   await expect(page.getByRole("alert")).toHaveText(
     "Something went wrong. Try again.",
   );
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
-  await page.getByRole("button", { name: "No lift" }).click();
-  await expect(page.getByRole("status")).toHaveText("No lift. Vote saved.");
-  await expect(page.getByRole("button", { name: "No lift" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Reject workout" }).click();
+  await expect(page.getByRole("status")).toHaveText("Vote saved: reject.");
+  await expect(
+    page.getByRole("button", { name: "Reject workout" }),
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Report photos" }).first().click();
   await page

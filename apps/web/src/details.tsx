@@ -233,7 +233,7 @@ export function DetailsFields({
     });
   return (
     <details className="details-fields">
-      <summary>Add details (optional)</summary>
+      <summary>Add workout details</summary>
       <fieldset className="choice-chips details-units" aria-label="Units">
         <button
           type="button"

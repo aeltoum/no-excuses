@@ -198,12 +198,7 @@ select:focus-visible {
   flex: none;
   background: var(--safety);
 }
-main {
-  width: min(100%, 960px);
-  min-width: 0;
-  margin: 0 auto;
-  padding: clamp(40px, 9vw, 96px) 20px;
-}
+
 .hero {
   min-width: 0;
 }
@@ -211,17 +206,7 @@ main {
   margin: 0 0 16px;
   color: var(--safety);
 }
-h1 {
-  max-width: 12ch;
-  margin: 0;
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: clamp(3rem, 12vw, 8rem);
-  font-weight: 900;
-  letter-spacing: 0.005em;
-  line-height: 0.92;
-  text-transform: uppercase;
-  overflow-wrap: anywhere;
-}
+
 .lead {
   max-width: 42rem;
   margin: 24px 0 32px;
@@ -767,13 +752,7 @@ button:disabled {
   gap: 16px;
   margin-bottom: 18px;
 }
-.home-header h1 {
-  font-size: clamp(2.75rem, 11vw, 4rem);
-  font-weight: 800;
-  line-height: 0.95;
-  text-transform: none;
-  overflow-wrap: normal;
-}
+
 .home-header span {
   color: var(--muted);
   font-size: 0.875rem;
@@ -1196,33 +1175,7 @@ button:disabled {
   padding: 0;
   border: 0;
 }
-.member-nav {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  position: sticky;
-  bottom: 0;
-  background: var(--ground);
-  border-top: 1px solid var(--rule);
-}
-.member-nav a {
-  position: relative;
-  min-width: 0;
-  min-height: 64px;
-  display: grid;
-  grid-template-rows: 24px auto;
-  place-items: center;
-  gap: 3px;
-  padding: 8px 4px;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-  text-align: center;
-  text-decoration: none;
-  overflow-wrap: normal;
-  word-break: keep-all;
-}
+
 .member-nav a > span {
   max-width: 100%;
   overflow: hidden;
@@ -1247,9 +1200,6 @@ button:disabled {
 @media (max-width: 420px) {
   .form-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .member-nav a {
-    font-size: 0.62rem;
   }
   .sign-in-doors div,
   .sign-in-secondary-actions {
@@ -1548,60 +1498,7 @@ button:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
-.friend-cards {
-  display: flex;
-  gap: 10px;
-  margin: 22px -20px 0;
-  padding: 2px 20px 6px;
-  overflow-x: auto;
-  list-style: none;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-}
-.friend-cards::-webkit-scrollbar {
-  display: none;
-}
-.friend-cards li {
-  flex: 0 0 132px;
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  background: var(--surface);
-  scroll-snap-align: start;
-}
-.friend-cards li.awaiting-review {
-  border-color: var(--activity-class);
-}
-.friend-card-name {
-  overflow: hidden;
-  font-size: 0.875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.friend-cards .barbell-mini {
-  width: 100%;
-  height: auto;
-}
-.friend-cards li > span {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
-}
-.home-log-button {
-  position: fixed;
-  z-index: 7;
-  right: max(16px, calc(50% - 300px));
-  bottom: calc(80px + env(safe-area-inset-bottom));
-  width: auto;
-  min-height: 56px;
-  margin: 0;
-  padding: 0 22px;
-  border-radius: 28px;
-  font-size: 1rem;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
-}
+
 /* Writing on a post: the button would cover the form's own actions. */
 body:has(.caption-compose, .post-compose) .home-log-button {
   display: none;
@@ -2268,18 +2165,6 @@ body {
   height: 28px;
 }
 
-/* Page hierarchy: the approved 46px screen title, a measured lead. */
-main {
-  padding-block: clamp(28px, 6vw, 64px) 40px;
-}
-h1 {
-  max-width: 14ch;
-  font-size: clamp(2.5rem, 11vw, 3.5rem);
-  font-weight: 800;
-  line-height: 0.95;
-  letter-spacing: 0.01em;
-  overflow-wrap: break-word;
-}
 .lead {
   max-width: 38ch;
   margin: 12px 0 28px;
@@ -2467,16 +2352,6 @@ body:has(.home-log-button) .result.event-notice {
   text-transform: none;
 }
 
-/* Tab bar: legible labels at compact widths. */
-.member-nav a {
-  font-size: 0.75rem;
-  transition: color 160ms ease;
-}
-@media (max-width: 420px) {
-  .member-nav a {
-    font-size: 0.6875rem;
-  }
-}
 @media (max-width: 240px) {
   h1 {
     font-size: 2.25rem;
@@ -3463,9 +3338,8 @@ fieldset.session-pick {
 .account-section {
   margin: 24px 0 0;
   color: var(--muted);
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 /* App shell: no sideways panning and no stray text selection on a phone.
@@ -3484,9 +3358,16 @@ body {
   overscroll-behavior-x: none;
 }
 body {
+  -webkit-touch-callout: none;
+}
+/* Only control chrome and drag handles resist selection; text stays copyable. */
+button,
+nav,
+[role="tab"],
+.sheet-drag,
+.home-log-button {
   -webkit-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;
 }
 input,
 textarea,
@@ -3717,9 +3598,7 @@ svg {
   align-items: center;
   margin-bottom: 12px;
 }
-.home-header h1 {
-  font-size: clamp(2.25rem, 9vw, 3rem);
-}
+
 .week-countdown {
   display: inline-flex;
   align-items: baseline;
@@ -3770,31 +3649,6 @@ svg {
   font-size: 0.8125rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-}
-
-/* Friends: a stories-style strip; each card keeps its own inner padding. */
-.friend-cards {
-  margin-top: 16px;
-}
-.friend-cards li {
-  flex-basis: 120px;
-  justify-items: center;
-  gap: 4px;
-  padding: 12px 12px 10px;
-  text-align: center;
-}
-.friend-cards li .barbell-mini {
-  width: calc(100% - 4px);
-  margin: 2px auto;
-}
-.friend-cards .friend-card-name {
-  max-width: 100%;
-}
-.friend-cards .friend-nudge {
-  width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
-  font-size: 0.75rem;
 }
 
 /* Profile photos */
@@ -4249,9 +4103,7 @@ svg {
 .home-header {
   align-items: center;
 }
-.home-header h1 {
-  margin-right: auto;
-}
+
 .week-tools-button {
   flex: none;
   width: 44px;
@@ -4307,56 +4159,6 @@ svg {
   font-size: 0.875rem;
 }
 
-/* Friends: slim chips so the feed starts sooner. The strip keeps the page gutter
-   on both ends while scrolling edge to edge. */
-.friend-cards {
-  display: flex;
-  gap: 8px;
-  margin: 18px -20px 0;
-  padding: 2px 20px 4px;
-  scroll-padding-inline: 20px;
-}
-.friend-cards li {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: min(260px, calc(100vw - 40px));
-  min-width: 0;
-  padding: 8px;
-  border-radius: 999px;
-  text-align: left;
-}
-.friend-card-body {
-  display: grid;
-  flex: 1 1 auto;
-  min-width: 0;
-  line-height: 1.2;
-}
-.friend-cards .friend-card-name {
-  font-size: 0.875rem;
-}
-.friend-card-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.friend-cards li .barbell-mini {
-  width: 40px;
-  margin: 0;
-}
-.friend-cards .friend-nudge {
-  width: auto;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 16px;
-  font-size: 0.75rem;
-}
-
 /* Log sheet: four activity plates fill the row now that Mixed is gone. */
 .activity-plates {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4406,4 +4208,386 @@ svg {
 }
 .duration-track button[aria-pressed="true"] small {
   color: var(--rubber);
+}
+
+/* Target is a Home subpage: explicit way back. */
+.back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  margin-bottom: 0.25rem;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Errors stay until dismissed, so their dismiss control takes pointer input. */
+.result.event-notice.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  /* Persistent, so it sits under any sheet opened later instead of blocking it. */
+  z-index: 15;
+}
+.result-dismiss {
+  flex: none;
+  width: 48px;
+  min-height: 48px;
+  margin: -12px -12px -12px auto;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+/* Glyph in CSS keeps the alert's text the message alone. */
+.result-dismiss::before {
+  content: "×";
+}
+
+/* 48px touch floor: compact icons keep their look, hit boxes grow. */
+.post-more,
+.profile-photo-remove {
+  min-height: 48px;
+  min-width: 48px;
+}
+.sheet-header .sheet-close,
+.week-tools-button {
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+}
+
+/* Proof that has not loaded is named, never silently blank. */
+.proof-frame img.is-failed {
+  visibility: hidden;
+}
+.proof-photo-note {
+  position: absolute;
+  inset: auto 12px 48px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+.proof-photo-retry {
+  min-height: 48px;
+  margin-left: auto;
+  padding: 0 16px;
+}
+.proof-decide-hint {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.proof-capture-rule {
+  margin: 0 0 12px;
+}
+.proof-decide {
+  flex-wrap: wrap;
+}
+.proof-decide-hint {
+  padding: 0 12px 12px;
+}
+/* Two-word decision labels stay on one line at 320px. */
+.proof-decide button {
+  white-space: nowrap;
+  font-size: 0.9375rem;
+}
+
+/* Member rows: names wrap; actions live in the member sheet. */
+.group-roster .group-member-copy strong {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.row-more {
+  min-width: 48px;
+  min-height: 48px;
+}
+.member-actions {
+  display: grid;
+  gap: 12px;
+}
+.member-actions .row-action {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* Provisional workouts: qualified, never shown as settled. */
+.own-progress .home-settle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* One task summary above progress details. */
+.needs-you {
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--safety);
+  border-radius: 12px;
+}
+.needs-you h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.needs-you ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.needs-you a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.needs-you a + a,
+.needs-you li + li a {
+  border-top: 1px solid var(--rule);
+}
+.needs-you strong {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--safety);
+  color: var(--ground);
+  text-align: center;
+}
+.needs-anchor {
+  scroll-margin-top: 80px;
+}
+#needs-review {
+  scroll-margin-top: 80px;
+}
+
+/* Log sheet: submission stays reachable while the form scrolls. */
+.log-sheet-footer {
+  position: sticky;
+  /* Sits over the sheet's bottom padding so nothing scrolls beneath it. */
+  bottom: calc(-20px - env(safe-area-inset-bottom));
+  margin-bottom: calc(-20px - env(safe-area-inset-bottom));
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin-inline: -20px;
+  padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+}
+.log-sheet-footer .sheet-hint {
+  margin: 0;
+}
+.log-discard {
+  justify-self: center;
+  min-height: 48px;
+}
+
+/* ------------------------------------------------------------------
+   Authoritative layer. Shared tokens and the single definition of each
+   component reworked in the UI audit; earlier duplicate blocks are gone.
+   ------------------------------------------------------------------ */
+:root {
+  /* Spacing: 4px base. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --gutter: 20px;
+  /* Radius by role, not one radius everywhere. */
+  --radius-control: 6px;
+  --radius-group: 8px;
+  --radius-sheet: 16px;
+  --radius-pill: 999px;
+  /* Touch floor. */
+  --control-min: 48px;
+  /* Type roles. */
+  --type-screen: clamp(2.5rem, 11vw, 2.875rem);
+  --type-sheet: 2rem;
+  --type-body: 1rem;
+  --type-secondary: 0.875rem;
+  --type-meta: 0.75rem;
+  /* Member content column: feed, progress, header and Log action share it. */
+  --content-width: 600px;
+  --nav-height: 72px;
+}
+
+main {
+  width: min(100%, calc(var(--content-width) + 2 * var(--gutter)));
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(28px, 6vw, 64px) var(--gutter) 40px;
+}
+/* Signed-out and console screens keep the wider reading area. */
+body:not(:has(.member-nav)) main,
+body:has(.operator-console) main {
+  width: min(100%, 960px);
+}
+/* Room under the last post for the Log action and the tab bar. */
+body:has(.home-log-button) main {
+  padding-bottom: calc(var(--nav-height) + 96px);
+}
+
+/* Screen titles: one role, sentence case, on every screen. */
+h1 {
+  max-width: 14ch;
+  margin: 0;
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: var(--type-screen);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+.home-header h1 {
+  margin-right: auto;
+}
+
+/* Tab bar: content aligned to the member column; labels never under 12px. */
+.member-nav {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  position: sticky;
+  bottom: 0;
+  padding-inline: max(0px, calc((100% - var(--content-width)) / 2));
+  background: var(--ground);
+  border-top: 1px solid var(--rule);
+}
+.member-nav a {
+  position: relative;
+  min-width: 0;
+  min-height: 64px;
+  display: grid;
+  grid-template-rows: 24px auto;
+  place-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: var(--type-meta);
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  transition: color 160ms ease;
+}
+
+/* Log workout: anchored to the member column's right edge, above the tab bar. */
+.home-log-button {
+  position: fixed;
+  z-index: 7;
+  right: max(16px, calc((100% - var(--content-width)) / 2));
+  bottom: calc(var(--nav-height) + 8px + env(safe-area-inset-bottom));
+  width: auto;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 22px;
+  border-radius: 28px;
+  font-size: var(--type-body);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+}
+
+/* Friends strip: name and count first, at most one urgent status. The right
+   edge fades so more friends read as reachable sideways. */
+.friend-cards {
+  display: flex;
+  gap: var(--space-2);
+  margin: 18px calc(-1 * var(--gutter)) 0;
+  padding: 2px var(--gutter) 4px;
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.friend-cards::-webkit-scrollbar {
+  display: none;
+}
+.friend-cards li {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(280px, calc(100vw - 2 * var(--gutter)));
+  min-width: 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+  scroll-snap-align: start;
+}
+.friend-cards li.awaiting-review {
+  border-color: var(--activity-class);
+}
+.friend-card-body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.25;
+}
+.friend-card-name {
+  overflow: hidden;
+  font-size: var(--type-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-card-count {
+  font-size: var(--type-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.friend-card-status {
+  color: var(--muted);
+  font-size: var(--type-meta);
+}
+.friend-cards .friend-nudge {
+  width: auto;
+  min-height: var(--control-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--type-secondary);
+}
+
+/* Compact and landscape adjustments to the layer above. */
+@media (max-width: 240px) {
+  main {
+    padding-inline: 12px;
+  }
+  h1 {
+    font-size: 2.25rem;
+  }
+  .member-nav {
+    position: static;
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  main {
+    padding-top: 32px;
+  }
+}
+/* The indicator follows the column-aligned tabs. */
+.member-nav .tab-indicator {
+  left: max(0px, calc((100% - var(--content-width)) / 2));
+  width: calc(min(100%, var(--content-width)) / 4);
+}
+.home-header h1 {
+  white-space: nowrap;
 }

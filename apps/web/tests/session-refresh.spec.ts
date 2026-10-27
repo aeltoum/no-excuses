@@ -118,43 +118,57 @@ test("expired access token with valid refresh credential restores signed-in API 
   for (const [index, digit] of [..."123456"].entries())
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(16000);
   expired = true;
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   expect(requests).toContain("refresh");
   expect(requests).toContain("api:Bearer fresh-access");
   requests.length = 0;
   await page.reload();
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await expect.poll(() => requests).toContain("api:Bearer fresh-access");
   liveUnavailable = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   // Transient outage keeps a signed-in member in the app.
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Access unavailable" }),
   ).toHaveCount(0);
   liveUnavailable = false;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   liveOffline = true;
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   // Transient outage keeps a signed-in member in the app.
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Access unavailable" }),
   ).toHaveCount(0);
   liveOffline = false;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   requests.length = 0;
   await page.clock.fastForward(7 * 24 * 60 * 60 * 1000);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(() => requests).toContain("refresh");
   await expect.poll(() => requests).toContain("api:Bearer fresh-access");
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
 
   rosterUnauthorized = true;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -164,7 +178,9 @@ test("expired access token with valid refresh credential restores signed-in API 
   expect(unauthorizedRosterRequests).toBe(2);
   rosterUnauthorized = false;
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("verdict.png"),
@@ -271,7 +287,9 @@ for (const outageStatus of [503, 429]) {
     for (const [index, digit] of [..."123456"].entries())
       await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
     await page.getByRole("button", { name: "Verify code" }).click();
-    await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Group", exact: true }),
+    ).toBeVisible();
     await page.clock.fastForward(121000);
     expired = true;
     apiTokens.length = 0;
@@ -297,7 +315,9 @@ for (const outageStatus of [503, 429]) {
     );
     await page.clock.resume();
     await page.getByRole("button", { name: "Try again" }).click();
-    await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Group", exact: true }),
+    ).toBeVisible();
     expect(apiTokens).toContain("Bearer recovered-access");
     await page.screenshot({
       fullPage: true,
@@ -427,16 +447,20 @@ test("expired live user check refreshes valid session instead of requiring sign-
   for (const [index, digit] of [..."123456"].entries())
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(16000);
   expired = true;
-  await page.getByRole("link", { name: "Group" }).click();
+  await page.getByRole("link", { name: "Group", exact: true }).click();
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   expect(requests).toContain("refresh");
   expect(requests).toContain("api:Bearer fresh-access");
   requests.length = 0;
   await page.reload();
-  await expect(page.getByRole("link", { name: "Group" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group", exact: true }),
+  ).toBeVisible();
   await expect.poll(() => requests).toContain("api:Bearer fresh-access");
   await page.screenshot({
     fullPage: true,

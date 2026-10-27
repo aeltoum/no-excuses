@@ -67,11 +67,11 @@ test("returning to the app shows friends' new progress and posts without a reloa
         : undefined,
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends).toContainText("2/3");
+  await expect(friends).toContainText("2 of 3 workouts");
   maya = 3;
   feed = [post()];
   await leaveAndReturn(page);
-  await expect(friends).toContainText("3/3");
+  await expect(friends).toContainText("3 of 3 workouts");
   await expect(page.getByAltText("Maya's workout activity")).toBeVisible();
   // No loading state replaces what was already on screen.
   await expect(page.getByRole("status", { name: /Loading/ })).toHaveCount(0);
@@ -88,10 +88,10 @@ test("an open Home picks up friends' activity on its own", async ({
     path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends).toContainText("2/3");
+  await expect(friends).toContainText("2 of 3 workouts");
   maya = 3;
   await page.clock.runFor(60_000);
-  await expect(friends).toContainText("3/3");
+  await expect(friends).toContainText("3 of 3 workouts");
   await page.screenshot({ path: info.outputPath("poll.png") });
 });
 
@@ -109,7 +109,7 @@ test("a token that expired in the background refreshes Home without an access ch
     { expires_at: undefined },
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends).toContainText("2/3");
+  await expect(friends).toContainText("2 of 3 workouts");
   // Auth issues a fresh token on return; the API now rejects the old one.
   let expired = false;
   const rejected: string[] = [];
@@ -159,7 +159,7 @@ test("a token that expired in the background refreshes Home without an access ch
     });
     document.dispatchEvent(new Event("visibilitychange"));
   });
-  await expect(friends).toContainText("3/3");
+  await expect(friends).toContainText("3 of 3 workouts");
   await page.clock.runFor(5_000);
   await expect(friends).toBeVisible();
   expect(

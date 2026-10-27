@@ -57,7 +57,7 @@ test("the bell lists notifications at once and marks them seen", async ({
   const cleared = await msUntilVisible(
     page,
     () => page.getByRole("button", { name: "Clear all" }).click(),
-    page.getByText("Nothing yet. Activity from your crew shows here."),
+    page.getByText("Nothing yet. Activity from your Group shows here."),
   );
   expect(cleared).toBeLessThanOrEqual(100);
   await expect

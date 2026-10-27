@@ -109,7 +109,7 @@ export function UnlockNote({ unlocks }: { unlocks: CardUnlock[] }) {
   return (
     <p className="unlock-note">
       <span aria-hidden="true">🃏</span> {latest.milestone}-week streak: you
-      added “{latest.title}” to your crew’s card deck.
+      added “{latest.title}” to your Group’s card deck.
     </p>
   );
 }

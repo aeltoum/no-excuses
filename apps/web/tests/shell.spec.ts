@@ -44,7 +44,7 @@ test("first launch shows the barbell brand once", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await expect(page.getByRole("status")).toHaveText("Loading your crew");
+  await expect(page.getByRole("status")).toHaveText("Loading your Group");
   await expect(
     page.locator('.launch-screen img[src="/icons/icon.svg"]'),
   ).toBeVisible();
@@ -54,7 +54,7 @@ test("first launch shows the barbell brand once", async ({
   ).toBeVisible();
   await page.getByRole("link", { name: "Continue to sign in" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByText("Loading your crew")).toHaveCount(0);
+  await expect(page.getByText("Loading your Group")).toHaveCount(0);
 });
 
 test("launch motion respects motion preference", async ({ page }) => {

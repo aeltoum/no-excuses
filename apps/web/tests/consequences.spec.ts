@@ -344,9 +344,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText([
-    "MAMaya2/3 · owes 2 🔥11-week streak · 3 workouts since last missNudge",
-  ]);
+  ).toHaveText(["MAMaya2 of 3 workoutsOwes 2 cardsNudge"]);
   await expect(
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
   ).toContainText("1/5");
@@ -359,7 +357,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await logButton.click();
   let lock = page.getByRole("dialog", { name: "Bar’s racked" });
   await expect(lock).toContainText("Pick your card");
-  await expect(page.getByRole("dialog", { name: "Log a workout" })).toHaveCount(
+  await expect(page.getByRole("dialog", { name: "Log workout" })).toHaveCount(
     0,
   );
   await page.waitForTimeout(400);

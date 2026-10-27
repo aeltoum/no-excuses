@@ -13,7 +13,8 @@ import {
   verifyOtp,
   WebAuthError,
 } from "./auth";
-import { ProfilePhoto } from "./avatars";
+import { Avatar, ProfilePhoto, useAvatars } from "./avatars";
+import { useConfirm } from "./Confirm";
 import { useFreshness } from "./freshness";
 import { GroupAdmin, renameGroup, setGroupAdmin } from "./GroupAdmin";
 import {
@@ -197,6 +198,8 @@ export function App({
   const pendingUser = useRef(hint?.userId ?? null);
   const [launching, setLaunching] = useState(!hint);
   const [path, setPath] = useState(currentPath);
+  const pathRef = useRef(path);
+  pathRef.current = path;
   const [access, setAccess] = useState<Access>(hint ? "signed-in" : "checking");
   const [accessRevision, setAccessRevision] = useState(0);
   const lastUnauthorizedToken = useRef<string | null>(null);
@@ -243,6 +246,9 @@ export function App({
   };
   const savedDisplayName = useRef("");
   const [notice, setNotice] = useNotice();
+  const [confirmSheet, ask] = useConfirm();
+  const [managedMemberId, setManagedMemberId] = useState<string | null>(null);
+  const avatars = useAvatars();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLaunching(false), 700);
@@ -427,7 +433,10 @@ export function App({
 
   useEffect(() => {
     const onPopState = () => {
-      setPath(currentPath());
+      // A sheet's own history entry keeps the path; only real moves clear notices.
+      const next = currentPath();
+      if (next === pathRef.current) return;
+      setPath(next);
       setNotice(null);
     };
     window.addEventListener("popstate", onPopState);
@@ -876,6 +885,8 @@ export function App({
   ).includes(path)
     ? (path as Route)
     : null;
+  // Target is a Home subpage: Home stays the selected tab.
+  const tabRoute = route === "/target" ? "/home" : route;
   const currentMemberIsAdmin = Boolean(
     membership &&
       groupRoster?.members.some(
@@ -901,7 +912,7 @@ export function App({
         <div>
           <p className="launch-name">No Excuses</p>
           <p className="launch-status" role="status">
-            Loading your crew
+            Loading your Group
           </p>
         </div>
       </main>
@@ -1167,8 +1178,8 @@ export function App({
                 `${session?.user.id}:${membership.groupId}:${membership.membershipId}`
                 ? `${groupRoster.members.length} members`
                 : membership
-                  ? "Loading your crew."
-                  : "Start a private crew or join one with an invitation code."
+                  ? "Loading your Group."
+                  : "Start a private Group or join one with an invitation code."
             }
           >
             {!membership && (
@@ -1196,7 +1207,7 @@ export function App({
                   {onboardingStep === 1
                     ? "About you"
                     : onboardingStep === 2
-                      ? "Your crew"
+                      ? "Your Group"
                       : "Your target"}
                 </p>
                 {onboardingStep === 1 && (
@@ -1235,9 +1246,9 @@ export function App({
                       });
                     }}
                   >
-                    <h2 id="onboarding-title">Before you join a crew</h2>
+                    <h2 id="onboarding-title">Before you join a Group</h2>
                     <label>
-                      What should your crew call you?
+                      What should your Group call you?
                       <input
                         value={displayName}
                         onChange={(event) => {
@@ -1339,7 +1350,7 @@ export function App({
                         .finally(() => release("preview"));
                     }}
                   >
-                    <h2 id="onboarding-title">Start a crew or join one?</h2>
+                    <h2 id="onboarding-title">Start a Group or join one?</h2>
                     <fieldset className="crew-choice" aria-label="Crew choice">
                       <button
                         className="target-button"
@@ -1347,7 +1358,7 @@ export function App({
                         aria-pressed={crewChoice === "start"}
                         onClick={() => setCrewChoice("start")}
                       >
-                        Start a crew
+                        Start a Group
                       </button>
                       <button
                         className="target-button"
@@ -1360,7 +1371,7 @@ export function App({
                     </fieldset>
                     {crewChoice === "start" ? (
                       <label>
-                        Crew name
+                        Group name
                         <input
                           value={crewName}
                           onChange={(event) => setCrewName(event.target.value)}
@@ -1570,7 +1581,7 @@ export function App({
                   <div
                     className="home-skeleton"
                     role="status"
-                    aria-label="Loading your crew"
+                    aria-label="Loading your Group"
                   >
                     <span className="skeleton skeleton-line" />
                     <span className="skeleton skeleton-row" />
@@ -1582,7 +1593,7 @@ export function App({
                     `${session?.user.id}:${membership.groupId}:${membership.membershipId}` && (
                     <div className="home-load-error">
                       <div>
-                        <h2>Couldn’t load your crew.</h2>
+                        <h2>Couldn’t load your Group.</h2>
                       </div>
                       <button
                         type="button"
@@ -1646,7 +1657,7 @@ export function App({
                             rename(name);
                             optimistic(
                               "rename",
-                              "Crew renamed.",
+                              "Group renamed.",
                               () => renameGroup(apiBaseUrl, token(), name),
                               () => {
                                 rename(previous);
@@ -1656,7 +1667,7 @@ export function App({
                           }}
                         >
                           <label>
-                            Crew name
+                            Group name
                             <input
                               value={crewNameDraft}
                               onChange={(event) =>
@@ -1681,14 +1692,10 @@ export function App({
                       <ul className="group-roster">
                         {groupRoster.members.map((member) => (
                           <li key={member.membershipId}>
-                            <span className="group-avatar" aria-hidden="true">
-                              {member.displayName
-                                .split(/\s+/)
-                                .slice(0, 2)
-                                .map((part) => part[0])
-                                .join("")
-                                .toUpperCase()}
-                            </span>
+                            <Avatar
+                              name={member.displayName}
+                              url={avatars[member.membershipId]}
+                            />
                             <span className="group-member-copy">
                               <strong>{member.displayName}</strong>
                               <span>
@@ -1712,82 +1719,124 @@ export function App({
                               member.membershipId !==
                                 membership.membershipId && (
                                 <button
-                                  className="row-action"
+                                  className="row-action row-more"
                                   type="button"
-                                  disabled={busy(
-                                    `admin:${member.membershipId}`,
-                                  )}
-                                  onClick={() => {
-                                    const admin = !member.creator;
-                                    setMemberAdmin(member.membershipId, admin);
-                                    optimistic(
-                                      `admin:${member.membershipId}`,
-                                      admin
-                                        ? `${member.displayName} is now an admin.`
-                                        : `${member.displayName} is no longer an admin.`,
-                                      () =>
-                                        setGroupAdmin(
-                                          apiBaseUrl,
-                                          token(),
-                                          member.membershipId,
-                                          admin,
-                                        ),
-                                      () =>
-                                        setMemberAdmin(
-                                          member.membershipId,
-                                          !admin,
-                                        ),
-                                    );
-                                  }}
+                                  aria-label={`Manage ${member.displayName}`}
+                                  onClick={() =>
+                                    setManagedMemberId(member.membershipId)
+                                  }
                                 >
-                                  {member.creator
-                                    ? "Remove admin"
-                                    : "Make admin"}
-                                </button>
-                              )}
-                            {manageGroup &&
-                              !member.creator &&
-                              member.membershipId !==
-                                membership.membershipId && (
-                                <button
-                                  className="row-action danger-text"
-                                  type="button"
-                                  disabled={busy(
-                                    `remove:${member.membershipId}`,
-                                  )}
-                                  onClick={() => {
-                                    if (
-                                      !window.confirm(
-                                        `Remove ${member.displayName} from ${groupRoster.groupName}?`,
-                                      )
-                                    )
-                                      return;
-                                    void act(
-                                      `remove:${member.membershipId}`,
-                                      async () => {
-                                        const draft = commandDraft(
-                                          "remove",
-                                          member.membershipId,
-                                        );
-                                        await api.remove(
-                                          token(),
-                                          membership.groupId,
-                                          member.membershipId,
-                                          draft.key,
-                                        );
-                                        commandDrafts.current.delete("remove");
-                                        setGroupRevision((value) => value + 1);
-                                        return "Member removed.";
-                                      },
-                                    );
-                                  }}
-                                >
-                                  Remove
+                                  ⋯
                                 </button>
                               )}
                           </li>
                         ))}
                       </ul>
+                      {(() => {
+                        const member = groupRoster.members.find(
+                          (entry) => entry.membershipId === managedMemberId,
+                        );
+                        return (
+                          <Sheet
+                            open={Boolean(member && manageGroup)}
+                            title={member?.displayName ?? ""}
+                            onDismiss={() => setManagedMemberId(null)}
+                          >
+                            {member && (
+                              <div className="member-actions">
+                                {manageGroup &&
+                                  member.membershipId !==
+                                    membership.membershipId && (
+                                    <button
+                                      className="row-action"
+                                      type="button"
+                                      disabled={busy(
+                                        `admin:${member.membershipId}`,
+                                      )}
+                                      onClick={() => {
+                                        const admin = !member.creator;
+                                        setMemberAdmin(
+                                          member.membershipId,
+                                          admin,
+                                        );
+                                        optimistic(
+                                          `admin:${member.membershipId}`,
+                                          admin
+                                            ? `${member.displayName} is now an admin.`
+                                            : `${member.displayName} is no longer an admin.`,
+                                          () =>
+                                            setGroupAdmin(
+                                              apiBaseUrl,
+                                              token(),
+                                              member.membershipId,
+                                              admin,
+                                            ),
+                                          () =>
+                                            setMemberAdmin(
+                                              member.membershipId,
+                                              !admin,
+                                            ),
+                                        );
+                                      }}
+                                    >
+                                      {member.creator
+                                        ? "Remove admin"
+                                        : "Make admin"}
+                                    </button>
+                                  )}
+                                {manageGroup &&
+                                  !member.creator &&
+                                  member.membershipId !==
+                                    membership.membershipId && (
+                                    <button
+                                      className="row-action danger-text"
+                                      type="button"
+                                      disabled={busy(
+                                        `remove:${member.membershipId}`,
+                                      )}
+                                      onClick={async () => {
+                                        if (
+                                          !(await ask({
+                                            title: `Remove ${member.displayName}?`,
+                                            body: `${member.displayName} leaves ${groupRoster.groupName} and stops counting toward its weeks.`,
+                                            confirm: `Remove ${member.displayName}`,
+                                            tone: "danger",
+                                          }))
+                                        )
+                                          return;
+                                        setManagedMemberId(null);
+                                        void act(
+                                          `remove:${member.membershipId}`,
+                                          async () => {
+                                            const draft = commandDraft(
+                                              "remove",
+                                              member.membershipId,
+                                            );
+                                            await api.remove(
+                                              token(),
+                                              membership.groupId,
+                                              member.membershipId,
+                                              draft.key,
+                                            );
+                                            commandDrafts.current.delete(
+                                              "remove",
+                                            );
+                                            setGroupRevision(
+                                              (value) => value + 1,
+                                            );
+                                            return "Member removed.";
+                                          },
+                                        );
+                                      }}
+                                    >
+                                      Remove from group
+                                    </button>
+                                  )}
+                              </div>
+                            )}
+                          </Sheet>
+                        );
+                      })()}
                       {manageGroup ? (
                         <section className="pending-invitations">
                           <h3>Invited, not joined yet</h3>
@@ -1809,11 +1858,14 @@ export function App({
                                   <button
                                     className="row-action"
                                     type="button"
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (
-                                        !window.confirm(
-                                          `Revoke invitation for ${invitation.email}?`,
-                                        )
+                                        !(await ask({
+                                          title: "Revoke invitation?",
+                                          body: `${invitation.email} can no longer use this invitation to join.`,
+                                          confirm: "Revoke invitation",
+                                          tone: "danger",
+                                        }))
                                       )
                                         return;
                                       const id = invitation.invitationId;
@@ -1973,14 +2025,21 @@ export function App({
                           className="danger-outline leave-group"
                           type="button"
                           disabled={busy("leave")}
-                          onClick={() => {
+                          onClick={async () => {
                             const closing = groupRoster.members.length === 1;
                             if (
-                              !window.confirm(
-                                closing
-                                  ? `Close ${groupRoster.groupName}? You are its last member, so it ends for good.`
+                              !(await ask({
+                                title: closing
+                                  ? `Close ${groupRoster.groupName}?`
                                   : `Leave ${groupRoster.groupName}?`,
-                              )
+                                body: closing
+                                  ? "You are its last member, so the group ends for good."
+                                  : "You stop counting toward this group’s weeks. Rejoining needs a new invitation.",
+                                confirm: closing
+                                  ? "Close group"
+                                  : "Leave group",
+                                tone: "danger",
+                              }))
                             )
                               return;
                             void act("leave", async () => {
@@ -2019,7 +2078,7 @@ export function App({
             )}
           </Page>
         ) : route === "/account" ? (
-          <Page title="You" lead="Your account and crew settings.">
+          <Page title="Account" lead="Your account and Group settings.">
             <div className="account-page">
               {deletionStep === "idle" && <Result notice={notice} />}
               <section className="account-identity" aria-label="Your identity">
@@ -2129,7 +2188,7 @@ export function App({
               groupScope.current ===
                 `${session?.user.id}:${membership?.groupId}:${membership?.membershipId}` ? (
                 <div className="account-load-error" role="alert">
-                  <span>Couldn’t load your crew.</span>
+                  <span>Couldn’t load your Group.</span>
                   <button
                     className="secondary-button"
                     type="button"
@@ -2160,7 +2219,7 @@ export function App({
                     href="/group"
                     onClick={(event) => navigate(event, "/group")}
                   >
-                    <span>Crew</span>
+                    <span>Group</span>
                     <span>
                       {groupLoad === "ready" &&
                       groupScope.current ===
@@ -2248,11 +2307,14 @@ export function App({
                 className="account-row"
                 type="button"
                 disabled={busy("remove-photos")}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    !window.confirm(
-                      "Delete every proof photo you’ve shared? Your workout counts and finished weeks stay. This can’t be undone.",
-                    )
+                    !(await ask({
+                      title: "Delete all proof photos?",
+                      body: "Every proof photo you’ve shared is deleted. Your workout counts and finished weeks stay. This can’t be undone.",
+                      confirm: "Delete photos",
+                      tone: "danger",
+                    }))
                   )
                     return;
                   void act("remove-photos", async () => {
@@ -2345,12 +2407,12 @@ export function App({
                     <h2 tabIndex={-1}>What deleting does</h2>
                     <ul>
                       <li>
-                        You leave {groupRoster?.groupName ?? "your crew"} right
+                        You leave {groupRoster?.groupName ?? "your Group"} right
                         away.
                       </li>
                       <li>You can’t sign in again with this account.</li>
                       <li>
-                        Your finished weeks stay in the crew’s history as
+                        Your finished weeks stay in the Group’s history as
                         “Former member”.
                       </li>
                       <li>This can’t be undone.</li>
@@ -2532,12 +2594,19 @@ export function App({
             }}
           />
         )}
+        {confirmSheet}
       </main>
       {access === "signed-in" && (
         <nav aria-label="Member destinations" className="member-nav">
           {memberRoutes.map(([destination, label]) => (
             <a
-              aria-current={route === destination ? "page" : undefined}
+              aria-current={
+                route === destination
+                  ? "page"
+                  : tabRoute === destination
+                    ? "true"
+                    : undefined
+              }
               href={destination}
               key={destination}
               onClick={(e) => navigate(e, destination)}
@@ -2563,7 +2632,7 @@ export function App({
                 Math.max(
                   0,
                   memberRoutes.findIndex(
-                    ([destination]) => destination === route,
+                    ([destination]) => destination === tabRoute,
                   ),
                 ) * 100
               }%)`,

@@ -31,7 +31,7 @@ test("a workout logged offline survives a reload and sends once back online", as
     }
   });
   await page.getByRole("button", { name: "Log workout" }).click();
-  const dialog = page.getByRole("dialog", { name: "Log a workout" });
+  const dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Cardio" }).click();
   await dialog.getByRole("button", { name: "30 min" }).click();
   const inputs = dialog.locator('input[type="file"]');

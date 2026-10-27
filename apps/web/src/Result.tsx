@@ -10,7 +10,8 @@ type Notice = {
 export function useNotice() {
   const [notice, setNotice] = useState<Notice>(null);
   useEffect(() => {
-    if (!notice || notice.persistent) return;
+    // Errors stay until the member dismisses them or the next notice replaces them.
+    if (!notice || notice.persistent || notice.kind === "error") return;
     const timer = window.setTimeout(() => setNotice(null), 3000);
     return () => window.clearTimeout(timer);
   }, [notice]);
@@ -20,17 +21,26 @@ export function useNotice() {
 export function Result({ notice }: { notice: Notice }) {
   // Chosen after commit, so a sheet closing in the same update is no longer the target.
   const [target, setTarget] = useState<Element | null>(null);
+  const [dismissed, setDismissed] = useState<Notice>(null);
   useLayoutEffect(() => {
     void notice;
     setTarget(document.querySelector('[role="dialog"]') ?? document.body);
   }, [notice]);
-  if (!notice) return null;
+  if (!notice || dismissed === notice) return null;
   const message = (
     <p
       className={`result ${notice.kind}${notice.persistent ? "" : " event-notice"}`}
       role={notice.kind === "error" ? "alert" : "status"}
     >
       {notice.text}
+      {notice.kind === "error" && !notice.persistent && (
+        <button
+          type="button"
+          className="result-dismiss"
+          aria-label="Dismiss"
+          onClick={() => setDismissed(notice)}
+        />
+      )}
     </p>
   );
   return notice.persistent

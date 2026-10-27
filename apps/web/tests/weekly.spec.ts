@@ -434,9 +434,7 @@ const weeklyLoop = async (
   await expect(
     page.getByText("2-week streak · 5 workouts since last miss"),
   ).toBeVisible();
-  await expect(
-    page.getByText("1-week streak · 3 workouts since last miss"),
-  ).toBeAttached();
+  // Friend chips carry count and one urgent status; streaks stay on History.
   await page.goto("/");
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
@@ -453,11 +451,10 @@ const weeklyLoop = async (
   await expect(
     page.getByRole("list", { name: "Activity colours" }),
   ).toHaveCount(0);
+  // Friend chips lead with a readable count, not a tiny barbell.
   await expect(
-    page
-      .getByRole("img", { name: "1 of 2 workouts" })
-      .locator('rect[fill="var(--activity-cardio)"]'),
-  ).toHaveCount(2);
+    page.getByRole("list", { name: "Friends this week" }),
+  ).toContainText("1 of 2 workouts");
   await expect(
     page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
   ).toHaveCount(0);
@@ -467,18 +464,16 @@ const weeklyLoop = async (
   await expect(page.getByText("Every rep counts.")).toHaveCount(0);
   const opener = page.getByRole("button", { name: "Log workout" });
   await opener.click();
-  let dialog = page.getByRole("dialog", { name: "Log a workout" });
+  let dialog = page.getByRole("dialog", { name: "Log workout" });
   await expect(
-    dialog.getByRole("heading", { name: "Log a workout" }),
+    dialog.getByRole("heading", { name: "Log workout" }),
   ).toBeFocused();
   await expect(
     dialog.getByRole("button", {
       name: /^(Strength|Cardio|Class|Sport|Mixed)$/,
     }),
   ).toHaveCount(4);
-  await expect(
-    dialog.getByText("Pick an activity and a time, then take both photos."),
-  ).toBeVisible();
+  await expect(dialog.getByText("Add your activity photo.")).toBeVisible();
   await expect(
     dialog.getByRole("button", { name: "Log workout" }),
   ).toBeDisabled();
@@ -497,14 +492,14 @@ const weeklyLoop = async (
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
   await opener.click();
-  dialog = page.getByRole("dialog", { name: "Log a workout" });
+  dialog = page.getByRole("dialog", { name: "Log workout" });
   await page
     .getByRole("button", { name: "Close dialog" })
     .click({ position: { x: 4, y: 4 } });
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
   await opener.click();
-  dialog = page.getByRole("dialog", { name: "Log a workout" });
+  dialog = page.getByRole("dialog", { name: "Log workout" });
   await dialog.getByRole("button", { name: "Other" }).click();
   await expect(dialog.getByLabel("Duration in minutes")).toHaveAttribute(
     "inputmode",
@@ -516,13 +511,9 @@ const weeklyLoop = async (
   );
   await dialog.getByRole("button", { name: "Strength" }).click();
   await expect(dialog.getByText("This one makes 3 of 4.")).toBeVisible();
-  await expect(
-    dialog.getByText("Pick an activity and a time, then take both photos."),
-  ).toBeVisible();
+  await expect(dialog.getByText("Add your activity photo.")).toBeVisible();
   await dialog.getByRole("button", { name: "45 min" }).click();
-  await expect(
-    dialog.getByText("Pick an activity and a time, then take both photos."),
-  ).toBeVisible();
+  await expect(dialog.getByText("Add your activity photo.")).toBeVisible();
   const photoInputs = dialog.locator('input[type="file"]');
   await expect(photoInputs.nth(0)).toHaveAttribute("capture", "environment");
   await expect(photoInputs.nth(1)).toHaveAttribute("capture", "user");
@@ -538,9 +529,7 @@ const weeklyLoop = async (
   await expect(
     dialog.getByRole("img", { name: "Your presence preview" }),
   ).toBeVisible();
-  await expect(
-    dialog.getByText("Pick an activity and a time, then take both photos."),
-  ).toHaveCount(0);
+  await expect(dialog.getByText("Add your activity photo.")).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Log workout" }),
   ).toBeEnabled();
@@ -638,7 +627,10 @@ const weeklyLoop = async (
     page.viewportSize()?.height ?? 0,
   );
 
+  // Errors stay until dismissed.
   await page.clock.runFor(3000);
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByRole("button", { name: "Save for next week" }).click();
   await expect(

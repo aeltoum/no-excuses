@@ -63,7 +63,7 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
   });
   // Excused friends show it and cannot be nudged.
   const friends = page.getByRole("list", { name: "Friends this week" });
-  await expect(friends).toContainText("excused");
+  await expect(friends).toContainText("Excused this week");
   await expect(friends.getByRole("button", { name: /Nudge/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Home 1/ })).toBeVisible();
 
@@ -107,7 +107,7 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
   ).toEqual([]);
   await sheet.getByRole("button", { name: "Next week" }).click();
   await sheet.getByRole("button", { name: "Travel or no access" }).click();
-  await sheet.getByLabel("Note for your crew (optional)").fill("Away");
+  await sheet.getByLabel("Note for your Group (optional)").fill("Away");
   const requested = await msUntilVisible(
     page,
     () => sheet.getByRole("button", { name: "Send request" }).click(),

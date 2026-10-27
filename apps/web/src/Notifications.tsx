@@ -231,7 +231,7 @@ export function NotificationBell({
           )
         ) : center.items.length === 0 ? (
           <p className="hint">
-            Nothing yet. Activity from your crew shows here.
+            Nothing yet. Activity from your Group shows here.
           </p>
         ) : (
           <>
@@ -378,7 +378,7 @@ export function NotificationSettings({
                 checked={prefs.digest}
                 onChange={(event) => save({ digest: event.target.checked })}
               />
-              Daily digest of crew activity
+              Daily digest of Group activity
             </label>
             <label>
               Digest time
@@ -398,7 +398,7 @@ export function NotificationSettings({
             </label>
             <p className="hint">
               Everything still shows under the bell. Digest time uses your
-              crew’s time zone.
+              Group’s time zone.
             </p>
           </div>
         )}

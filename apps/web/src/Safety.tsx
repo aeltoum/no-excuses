@@ -50,11 +50,11 @@ export function useConduct(apiBaseUrl: string, token: string) {
   const sheet = (
     <Sheet
       open={open}
-      title="Crew conduct rules"
+      title="Group conduct rules"
       onDismiss={() => finish(false)}
     >
       <div className="conduct-rules">
-        <p>Before you write anything your crew can read:</p>
+        <p>Before you write anything your Group can read:</p>
         <ul>
           <li>
             No sexual content, threats, harassment, slurs, or humiliation.
