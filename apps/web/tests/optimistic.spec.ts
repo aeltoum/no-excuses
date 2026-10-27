@@ -508,7 +508,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
     testInfo,
     "wall restore",
     () => page.getByRole("button", { name: "Restore" }).click(),
-    page.getByRole("button", { name: "Report photos" }),
+    page.getByText("Restored.", { exact: true }),
   );
   await page.screenshot({
     fullPage: true,
