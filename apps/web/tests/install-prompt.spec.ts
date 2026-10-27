@@ -59,6 +59,11 @@ test("iPhone Safari members are told to install for notifications until they dis
   await tip.getByRole("button", { name: "Dismiss install tip" }).click();
   await expect(tip).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Our week|Week ends in|Week closing)/,
+    }),
+  ).toBeVisible();
   await expect(tip).toHaveCount(0);
 });

@@ -4591,3 +4591,69 @@ h1 {
 .home-header h1 {
   white-space: nowrap;
 }
+
+/* Home title: the week's countdown in the screen-title role. */
+.week-countdown-title {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.week-countdown-title.is-close {
+  color: var(--error);
+}
+
+/* Feed photos sit inside the column with a visible edge, never cut by the screen. */
+.proof-frame {
+  margin-inline: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+}
+.proof-reactions .proof-comment {
+  margin-right: -10px;
+}
+/* Own-post actions sit on the right, under the comment bubble. */
+.proof-post > .proof-report {
+  justify-self: end;
+}
+
+/* Every member's bar this week, on History. */
+.group-bars ul {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 32px;
+  padding: 0;
+  list-style: none;
+}
+.group-bars li {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.group-bars-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.group-bars-head span:last-child {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--type-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.group-bars .barbell-mini {
+  width: 100%;
+  height: auto;
+}
+
+/* Discard draft: same shape as Log workout, in the error colour. */
+.log-sheet-footer .log-discard {
+  justify-self: stretch;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--error);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}

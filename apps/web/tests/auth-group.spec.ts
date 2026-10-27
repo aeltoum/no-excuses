@@ -690,7 +690,12 @@ test("invalid code retains email and denied Group action hides private detail", 
   ).toBeVisible();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Our week|Week ends in|Week closing)/,
+    }),
+  ).toBeVisible();
   await page.goto("/group");
   await page.getByLabel("Friend email").fill("friend@example.test");
   await page.getByRole("button", { name: "Invite a friend" }).click();

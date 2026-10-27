@@ -668,26 +668,8 @@ export function ProofFeed({
             ensureConduct={ensureConduct}
             confirmReport={confirmReport}
             onNotice={setNotice}
-            onReportPhotos={
-              item.mine
-                ? undefined
-                : async () => {
-                    if (
-                      await ask({
-                        title: "Report these photos?",
-                        body: "They’ll be hidden from the Group until the Group admin reviews them.",
-                        confirm: "Report photos",
-                        tone: "danger",
-                      })
-                    )
-                      void act(
-                        item,
-                        "report",
-                        "",
-                        "Reported. The photos are hidden.",
-                      );
-                  }
-            }
+            // Photo reports are paused for now; the flow returns with moderation.
+            onReportPhotos={undefined}
           />
         )}
         {item.reviewStatus === "questioned" && (

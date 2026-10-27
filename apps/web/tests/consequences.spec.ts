@@ -509,7 +509,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   });
   for (const [label, ms] of Object.entries(timings))
     expect(ms, label).toBeLessThanOrEqual(100);
-  expect(uploads).toEqual([
+  // Clip players preload metadata for thumbnails; only PUTs are uploads.
+  expect(uploads.filter((entry) => entry.startsWith("PUT:"))).toEqual([
     `PUT:/storage/v1/object/upload/sign/consequence-clips/${clipPath}:video/webm`,
   ]);
   await expect(
@@ -524,9 +525,14 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
       "Your next card is ready. Start it now; friends keep reviewing this one.",
     ),
   ).toBeVisible();
+  // Metadata only: enough for a first-frame thumbnail, not the whole clip.
   await expect(page.getByLabel("Your proof clip")).toHaveAttribute(
     "preload",
-    "none",
+    "metadata",
+  );
+  await expect(page.getByLabel("Your proof clip")).toHaveAttribute(
+    "src",
+    /#t=0\.1$/,
   );
   // Proof is in: logging unlocks without waiting for approvals.
   await expect(logButton).toHaveAccessibleName("Log workout");
@@ -547,8 +553,8 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(review).toContainText("Maya says they did their card");
   await expect(review).toContainText("100 push-ups");
   const friendClip = review.getByLabel("Maya’s proof clip");
-  await expect(friendClip).toHaveAttribute("src", friendClipUrl);
-  await expect(friendClip).toHaveAttribute("preload", "none");
+  await expect(friendClip).toHaveAttribute("src", `${friendClipUrl}#t=0.1`);
+  await expect(friendClip).toHaveAttribute("preload", "metadata");
   await expect(friendClip).toHaveAttribute("controls", "");
   expect(
     await friendClip.evaluate((video: HTMLVideoElement) => [

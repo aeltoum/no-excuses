@@ -243,17 +243,11 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     page.getByRole("button", { name: "Reject workout" }),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Report photos" }).first().click();
-  await page
-    .getByRole("dialog", { name: "Report these photos?" })
-    .getByRole("button", { name: "Report photos" })
-    .click();
-  await expect(page.getByRole("status")).toHaveText(
-    "Reported. The photos are hidden.",
+  // Photo reports are paused for now.
+  await expect(page.getByRole("button", { name: "Report photos" })).toHaveCount(
+    0,
   );
-  expect(actions).toEqual(["review:verify", "vote:reject", "report:"]);
-  // The reported post leaves the feed, so nothing is left waiting on the member.
-  await expect(homeTab).toHaveAccessibleName("Home");
+  expect(actions).toEqual(["review:verify", "vote:reject"]);
   // Only the deliberately failed vote may log.
   expect(errors.filter((text) => !text.includes("status of 500"))).toEqual([]);
 });

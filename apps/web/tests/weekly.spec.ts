@@ -437,7 +437,12 @@ const weeklyLoop = async (
   // Friend chips carry count and one urgent status; streaks stay on History.
   await page.goto("/");
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
-  await expect(page.getByRole("heading", { name: "Our week" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Our week|Week ends in|Week closing)/,
+    }),
+  ).toBeVisible();
   await expect(page.getByText("2 of 4 this week")).toBeVisible();
   await expect(page.getByRole("link", { name: "Home" })).toHaveAttribute(
     "aria-current",

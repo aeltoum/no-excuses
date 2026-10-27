@@ -72,35 +72,29 @@ const intensityLabels = {
   high: { emoji: "🥵", text: "Brutal" },
 };
 
-// Time left before the week closes, refreshed each minute.
+// Time left before the week closes, as the Home title, ticking each second.
 function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    if (!endsAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
-  if (!endsAt) return <span className="week-countdown" />;
-  const minutes = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 60_000));
+  }, [endsAt]);
+  if (!endsAt) return <h1>Our week</h1>;
+  const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000));
   // The server rolls the week over within a minute or so.
-  if (minutes === 0)
-    return <span className="week-countdown is-close">Week closing</span>;
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const text =
-    days > 0
-      ? `${days}d ${hours}h`
-      : hours > 0
-        ? `${hours}h ${minutes % 60}m`
-        : `${minutes}m`;
+  if (seconds === 0)
+    return <h1 className="week-countdown-title is-close">Week closing</h1>;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const text = `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
   return (
-    <span
-      className={`week-countdown${minutes < 1440 ? " is-close" : ""}`}
+    <h1
+      className={`week-countdown-title${seconds < 86_400 ? " is-close" : ""}`}
       title={new Date(endsAt).toLocaleString()}
     >
       <span className="visually-hidden">Week ends in </span>
-      {text}
-      <small aria-hidden="true"> left</small>
-    </span>
+      <time dateTime={endsAt}>{text}</time>
+    </h1>
   );
 }
 
@@ -956,7 +950,6 @@ export function Weekly({
     >
       {home ? (
         <header className="home-header">
-          <h1>Our week</h1>
           <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
           {own && (
             <button
@@ -1669,7 +1662,7 @@ export function Weekly({
                         {draftStarted && (
                           <button
                             type="button"
-                            className="text-button log-discard"
+                            className="log-discard"
                             onClick={() => {
                               resetDraft();
                               setSheetOpen(false);
@@ -1961,6 +1954,41 @@ export function Weekly({
           )}
           {route === "/history" && (
             <>
+              {progress.length > 0 && (
+                <section
+                  className="group-bars"
+                  aria-labelledby="group-bars-title"
+                >
+                  <h2 id="group-bars-title">The Group this week</h2>
+                  <ul>
+                    {progress.map((item) => (
+                      <li key={item.membershipId}>
+                        <span className="group-bars-head">
+                          <Avatar
+                            name={item.displayName}
+                            url={avatars[item.membershipId]}
+                            size="sm"
+                          />
+                          <strong>
+                            {item.membershipId === membership.membershipId
+                              ? "You"
+                              : item.displayName}
+                          </strong>
+                          <span>
+                            {item.completedWorkoutCount} of {item.lockedTarget}
+                          </span>
+                        </span>
+                        <Barbell
+                          count={item.completedWorkoutCount}
+                          target={item.lockedTarget}
+                          size="mini"
+                          activityTypes={item.activityTypes}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               <SeasonCard season={extras.season} />
               <UnlockList unlocks={extras.unlocks} />
               <h2>The rack</h2>
@@ -2107,11 +2135,16 @@ export async function loadWeekly(
     syncedAt: Date.now(),
   };
   if (route === "/history") {
-    const [historyResponse, targetResponse] = await Promise.all([
-      api.history(token, groupId),
-      api.target(token),
-    ]);
+    // History also shows every member's bar for the current week.
+    const [historyResponse, targetResponse, progressResponse] =
+      await Promise.all([
+        api.history(token, groupId),
+        api.target(token),
+        api.progress(token, groupId).catch(() => null),
+      ]);
     next.history = historyResponse.data as FinalizedWeeklyHistoryItem[];
+    if (progressResponse)
+      next.progress = progressResponse.data as CurrentWeekProgressItem[];
     next.targetContext = targetResponse.data as WeeklyTargetContext;
   } else if (route === "/target") {
     const [progressResponse, targetResponse] = await Promise.all([

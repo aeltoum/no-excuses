@@ -160,17 +160,19 @@ const verdictText: Record<string, string> = {
   cannot_assess: "You couldn’t tell on",
 };
 
-// Loads only on tap, so a list of clips costs nothing until someone plays one.
+// Loads metadata and the first frame only, so each clip shows a thumbnail
+// instead of a black box; the full clip streams on play.
 function ClipPlayer({ url, label }: { url?: string | null; label: string }) {
   if (!url) return null;
   return (
     // biome-ignore lint/a11y/useMediaCaption: member-recorded proof has no captions
     <video
       className="clip-player"
-      src={url}
+      // The media fragment seeks past a blank first frame for the poster.
+      src={url.includes("#") ? url : `${url}#t=0.1`}
       controls
       playsInline
-      preload="none"
+      preload="metadata"
       aria-label={label}
     />
   );
