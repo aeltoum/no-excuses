@@ -256,11 +256,15 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   expect(questionMs).toBeLessThanOrEqual(100);
   await expect(question).toHaveCount(0);
   await expect(page.getByText("Questioned", { exact: true })).toHaveCount(2);
+  // The questioner is a voter too, so their vote controls show at once.
+  await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(2);
   answerReview();
   await undoDelay();
   await expect(question).toHaveCount(0);
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
+  // Jordan's post was already questioned; Maya's just got its own vote controls.
+  const jordan = page.locator(".proof-post").filter({ hasText: "Jordan" });
   // A failed vote rolls back: the buttons and counts return with an error.
   const undoVoteDelay = await delayRoute(
     page,
@@ -269,7 +273,7 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   );
   const voteMs = await msUntilVisible(
     page,
-    () => page.getByRole("button", { name: "Reject workout" }).click(),
+    () => jordan.getByRole("button", { name: "Reject workout" }).click(),
     page.getByText("Vote saved: reject."),
   );
   testInfo.annotations.push({
@@ -282,10 +286,10 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
     "Something went wrong. Try again.",
   );
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
-  await page.getByRole("button", { name: "Reject workout" }).click();
+  await jordan.getByRole("button", { name: "Reject workout" }).click();
   await expect(page.getByRole("status")).toHaveText("Vote saved: reject.");
   await expect(
-    page.getByRole("button", { name: "Reject workout" }),
+    jordan.getByRole("button", { name: "Reject workout" }),
   ).toHaveCount(0);
 
   // Photo reports are paused for now.
