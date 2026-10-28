@@ -196,12 +196,12 @@ Presentation never broadens media access or retention:
 - A submitted Workout report has exactly two photos: the Activity photo is primary and the
   Member-presence photo is secondary. Preserve each role, factual description, meaningful
   crop, and complete detail-view facts.
-- A Verified Proof pair remains available for exactly 90 days from verification only while
-  every authorization, membership, consent, and moderation condition remains satisfied.
+- A Verified Proof pair stays on the Group Wall with no time limit, only while every
+  authorization, membership, consent, and moderation condition remains satisfied.
 - Consent withdrawal, author removal, departure or removal, Account deletion, service
   termination, Group closure, moderation removal, Unsupported, or Rejected revokes access and
   starts the approved early-deletion lifecycle. A Content report suppresses the pair while
-  moderation is pending; clearance never restarts the retention clock.
+  moderation is pending; clearance restores it.
 - After media deletion, show only finalized structured outcomes already allowed to remain.
   Never retain or regenerate thumbnails, blurs, palettes, embeddings, captions, or another
   recoverable derivative. Counts, gaps, dates, filters, and loading boundaries must not reveal
