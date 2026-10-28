@@ -28,6 +28,7 @@ import {
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
 import { useConduct } from "./Safety";
+import { type StoryMember, StoryRings } from "./Stories";
 import {
   isSeen,
   markSeen,
@@ -233,6 +234,8 @@ export function ProofFeed({
   needsExtra,
   needsExtraCount = 0,
   needsExtraShown = false,
+  members = [],
+  viewerId = "",
 }: {
   apiBaseUrl: string;
   token: string;
@@ -248,6 +251,9 @@ export function ProofFeed({
   // What in needsExtra waits on the viewer, and whether it shows at all.
   needsExtraCount?: number;
   needsExtraShown?: boolean;
+  // Current Group members for the story rings, and the viewer among them.
+  members?: StoryMember[];
+  viewerId?: string;
 }) {
   const [items, setItems] = useState<ProofItem[]>(
     () => cachedFeed(cacheKey) ?? [],
@@ -1228,6 +1234,16 @@ export function ProofFeed({
   return (
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
+      <StoryRings
+        members={members}
+        viewerId={viewerId}
+        cacheKey={cacheKey}
+        posts={items.filter(
+          (entry) => entry.reviewStatus !== "questioned" && inWindow(entry),
+        )}
+        ownSince={windowStart === null ? null : windowStart + weekMs}
+        seenAtLoad={seenAtLoad}
+      />
       {state === "loading" ? (
         <div
           className="day-rows-skeleton"
