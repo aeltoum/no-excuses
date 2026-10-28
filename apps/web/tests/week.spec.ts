@@ -52,9 +52,12 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
   await expect(
     page.getByRole("list", { name: "Friends this week" }),
   ).toHaveCount(0);
+  // Cards waiting on the member sit in Home's Needs you.
   await expect(
-    page.getByRole("region", { name: "Consequence cards" }),
-  ).toHaveCount(0);
+    page
+      .getByRole("region", { name: "Needs you" })
+      .getByRole("region", { name: "Consequence cards" }),
+  ).toHaveCount(1);
   await expect(nav.getByRole("link", { name: /^Home/ })).toHaveAccessibleName(
     "Home 1 waiting on you",
   );

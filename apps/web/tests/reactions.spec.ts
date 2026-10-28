@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { homeExtras, openWeek } from "./member";
+import { closePost, homeExtras, openPost, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -192,6 +192,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
   // On a slow API the drawer and your own controls show at once; names follow below them.
+  await openPost(page, "Maya");
   failNextReactors = false;
   failNextReaction = false;
   const slow = [
@@ -249,9 +250,11 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
 
   // Chips open a drawer of who reacted; on your own proof it is view-only,
   // with the comment button beside the chips.
+  await closePost(page);
+  await openPost(page, "You");
   const reactions = page.getByRole("group", { name: "Reactions" });
-  await expect(reactions).toHaveCount(2);
-  const own = reactions.nth(1);
+  await expect(reactions).toHaveCount(1);
+  const own = reactions;
   await expect(own.getByRole("button")).toHaveCount(2);
   await expect(own.getByRole("button", { name: "Comment" })).toBeVisible();
   const strong = own.getByRole("button", { name: "💪, 1" });
@@ -299,6 +302,8 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await expect(strong).toBeFocused();
 
   // On friends' proof the drawer adds or removes your own emoji.
+  await closePost(page);
+  await openPost(page, "Maya");
   const friend = reactions.first();
   const fire = friend.getByRole("button", { name: "🔥, 2" });
   await expect(fire).toHaveAttribute("aria-pressed", "false");
@@ -395,12 +400,18 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   // The page behind an open sheet stays put.
   await add.click();
   await expect(sheet).toBeVisible();
-  const scrollY = await page.evaluate(() => window.scrollY);
-  expect(scrollY).toBeGreaterThan(0);
+  // The full-screen post scrolls on its own; neither it nor the page moves.
+  const scrolled = () =>
+    page.evaluate(
+      () =>
+        window.scrollY +
+        (document.querySelector(".post-viewer")?.scrollTop ?? 0),
+    );
+  const scrollY = await scrolled();
   await page.mouse.move(195, 40);
   await page.mouse.wheel(0, 600);
   await page.keyboard.press("PageDown");
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+  await expect.poll(scrolled).toBe(scrollY);
   // Category tabs are line icons with names; a horizontal swipe changes tab.
   const tabs = sheet.getByRole("tablist", { name: "Categories" });
   await expect(tabs.getByRole("tab")).toHaveCount(9);
@@ -480,6 +491,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await expect(add).toBeFocused();
 
   // Only members behind target can be nudged, once, from Week.
+  await closePost(page);
   await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(
@@ -577,6 +589,7 @@ test("Signing out drops the cached reactor names", async ({ page }) => {
   await page.goto("/sign-in");
   await page.getByRole("button", { name: "I already have an account" }).click();
   await signIn("member@example.test");
+  await openPost(page, "Maya");
   const fire = page
     .getByRole("group", { name: "Reactions" })
     .getByRole("button", { name: "🔥, 2" });
@@ -584,6 +597,7 @@ test("Signing out drops the cached reactor names", async ({ page }) => {
   await fire.click();
   await expect(drawer.locator(".reactor-name")).toHaveText(["Jordan", "Sam"]);
   await page.keyboard.press("Escape");
+  await closePost(page);
   // Sign out in place, without a reload that would reset memory anyway.
   await page.getByRole("link", { name: "Account", exact: true }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -591,6 +605,7 @@ test("Signing out drops the cached reactor names", async ({ page }) => {
   await page.getByRole("link", { name: "Continue to sign in" }).click();
   await page.getByRole("button", { name: "Use another email" }).click();
   await signIn("other@example.test");
+  await openPost(page, "Maya");
   await fire.click();
   await expect(drawer.getByRole("status")).toHaveText("Loading names…");
   await expect(drawer.locator(".reactor-name")).toHaveCount(0);

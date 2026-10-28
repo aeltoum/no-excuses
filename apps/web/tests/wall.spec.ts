@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { homeExtras, openHome, openWeek } from "./member";
+import { closePost, homeExtras, openHome, openPost, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -194,7 +194,7 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   // Posts count on submit: only the Group decision waits on the viewer.
   await expect(
-    page.getByRole("heading", { name: "Needs your vote" }),
+    page.getByRole("button", { name: "Needs you 1 waiting" }),
   ).toBeVisible();
   const homeTab = page.getByRole("link", { name: /^Home/ });
   await expect(homeTab).toHaveAccessibleName("Home 1 waiting on you");
@@ -209,6 +209,7 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   ).toBeVisible();
   // The docking bar is covered in week.spec.ts.
   await openHome(page);
+  await openPost(page, "Maya");
   await expect(
     page.getByRole("img", { name: "Maya at the workout" }),
   ).toBeVisible();
@@ -255,16 +256,19 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   });
   expect(questionMs).toBeLessThanOrEqual(100);
   await expect(question).toHaveCount(0);
-  await expect(page.getByText("Questioned", { exact: true })).toHaveCount(2);
-  // The questioner is a voter too, so their vote controls show at once.
-  await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(2);
+  await expect(page.getByText("Questioned", { exact: true })).toHaveCount(1);
   answerReview();
   await undoDelay();
   await expect(question).toHaveCount(0);
+  // Maya's post leaves the day rows for Needs you, where the questioner votes too.
+  await closePost(page);
+  await expect(page.getByRole("button", { name: /^Maya,/ })).toHaveCount(0);
+  await expect(page.locator(".needs-post")).toHaveCount(2);
+  await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(2);
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   // Jordan's post was already questioned; Maya's just got its own vote controls.
-  const jordan = page.locator(".proof-post").filter({ hasText: "Jordan" });
+  const jordan = page.locator(".needs-post").filter({ hasText: "Jordan" });
   // A failed vote rolls back: the buttons and counts return with an error.
   const undoVoteDelay = await delayRoute(
     page,

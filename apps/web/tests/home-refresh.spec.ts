@@ -4,6 +4,7 @@ import {
   homeExtras,
   membershipId,
   openHome,
+  openPost,
   openWeek,
   signIn,
 } from "./member";
@@ -79,6 +80,7 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
   await expect(friends.locator(".avatar img")).toHaveAttribute("src", photo);
   await openHome(page);
 
+  await openPost(page, "Maya");
   const card = page.locator(".proof-post").filter({ hasText: "Leg day" });
   await expect(card.locator(".post-caption")).toHaveText("Maya Leg day");
   // A mixed workout's caption once took the chalk plate colour behind chalk text.

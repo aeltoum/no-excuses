@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { Avatar, useAvatars } from "./avatars";
 import { useConfirm } from "./Confirm";
@@ -112,6 +118,63 @@ const dayLabel = (iso: string) => {
   });
 };
 
+const weekMs = 7 * 86_400_000;
+// Start of the previous accountability week, from the current week's end.
+// A cached end that has passed rolls forward, so Home never shows a stale window.
+export const feedWindowStart = (endsAt: string | null | undefined) => {
+  const end = endsAt ? Date.parse(endsAt) : Number.NaN;
+  if (Number.isNaN(end)) return null;
+  const weeks = Math.max(0, Math.ceil((Date.now() - end + 1) / weekMs));
+  return end + weeks * weekMs - 2 * weekMs;
+};
+
+const needsKey = "needs-you-collapsed";
+const readNeedsOpen = () => {
+  try {
+    return localStorage.getItem(needsKey) !== "1";
+  } catch {
+    return true;
+  }
+};
+const writeNeedsOpen = (open: boolean) => {
+  try {
+    if (open) localStorage.removeItem(needsKey);
+    else localStorage.setItem(needsKey, "1");
+  } catch {
+    // Collapse state is a per-device convenience.
+  }
+};
+
+// Referee lights: white accepts, red rejects, dark still to vote.
+function Lights({ item }: { item: ProofItem }) {
+  const voters = Math.max(
+    item.eligibleVoters,
+    item.acceptVotes + item.rejectVotes,
+  );
+  const left = voters - item.acceptVotes - item.rejectVotes;
+  return (
+    <span
+      className="referee-lights"
+      role="img"
+      aria-label={`${item.acceptVotes} accept, ${item.rejectVotes} reject, ${left} still to vote`}
+    >
+      {Array.from({ length: voters }, (_, index) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: lights are positional.
+          key={index}
+          className={
+            index < item.acceptVotes
+              ? "is-white"
+              : index < item.acceptVotes + item.rejectVotes
+                ? "is-red"
+                : undefined
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
 // The Wall feed rendered on Home: proof waiting on the viewer first, then everything by day.
 // Feed state without the posts, for Week's review status and settle line.
 export function useFeedItems(
@@ -158,6 +221,10 @@ export function ProofFeed({
   onRevoked,
   onItems,
   onDeleted,
+  windowEndsAt,
+  needsExtra,
+  needsExtraCount = 0,
+  needsExtraShown = false,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -166,6 +233,13 @@ export function ProofFeed({
   onRevoked: () => void;
   onItems: (items: ProofItem[]) => void;
   onDeleted?: (currentWeekCount: number) => void;
+  // End of the current accountability week; Home shows it and the week before.
+  windowEndsAt?: string | null;
+  // The member's own Needs you items beside questioned posts (cards, ballots).
+  needsExtra?: ReactNode;
+  // What in needsExtra waits on the viewer, and whether it shows at all.
+  needsExtraCount?: number;
+  needsExtraShown?: boolean;
 }) {
   const [items, setItems] = useState<ProofItem[]>(
     () => cachedFeed(cacheKey) ?? [],
@@ -189,6 +263,66 @@ export function ProofFeed({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [captioning, setCaptioning] = useState({ id: "", count: 0 });
   const [captioned, setCaptioned] = useState<ReadonlySet<string>>(new Set());
+  const [needsOpen, setNeedsOpen] = useState(readNeedsOpen);
+  // The post open full screen, and the tile that opened it for focus return.
+  const [viewing, setViewing] = useState<string | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const openPost = (id: string, from: HTMLElement) => {
+    opener.current = from;
+    setViewing(id);
+  };
+  const closePost = useCallback(() => {
+    setViewing(null);
+    opener.current?.focus();
+  }, []);
+  const viewingOpen = viewing !== null;
+  useEffect(() => {
+    if (!viewingOpen) return;
+    closeRef.current?.focus();
+    document.documentElement.classList.add("post-viewer-open");
+    const onKey = (event: KeyboardEvent) => {
+      // Tab stays inside the post; a sheet over it keeps its own trap.
+      const viewer = document.querySelector<HTMLElement>(".post-viewer");
+      if (
+        event.key === "Tab" &&
+        viewer &&
+        !event.defaultPrevented &&
+        !document.querySelector(".sheet-layer")
+      ) {
+        const controls = [
+          ...viewer.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ].filter((control) => control.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls.at(-1);
+        const active = document.activeElement;
+        if (!viewer.contains(active)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        } else if (event.shiftKey && active === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+        return;
+      }
+      // A confirm sheet or menu over the post handles its own Escape.
+      if (
+        event.key === "Escape" &&
+        !document.querySelector(".sheet-layer, .post-menu-list")
+      )
+        closePost();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.documentElement.classList.remove("post-viewer-open");
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [viewingOpen, closePost]);
   useEffect(() => {
     if (!menuFor) return;
     const close = (event: Event) => {
@@ -474,12 +608,30 @@ export function ProofFeed({
     !decided.has(item.workoutCheckinId) && item.canReview;
   const needsVote = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canVote && !item.myVote;
-  const toReview = items.filter(needsVote);
+  const windowStart = feedWindowStart(windowEndsAt);
+  const inWindow = (item: ProofItem) =>
+    windowStart === null || Date.parse(item.submittedAt) >= windowStart;
+  const byNewest = (left: ProofItem, right: ProofItem) =>
+    Date.parse(right.submittedAt) - Date.parse(left.submittedAt);
+  // Questioned posts leave the rows for Needs you; one still open for a vote stays reachable.
+  const questioned = items
+    .filter(
+      (item) =>
+        item.reviewStatus === "questioned" &&
+        (inWindow(item) || needsVote(item)),
+    )
+    .sort(byNewest);
   const days = new Map<string, ProofItem[]>();
-  for (const item of items.filter((entry) => !toReview.includes(entry))) {
+  for (const item of items
+    .filter((entry) => entry.reviewStatus !== "questioned" && inWindow(entry))
+    .sort(byNewest)) {
     const key = dayLabel(item.submittedAt);
     days.set(key, [...(days.get(key) ?? []), item]);
   }
+  // Only what waits on the viewer counts; voted and own questioned posts stay listed.
+  const needsCount = questioned.filter(needsVote).length + needsExtraCount;
+  const needsShown = questioned.length > 0 || needsExtraShown;
+  const viewed = items.find((item) => item.workoutCheckinId === viewing);
 
   // Own posts only: caption and delete live in a menu at the post's top right.
   const ownMenu = (item: ProofItem, disabled: boolean) => {
@@ -580,9 +732,8 @@ export function ProofFeed({
     );
   };
 
-  const post = (item: ProofItem) => {
-    const disabled = busy === item.workoutCheckinId;
-    const who = item.mine ? "You" : item.authorName;
+  // Photo load state for one post; a vote can only accept proof the viewer has seen.
+  const photoKit = (item: ProofItem) => {
     const id = item.workoutCheckinId;
     const urls = {
       activity: item.activityPhotoUrl,
@@ -641,6 +792,14 @@ export function ProofFeed({
           }
         />
       ) : null;
+    return { photo, photosSeen, photoFailed, photoNote, retryPhotos };
+  };
+
+  const post = (item: ProofItem) => {
+    const disabled = busy === item.workoutCheckinId;
+    const who = item.mine ? "You" : item.authorName;
+    const { photo, photosSeen, photoFailed, photoNote, retryPhotos } =
+      photoKit(item);
     return (
       <li
         className="proof-post"
@@ -880,15 +1039,177 @@ export function ProofFeed({
     );
   };
 
+  // A questioned post in Needs you: who, the tally in referee lights, and the vote.
+  const questionedCard = (item: ProofItem) => {
+    const id = item.workoutCheckinId;
+    const disabled = busy === id;
+    const who = item.mine ? "You" : item.authorName;
+    const { photo, photosSeen } = photoKit(item);
+    const voted = decided.has(id) || item.myVote;
+    return (
+      <li className="needs-post" key={id} data-post={id}>
+        <button
+          type="button"
+          className="needs-thumb"
+          aria-label={`Open ${item.mine ? "your" : `${item.authorName}’s`} post`}
+          onClick={(event) => openPost(id, event.currentTarget)}
+        >
+          {photo(
+            "activity",
+            item.activityPhotoUrl,
+            "needs-thumb-main",
+            `${item.mine ? "Your" : `${item.authorName}'s`} workout activity`,
+          )}
+          {photo(
+            "presence",
+            item.presencePhotoUrl,
+            "needs-thumb-inset",
+            `${who} at the workout`,
+          )}
+        </button>
+        <div className="needs-post-body">
+          <p className="needs-post-title">
+            <strong>
+              {item.mine ? "Your" : `${item.authorName}’s`} {item.activityType}{" "}
+              was questioned
+            </strong>
+            <Lights item={item} />
+          </p>
+          <p className="needs-post-note">
+            {label(item.activityType)}, {item.durationMinutes} min. It still
+            counts unless most of the Group rejects it.
+          </p>
+          <p className="proof-tally">
+            Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}
+            {item.eligibleVoters} voters · {remaining(item.decisionClosesAt)}
+          </p>
+        </div>
+        {needsVote(item) ? (
+          <fieldset className="needs-vote" aria-label="Your vote">
+            <button
+              type="button"
+              className="needs-accept"
+              aria-label="Accept workout"
+              disabled={disabled || !photosSeen}
+              onClick={() =>
+                void act(item, "vote", "accept", "Vote saved: accept.")
+              }
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              className="needs-reject"
+              aria-label="Reject workout"
+              disabled={disabled}
+              onClick={() =>
+                void act(item, "vote", "reject", "Vote saved: reject.")
+              }
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              className="needs-unsure"
+              disabled={disabled}
+              onClick={() =>
+                void act(
+                  item,
+                  "vote",
+                  "cannot_assess",
+                  "Marked can’t assess. You won’t be reminded again.",
+                )
+              }
+            >
+              Can’t assess
+            </button>
+          </fieldset>
+        ) : item.mine ? (
+          <div className="needs-vote">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={disabled}
+              onClick={() =>
+                void act(
+                  item,
+                  "withdraw",
+                  "",
+                  "Withdrawn. It won’t count this week.",
+                )
+              }
+            >
+              Withdraw report
+            </button>
+          </div>
+        ) : voted ? (
+          <p className="needs-voted">
+            {item.myVote === "cannot_assess" || !item.myVote
+              ? "Your vote is in."
+              : `You voted ${item.myVote}.`}{" "}
+            The Group settles the rest.
+          </p>
+        ) : null}
+      </li>
+    );
+  };
+
+  const tile = (item: ProofItem) => {
+    const id = item.workoutCheckinId;
+    const who = item.mine ? "You" : item.authorName;
+    const workout = `${label(item.activityType)} · ${item.durationMinutes} min`;
+    return (
+      <li key={id} className="day-tile">
+        <button
+          type="button"
+          className="day-tile-open"
+          data-post={id}
+          aria-label={`${who}, ${workout}. Open post`}
+          onClick={(event) => openPost(id, event.currentTarget)}
+        >
+          {item.activityPhotoUrl ? (
+            <img
+              className="day-tile-photo"
+              src={item.activityPhotoUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <span className="day-tile-photo" />
+          )}
+          <span className="day-tile-cap" aria-hidden="true">
+            <strong className="day-tile-name">{who}</strong>
+            <span className="day-tile-workout">
+              {item.hidden ? "Reported" : workout}
+            </span>
+          </span>
+          <i
+            className={`day-tile-plate activity-swatch activity-${item.activityType}`}
+            aria-hidden="true"
+          />
+        </button>
+      </li>
+    );
+  };
+
   return (
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
-      {confirmSheet}
-      {conductSheet}
       {state === "loading" ? (
-        <p role="status" className="proof-feed-note">
-          Loading proof…
-        </p>
+        <div
+          className="day-rows-skeleton"
+          role="status"
+          aria-label="Loading posts"
+        >
+          <span className="skeleton day-skeleton-head" />
+          <span className="day-skeleton-reel">
+            <span className="skeleton day-skeleton-tile" />
+            <span className="skeleton day-skeleton-tile" />
+            <span className="skeleton day-skeleton-tile" />
+          </span>
+        </div>
       ) : state === "error" ? (
         <div className="proof-feed-note">
           <p role="alert">Couldn’t load the proof feed.</p>
@@ -900,29 +1221,106 @@ export function ProofFeed({
             Try again
           </button>
         </div>
-      ) : items.length === 0 ? (
-        <p className="proof-feed-note">
-          No proof yet this week. Log a workout and be first.
-        </p>
-      ) : (
-        <>
-          {toReview.length > 0 && (
-            <section id="needs-review" aria-labelledby="feed-review-heading">
-              <h2 id="feed-review-heading" className="feed-day">
-                Needs your vote
-                <span className="feed-badge">{toReview.length}</span>
-              </h2>
-              <ul className="proof-list">{toReview.map(post)}</ul>
-            </section>
+      ) : null}
+      {state !== "error" && needsShown && (
+        <section
+          id="needs-you"
+          className={`needs-you-panel${needsOpen ? " is-open" : ""}`}
+          aria-labelledby="needs-you-heading"
+        >
+          <h2 id="needs-you-heading" className="needs-you-heading">
+            <button
+              type="button"
+              className="needs-you-toggle"
+              aria-expanded={needsOpen}
+              aria-controls="needs-you-body"
+              aria-label={
+                needsCount > 0 ? `Needs you ${needsCount} waiting` : "Needs you"
+              }
+              onClick={() => {
+                writeNeedsOpen(!needsOpen);
+                setNeedsOpen(!needsOpen);
+              }}
+            >
+              <span>Needs you</span>
+              {needsCount > 0 && (
+                <span className="feed-badge">{needsCount}</span>
+              )}
+              <span className="needs-you-chevron" aria-hidden="true" />
+            </button>
+          </h2>
+          {needsOpen && (
+            <div id="needs-you-body" className="needs-you-body">
+              {questioned.length > 0 && (
+                <ul className="needs-posts" aria-label="Questioned workouts">
+                  {questioned.map(questionedCard)}
+                </ul>
+              )}
+              {needsExtra}
+            </div>
           )}
-          {[...days.entries()].map(([day, posts]) => (
-            <section key={day} aria-label={day}>
-              <h2 className="feed-day">{day}</h2>
-              <ul className="proof-list">{posts.map(post)}</ul>
-            </section>
-          ))}
-        </>
+        </section>
       )}
+      {state === "ready" &&
+        (days.size === 0 ? (
+          <p className="proof-feed-note">No posts this week or last.</p>
+        ) : (
+          <ol className="day-rows" aria-label="Posts by day">
+            {[...days.entries()].map(([day, posts]) => (
+              <li key={day} className="day-row">
+                <h2 className="day-row-head">
+                  <span>{day}</span>
+                  <span className="day-row-count">
+                    {posts.length} {posts.length === 1 ? "post" : "posts"}
+                  </span>
+                </h2>
+                <ul
+                  className="day-reel"
+                  aria-label={`${day} posts`}
+                  // Scrolls sideways; keyboard users reach the tiles inside.
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
+                  tabIndex={0}
+                >
+                  {posts.map(tile)}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        ))}
+      {viewed && (
+        <div
+          className="post-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${viewed.mine ? "Your" : `${viewed.authorName}’s`} post`}
+        >
+          <div className="post-viewer-bar">
+            <button
+              ref={closeRef}
+              type="button"
+              className="post-viewer-close"
+              aria-label="Close post"
+              onClick={closePost}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+          <ul className="proof-list post-viewer-list">{post(viewed)}</ul>
+        </div>
+      )}
+      {confirmSheet}
+      {conductSheet}
     </section>
   );
 }

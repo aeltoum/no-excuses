@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./member";
+import { openPost, signIn } from "./member";
 
 const proofPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -113,6 +113,7 @@ test("feed posts show their details on one line", async ({ page }) => {
         ]
       : undefined,
   );
+  await openPost(page, "Maya");
   await expect(
     page.getByText("Back squat 3×5 @ 100 kg · Row 2 km in 8:00"),
   ).toBeVisible();

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { friendId, openHome, progressItem, signIn } from "./member";
+import { friendId, openHome, openPost, progressItem, signIn } from "./member";
 
 const photo =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='3' height='4'><rect width='3' height='4' fill='%23555'/></svg>";
@@ -76,7 +76,7 @@ test("returning to the app shows friends' new progress and posts without a reloa
   await leaveAndReturn(page);
   await expect(friends).toContainText("3 of 3 workouts");
   await openHome(page);
-  await expect(page.getByAltText("Maya's workout activity")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Maya,/ })).toBeVisible();
   // No loading state replaces what was already on screen.
   await expect(page.getByRole("status", { name: /Loading/ })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("resume.png") });
@@ -197,6 +197,7 @@ test("a reaction tapped while a background reload is in flight stays", async ({
     }
     return path === "/v1/proof/feed" ? feed() : undefined;
   });
+  await openPost(page, "Maya");
   const fire = page.getByRole("button", { name: /^🔥, \d/ }).first();
   await expect(fire).toHaveAttribute("aria-pressed", "false");
   // The reload reads the server before the tap and answers after it lands.
@@ -279,6 +280,7 @@ test("a reload dropped for an overlapping write runs again at once", async ({
     }
     return path === "/v1/proof/feed" ? feed() : undefined;
   });
+  await openPost(page, "Maya");
   const fire = page.getByRole("button", { name: /^🔥, \d/ }).first();
   await expect(fire).toHaveAttribute("aria-pressed", "false");
   let answer = () => {};
@@ -305,6 +307,10 @@ test("a reload dropped for an overlapping write runs again at once", async ({
   // Maya posts again meanwhile; the dropped reload must not hide it for a minute.
   posts = 2;
   answer();
-  await expect(page.getByAltText("Maya's workout activity")).toHaveCount(2);
+  await expect(
+    page
+      .getByRole("list", { name: "Posts by day" })
+      .getByRole("button", { name: /^Maya,/ }),
+  ).toHaveCount(2);
   await expect(fire).toHaveAttribute("aria-pressed", "true");
 });
