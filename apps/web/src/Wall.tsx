@@ -127,6 +127,34 @@ const dayLabel = (iso: string) => {
   });
 };
 
+const startOfDay = (iso: string) => {
+  const day = new Date(iso);
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+};
+// The empty days strictly between two post days (newer first), as one label, or null.
+export const gapLabel = (newer: number, older: number) => {
+  const empty: Date[] = [];
+  const cursor = new Date(newer);
+  for (;;) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (cursor.getTime() <= older) break;
+    empty.push(new Date(cursor));
+  }
+  if (empty.length === 0) return null;
+  const long = empty.length >= 7;
+  const name = (date: Date) =>
+    date.toLocaleDateString(
+      undefined,
+      long
+        ? { weekday: "short", month: "short", day: "numeric" }
+        : { weekday: "short" },
+    );
+  // Oldest first, as the week reads.
+  const ordered = empty.reverse();
+  if (ordered.length <= 2) return ordered.map(name).join(", ");
+  return `${name(ordered[0])} – ${name(ordered[ordered.length - 1])}`;
+};
+
 const weekMs = 7 * 86_400_000;
 // Start of the previous accountability week, from the current week's end.
 // A cached end that has passed rolls forward, so Home never shows a stale window.
@@ -236,6 +264,7 @@ export function ProofFeed({
   needsExtraShown = false,
   members = [],
   viewerId = "",
+  solo = false,
 }: {
   apiBaseUrl: string;
   token: string;
@@ -254,6 +283,8 @@ export function ProofFeed({
   // Current Group members for the story rings, and the viewer among them.
   members?: StoryMember[];
   viewerId?: string;
+  // The viewer is the Group's only current member.
+  solo?: boolean;
 }) {
   const [items, setItems] = useState<ProofItem[]>(
     () => cachedFeed(cacheKey) ?? [],
@@ -649,13 +680,19 @@ export function ProofFeed({
         (inWindow(item) || needsVote(item)),
     )
     .sort(byNewest);
+  const inScope = items.filter(
+    (entry) => entry.reviewStatus !== "questioned" && inWindow(entry),
+  );
   const days = new Map<string, ProofItem[]>();
-  for (const item of items
-    .filter((entry) => entry.reviewStatus !== "questioned" && inWindow(entry))
-    .sort(byNewest)) {
+  // Local start of each post day, so empty days between them can collapse into one row.
+  const dayStarts = new Map<string, number>();
+  for (const item of [...inScope].sort(byNewest)) {
     const key = dayLabel(item.submittedAt);
     days.set(key, [...(days.get(key) ?? []), item]);
+    if (!dayStarts.has(key)) dayStarts.set(key, startOfDay(item.submittedAt));
   }
+  const caughtUp =
+    inScope.length > 0 && inScope.every((item) => isSeen(cacheKey, item));
   // Within a day, unseen posts first, then newest first.
   const unseenFirst = (left: ProofItem, right: ProofItem) =>
     Number(seenAtLoad.has(left.workoutCheckinId)) -
@@ -1238,9 +1275,7 @@ export function ProofFeed({
         members={members}
         viewerId={viewerId}
         cacheKey={cacheKey}
-        posts={items.filter(
-          (entry) => entry.reviewStatus !== "questioned" && inWindow(entry),
-        )}
+        posts={inScope}
         ownSince={windowStart === null ? null : windowStart + weekMs}
         seenAtLoad={seenAtLoad}
       />
@@ -1310,29 +1345,65 @@ export function ProofFeed({
       )}
       {state === "ready" &&
         (days.size === 0 ? (
-          <p className="proof-feed-note">No posts this week or last.</p>
+          solo ? (
+            <p className="feed-empty feed-solo">Your crew’s posts land here.</p>
+          ) : (
+            <div className="feed-empty">
+              <span className="feed-ghosts" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+              <h2>No posts this week or last.</h2>
+              <p>Workouts your crew logs show up here, newest day first.</p>
+            </div>
+          )
         ) : (
-          <ol className="day-rows" aria-label="Posts by day">
-            {[...days.entries()].map(([day, posts]) => (
-              <li key={day} className="day-row">
-                <h2 className="day-row-head">
-                  <span>{day}</span>
-                  <span className="day-row-count">
-                    {posts.length} {posts.length === 1 ? "post" : "posts"}
-                  </span>
-                </h2>
-                <ul
-                  className="day-reel"
-                  aria-label={`${day} posts`}
-                  // Scrolls sideways; keyboard users reach the tiles inside.
-                  // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
-                  tabIndex={0}
-                >
-                  {posts.map(tile)}
-                </ul>
-              </li>
-            ))}
-          </ol>
+          <>
+            {caughtUp && (
+              <p className="feed-caught" role="status">
+                <span>You’re caught up</span>
+              </p>
+            )}
+            <ol className="day-rows" aria-label="Posts by day">
+              {[...days.entries()].flatMap(([day, posts], index, all) => {
+                const row = (
+                  <li key={day} className="day-row">
+                    <h2 className="day-row-head">
+                      <span>{day}</span>
+                      <span className="day-row-count">
+                        {posts.length} {posts.length === 1 ? "post" : "posts"}
+                      </span>
+                    </h2>
+                    <ul
+                      className="day-reel"
+                      aria-label={`${day} posts`}
+                      // Scrolls sideways; keyboard users reach the tiles inside.
+                      // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
+                      tabIndex={0}
+                    >
+                      {posts.map(tile)}
+                    </ul>
+                  </li>
+                );
+                const next = all[index + 1];
+                if (!next) return [row];
+                const gap = gapLabel(
+                  dayStarts.get(day) ?? 0,
+                  dayStarts.get(next[0]) ?? 0,
+                );
+                return gap
+                  ? [
+                      row,
+                      <li key={`gap-${day}`} className="day-gap">
+                        <span>{gap}</span>
+                        <span>No posts</span>
+                      </li>,
+                    ]
+                  : [row];
+              })}
+            </ol>
+          </>
         ))}
       {viewed && (
         <div
