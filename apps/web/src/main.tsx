@@ -62,7 +62,13 @@ const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Missing application root");
 const root = createRoot(rootElement);
 
-try {
+if (
+  import.meta.env.DEV &&
+  new URLSearchParams(location.search).get("proto") === "home"
+) {
+  const { HomeFeedPrototype } = await import("./HomeFeed.prototype");
+  root.render(<HomeFeedPrototype />);
+} else try {
   const environment = readPublicEnvironment(import.meta.env);
   const auth = createClient(
     environment.supabaseUrl,
