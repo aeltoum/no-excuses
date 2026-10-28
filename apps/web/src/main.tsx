@@ -64,6 +64,12 @@ const root = createRoot(rootElement);
 
 if (
   import.meta.env.DEV &&
+  new URLSearchParams(location.search).get("proto") === "empty"
+) {
+  const { EmptyStatesPrototype } = await import("./EmptyStates.prototype");
+  root.render(<EmptyStatesPrototype />);
+} else if (
+  import.meta.env.DEV &&
   new URLSearchParams(location.search).get("proto") === "home"
 ) {
   const { HomeFeedPrototype } = await import("./HomeFeed.prototype");

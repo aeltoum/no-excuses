@@ -1,0 +1,26 @@
+/* PROTOTYPE — throwaway styles for EmptyStates.prototype.tsx (builds on HomeFeed.prototype.css) */
+.es-ghosts { pointer-events: none; }
+.es-ghost { flex: 0 0 168px; aspect-ratio: 9 / 16; border-radius: 12px; border: 2px dashed var(--empty-slot); }
+.es-ghost.small { flex-basis: 64px; }
+.es-ghosts .es-ghost:nth-child(2) { opacity: 0.6; }
+.es-ghosts .es-ghost:nth-child(3) { opacity: 0.3; }
+.es-gaptext { align-self: center; font-size: 0.8rem; }
+
+.es-empty { display: grid; gap: 8px; margin-top: 18px; }
+.es-empty .hp-reel { margin-bottom: 12px; }
+.es-empty h2 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+.es-cta { justify-self: start; margin-top: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; font-weight: 600; }
+
+.es-needs-clear { margin: 14px 0 4px !important; color: var(--muted); font-size: 0.8rem; }
+
+.es-gaprow { display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--rule); font-size: 0.875rem; color: var(--muted); }
+
+.es-caught { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 14px; border-radius: 16px; background: var(--surface); font-size: 0.9rem; }
+.es-caught strong { flex: 1; font-weight: 600; }
+.es-caught button { min-height: 40px; padding: 0 14px; border: 0; border-radius: 12px; font-weight: 600; }
+
+.es-invite-ring { flex: 0 0 auto; display: grid; justify-items: center; gap: 6px; padding: 0; border: 0; background: none; }
+.es-invite-ring > span:first-child { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px dashed var(--chalk); font-size: 1.6rem; }
+
+.es-switch .es-dir { width: auto; padding: 0 12px; border-radius: 999px; background: #000; color: #fff !important; font-size: 0.75rem; font-weight: 700; }
