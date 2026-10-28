@@ -19,6 +19,7 @@ import {
 import { Avatar, useAvatars } from "./avatars";
 import { Barbell } from "./Barbell";
 import { Consequences, type LogBlock, useCardSummary } from "./Consequences";
+import { CountNotice } from "./CountNotice";
 import {
   type DetailsDraft,
   DetailsFields,
@@ -436,6 +437,18 @@ export function Weekly({
       Boolean(membership),
     feedRevoked,
   );
+  // Dismissing the one-time notice is optimistic; a failure brings it back with an error.
+  const [noticeFailed, setNoticeFailed] = useState(false);
+  const dismissNotice = () => {
+    setNoticeFailed(false);
+    applyExtras((current) => ({ ...current, countNotice: false }));
+    call(apiBaseUrl, token, "/v1/notices/dismiss", { method: "POST" }).catch(
+      () => {
+        applyExtras((current) => ({ ...current, countNotice: true }));
+        setNoticeFailed(true);
+      },
+    );
+  };
   const ballotAttention = extras.exceptions.toDecide.filter(
     (ballot) => !ballot.myResponse,
   ).length;
@@ -1085,6 +1098,9 @@ export function Weekly({
         <>
           {home && (
             <>
+              {!week && extras.countNotice && (
+                <CountNotice failed={noticeFailed} onDismiss={dismissNotice} />
+              )}
               {!week && <InstallPrompt />}
               {week && own && (
                 <div

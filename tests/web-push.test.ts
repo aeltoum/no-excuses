@@ -84,8 +84,8 @@ describe("Web Push notifications", () => {
     expect(await outbox(db)).toEqual([
       {
         account_id: peer,
-        title: "Alex logged a workout",
-        body: "1 of 3 this week. Your move.",
+        title: "Alex posted a cardio workout",
+        body: "1 of 3 this week.",
       },
     ]);
   });
