@@ -16,12 +16,17 @@ self.addEventListener("activate", (event) =>
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  const key = photoKey(new URL(event.request.url));
+  const url = new URL(event.request.url);
+  const key = photoKey(url);
   if (!key) return;
   event.respondWith(
     caches.open(photoCache).then(async (cache) => {
       const hit = await cache.match(key);
       if (hit) return hit;
+      // The app marks a saved URL whose token expired: storage would only
+      // answer 400, so a miss waits for the fresh URL instead.
+      if (url.searchParams.has("cache-only"))
+        return new Response(null, { status: 504 });
       const response = await fetch(event.request);
       if (response.ok) {
         await cache.put(key, response.clone());

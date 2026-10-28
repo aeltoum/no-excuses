@@ -73,7 +73,7 @@ const intensityLabels = {
   high: { emoji: "🥵", text: "Brutal" },
 };
 
-// Time left before the week closes, as the Home title, ticking each second.
+// Time left before the week closes, as the Week title, ticking each second.
 function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -962,7 +962,11 @@ export function Weekly({
     >
       {home ? (
         <header className="home-header">
-          <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
+          {week ? (
+            <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
+          ) : (
+            <h1>Home</h1>
+          )}
           {week && own && (
             <button
               type="button"
@@ -1274,6 +1278,41 @@ export function Weekly({
                     ))}
                 </ul>
               )}
+              {week && own && progress.length > 0 && (
+                <section
+                  className="group-bars"
+                  aria-labelledby="group-bars-title"
+                >
+                  <h2 id="group-bars-title">The Group this week</h2>
+                  <ul>
+                    {progress.map((item) => (
+                      <li key={item.membershipId}>
+                        <span className="group-bars-head">
+                          <Avatar
+                            name={item.displayName}
+                            url={avatars[item.membershipId]}
+                            size="sm"
+                          />
+                          <strong>
+                            {item.membershipId === membership.membershipId
+                              ? "You"
+                              : item.displayName}
+                          </strong>
+                          <span>
+                            {item.completedWorkoutCount} of {item.lockedTarget}
+                          </span>
+                        </span>
+                        <Barbell
+                          count={item.completedWorkoutCount}
+                          target={item.lockedTarget}
+                          size="mini"
+                          activityTypes={item.activityTypes}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               {week && own && (
                 <div id="needs-consequences" className="needs-anchor">
                   <Consequences
@@ -1287,9 +1326,10 @@ export function Weekly({
                   />
                 </div>
               )}
-              {!week && own && (
+              {/* Home has no way to start a timed workout; one already running still finishes here. */}
+              {!week && own && extras.session && (
                 <div className="home-tasks">
-                  {<div className="home-actions">{sessionCard()}</div>}
+                  <div className="home-actions">{sessionCard()}</div>
                 </div>
               )}
               {!week && own && (
@@ -1770,8 +1810,6 @@ export function Weekly({
                   onRevoked={feedRevoked}
                   onItems={feedItems}
                   windowEndsAt={targetContext?.nextWeekStartsAt}
-                  members={progress}
-                  viewerId={membership.membershipId}
                   solo={targetContext?.memberCount === 1}
                   needsExtraCount={cardAttention + ballotAttention}
                   needsExtraShown={
@@ -1974,41 +2012,6 @@ export function Weekly({
           )}
           {route === "/history" && (
             <>
-              {progress.length > 0 && (
-                <section
-                  className="group-bars"
-                  aria-labelledby="group-bars-title"
-                >
-                  <h2 id="group-bars-title">The Group this week</h2>
-                  <ul>
-                    {progress.map((item) => (
-                      <li key={item.membershipId}>
-                        <span className="group-bars-head">
-                          <Avatar
-                            name={item.displayName}
-                            url={avatars[item.membershipId]}
-                            size="sm"
-                          />
-                          <strong>
-                            {item.membershipId === membership.membershipId
-                              ? "You"
-                              : item.displayName}
-                          </strong>
-                          <span>
-                            {item.completedWorkoutCount} of {item.lockedTarget}
-                          </span>
-                        </span>
-                        <Barbell
-                          count={item.completedWorkoutCount}
-                          target={item.lockedTarget}
-                          size="mini"
-                          activityTypes={item.activityTypes}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
               <SeasonCard season={extras.season} />
               <UnlockList unlocks={extras.unlocks} />
               <h2>The rack</h2>
@@ -2175,16 +2178,11 @@ export async function loadWeekly(
     syncedAt: Date.now(),
   };
   if (route === "/history") {
-    // History also shows every member's bar for the current week.
-    const [historyResponse, targetResponse, progressResponse] =
-      await Promise.all([
-        api.history(token, groupId),
-        api.target(token),
-        api.progress(token, groupId).catch(() => null),
-      ]);
+    const [historyResponse, targetResponse] = await Promise.all([
+      api.history(token, groupId),
+      api.target(token),
+    ]);
     next.history = historyResponse.data as FinalizedWeeklyHistoryItem[];
-    if (progressResponse)
-      next.progress = progressResponse.data as CurrentWeekProgressItem[];
     next.targetContext = targetResponse.data as WeeklyTargetContext;
   } else if (route === "/target") {
     const [progressResponse, targetResponse] = await Promise.all([
@@ -2194,7 +2192,7 @@ export async function loadWeekly(
     next.progress = progressResponse.data;
     next.targetContext = targetResponse.data as WeeklyTargetContext;
   } else {
-    // Home also reads the week's end for its countdown; that part may fail alone.
+    // Home and Week also read the week's end (Week's countdown); that part may fail alone.
     const [progressResponse, targetResponse] = await Promise.all([
       api.progress(token, groupId),
       api.target(token).catch(() => null),

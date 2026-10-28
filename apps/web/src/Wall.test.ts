@@ -70,3 +70,29 @@ describe("loadProofFeed", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("saved signed URLs", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("replaces an old URL whose image failed, even while it is still valid", async () => {
+    const { markFailed } = await import("./signed");
+    const old = signed("f.jpg", Date.now() + 10 * hour, "old");
+    const fresh = signed("f.jpg", Date.now() + 24 * hour, "new");
+    markFailed(old);
+    expect(keepPhotoUrls([item(old)], [item(fresh)])[0]?.activityPhotoUrl).toBe(
+      fresh,
+    );
+  });
+
+  it("never hands storage an expired URL", async () => {
+    const { savedSigned } = await import("./signed");
+    const expired = signed("a.jpg", Date.now() - hour, "old");
+    vi.stubGlobal("navigator", { serviceWorker: { controller: null } });
+    expect(savedSigned(expired)).toBeNull();
+    vi.stubGlobal("navigator", { serviceWorker: { controller: {} } });
+    // With the service worker, only its cache is asked.
+    expect(savedSigned(expired)).toContain("cache-only=1");
+    const valid = signed("a.jpg", Date.now() + hour, "ok");
+    expect(savedSigned(valid)).toBe(valid);
+  });
+});

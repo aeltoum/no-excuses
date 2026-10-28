@@ -52,6 +52,9 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
   await expect(
     page.getByRole("list", { name: "Friends this week" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "The Group this week" }),
+  ).toHaveCount(0);
   // Cards waiting on the member sit in Home's Needs you.
   await expect(
     page
@@ -80,6 +83,11 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText(["MAMaya2 of 3 workoutsOwes 1 cardNudge"]);
+  // Every member's barbell for this week lives on Week alone.
+  const bars = page.getByRole("region", { name: "The Group this week" });
+  await expect(bars.getByRole("listitem")).toHaveCount(2);
+  await expect(bars.getByRole("listitem").first()).toContainText("You1 of 3");
+  await expect(bars.getByRole("listitem").nth(1)).toContainText("Maya2 of 3");
   await expect(
     page.getByRole("region", { name: "Consequence cards" }),
   ).toBeVisible();

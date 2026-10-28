@@ -62,7 +62,7 @@ test("iPhone Safari members are told to install for notifications until they dis
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: /^(Our week|Week ends in|Week closing)/,
+      name: "Home",
     }),
   ).toBeVisible();
   await expect(tip).toHaveCount(0);
