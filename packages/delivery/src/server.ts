@@ -1103,7 +1103,7 @@ async function proof(request: Request, path: string): Promise<Response> {
       const [, id = "", action = ""] = match;
       const choice = String(body.choice ?? "");
       const allowed: Record<string, string[]> = {
-        review: ["verify", "question"],
+        review: ["question"],
         vote: ["accept", "reject", "cannot_assess"],
         moderate: ["restore", "remove"],
         withdraw: [""],

@@ -17,7 +17,7 @@ export type ProofItem = {
   perceivedIntensity: string;
   completedAt: string;
   submittedAt: string;
-  reviewStatus: "pending" | "verified" | "questioned";
+  reviewStatus: "verified" | "questioned";
   reviewClosesAt: string | null;
   decisionClosesAt: string | null;
   hidden: boolean;

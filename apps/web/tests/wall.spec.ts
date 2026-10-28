@@ -1,10 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { homeExtras, openHome, openWeek } from "./member";
+import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
-const pendingId = "70000000-0000-4000-8000-000000000001";
+const recentId = "70000000-0000-4000-8000-000000000001";
 const questionedId = "70000000-0000-4000-8000-000000000002";
 const session = {
   access_token: "live-access",
@@ -26,7 +27,7 @@ const photo =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='3' height='4'><rect width='3' height='4' fill='%23555'/></svg>";
 const friendMembershipId = "30000000-0000-4000-8000-000000000002";
 const item = (overrides: Record<string, unknown>) => ({
-  workoutCheckinId: pendingId,
+  workoutCheckinId: recentId,
   authorMembershipId: friendMembershipId,
   authorName: "Maya",
   mine: false,
@@ -35,7 +36,7 @@ const item = (overrides: Record<string, unknown>) => ({
   perceivedIntensity: "high",
   completedAt: "2026-10-12T15:00:00.000Z",
   submittedAt: "2026-10-12T15:05:00.000Z",
-  reviewStatus: "pending",
+  reviewStatus: "verified",
   reviewClosesAt: new Date(Date.now() + 5 * 3_600_000).toISOString(),
   decisionClosesAt: null,
   hidden: false,
@@ -57,7 +58,7 @@ const releaseReview = new Promise<void>((resolve) => {
   answerReview = resolve;
 });
 
-test("Home feed reviews, votes on, and reports friends' proof", async ({
+test("Home feed questions, votes on, and reports friends' proof", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -154,7 +155,16 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
       if (action[2] === "review")
         feed = feed.map((entry) =>
           entry.workoutCheckinId === action[1]
-            ? { ...entry, reviewStatus: "verified", canReview: false }
+            ? {
+                ...entry,
+                reviewStatus: "questioned",
+                reviewClosesAt: null,
+                decisionClosesAt: new Date(
+                  Date.now() + 48 * 3_600_000,
+                ).toISOString(),
+                eligibleVoters: 2,
+                canReview: false,
+              }
             : entry,
         );
       if (action[2] === "vote")
@@ -182,16 +192,17 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  // Posts count on submit: only the Group decision waits on the viewer.
   await expect(
-    page.getByRole("heading", { name: "Needs your review" }),
+    page.getByRole("heading", { name: "Needs your vote" }),
   ).toBeVisible();
   const homeTab = page.getByRole("link", { name: /^Home/ });
-  await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
+  await expect(homeTab).toHaveAccessibleName("Home 1 waiting on you");
   // The week's status, friends and docking bar live on Week.
   await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText([
-    "MAMaya2 of 3 workoutsNeeds your reviewNudge",
+    "MAMaya2 of 3 workoutsNeeds your voteNudge",
   ]);
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
@@ -201,7 +212,21 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(
     page.getByRole("img", { name: "Maya at the workout" }),
   ).toBeVisible();
-  await expect(page.getByText("Review · 5h left")).toBeVisible();
+  // No single-peer review: no Verify button, review labels, stamp or lamps.
+  await expect(
+    page.getByRole("button", { name: /Verify workout/ }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/Awaiting review|Review ·/)).toHaveCount(0);
+  await expect(page.getByText("Needs your review")).toHaveCount(0);
+  await expect(page.locator(".proof-stamp, .proof-decide .lamp")).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
+  await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
+  const question = page.getByRole("button", {
+    name: "Question workout · 5h left",
+  });
+  await expect(question).toBeVisible();
   expect(
     (await new AxeBuilder({ page }).analyze()).violations.filter((entry) =>
       ["serious", "critical"].includes(entry.impact ?? ""),
@@ -212,22 +237,47 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
     path: testInfo.outputPath("wall-review.png"),
   });
 
-  // Both posts carry a light box: the pending review first, then the vote.
-  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(1);
+  // Questioning shows at once, while a slow API is still answering.
   await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(1);
-  await page.getByRole("button", { name: "Verify workout" }).first().click();
-  // The choice disappears on tap, before the API answers.
-  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
-  // Outcome shows at once, while the API is still answering.
-  await expect(page.getByRole("status")).toHaveText("Workout verified.");
-  await expect(page.getByText("Verified ✓", { exact: true })).toBeVisible();
+  const undoDelay = await delayRoute(
+    page,
+    "http://127.0.0.1:8787/v1/proof/*/review",
+    1000,
+  );
+  const questionMs = await msUntilVisible(
+    page,
+    () => question.click(),
+    page.getByText("Workout questioned. The Group votes for 48 hours."),
+  );
+  testInfo.annotations.push({
+    type: "question feedback ms",
+    description: String(questionMs),
+  });
+  expect(questionMs).toBeLessThanOrEqual(100);
+  await expect(question).toHaveCount(0);
+  await expect(page.getByText("Questioned", { exact: true })).toHaveCount(2);
   answerReview();
-  // A made choice takes its buttons with it.
-  await expect(page.getByRole("group", { name: "Review" })).toHaveCount(0);
+  await undoDelay();
+  await expect(question).toHaveCount(0);
 
   await expect(page.getByText("Accept 1 · Reject 0 of 3 voters")).toBeVisible();
   // A failed vote rolls back: the buttons and counts return with an error.
-  await page.getByRole("button", { name: "Reject workout" }).click();
+  const undoVoteDelay = await delayRoute(
+    page,
+    "http://127.0.0.1:8787/v1/proof/*/vote",
+    1000,
+  );
+  const voteMs = await msUntilVisible(
+    page,
+    () => page.getByRole("button", { name: "Reject workout" }).click(),
+    page.getByText("Vote saved: reject."),
+  );
+  testInfo.annotations.push({
+    type: "vote feedback ms",
+    description: String(voteMs),
+  });
+  expect(voteMs).toBeLessThanOrEqual(100);
+  await undoVoteDelay();
   await expect(page.getByRole("alert")).toHaveText(
     "Something went wrong. Try again.",
   );
@@ -242,7 +292,7 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(page.getByRole("button", { name: "Report photos" })).toHaveCount(
     0,
   );
-  expect(actions).toEqual(["review:verify", "vote:reject"]);
+  expect(actions).toEqual(["review:question", "vote:reject"]);
   // Only the deliberately failed vote may log.
   expect(errors.filter((text) => !text.includes("status of 500"))).toEqual([]);
 });

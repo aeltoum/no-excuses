@@ -423,8 +423,8 @@ export function Weekly({
   const [docked, setDocked] = useState(false);
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const [feedAttention, setFeedAttention] = useState(0);
-  const [feedTasks, setFeedTasks] = useState({ reviews: 0, votes: 0 });
-  const [ownAwaiting, setOwnAwaiting] = useState(0);
+  const [feedTasks, setFeedTasks] = useState({ votes: 0 });
+  const [ownQuestioned, setOwnQuestioned] = useState(0);
   const [cardAttention, setCardAttention] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
   const feedRevoked = useCallback(() => revokeRef.current(), []);
@@ -452,18 +452,12 @@ export function Weekly({
   const excused = new Set(extras.exceptions.excused);
   const weekOffPending = new Set(extras.exceptions.pending);
   const feedItems = useCallback((items: ProofItem[]) => {
-    const waiting = items.filter(
-      (item) => item.canReview || (item.canVote && !item.myVote),
-    );
+    // Only a Group decision waits on the member; questioning is optional.
+    const waiting = items.filter((item) => item.canVote && !item.myVote);
     setFeedAttention(waiting.length);
-    setFeedTasks({
-      reviews: items.filter((item) => item.canReview).length,
-      votes: items.filter(
-        (item) => !item.canReview && item.canVote && !item.myVote,
-      ).length,
-    });
-    setOwnAwaiting(
-      items.filter((item) => item.mine && item.reviewStatus === "pending")
+    setFeedTasks({ votes: waiting.length });
+    setOwnQuestioned(
+      items.filter((item) => item.mine && item.reviewStatus === "questioned")
         .length,
     );
     setAwaitingReview(new Set(waiting.map((item) => item.authorMembershipId)));
@@ -622,7 +616,7 @@ export function Weekly({
     )?.lockedTarget;
     setNotice({
       kind: "success",
-      text: `Workout logged. ${last?.count} of ${target} this week. It counts once a friend verifies it or 24 hours pass.`,
+      text: `Workout logged. ${last?.count} of ${target} this week. It counts now; friends can question it for 24 hours.`,
     });
     // Refresh in the background; the screen already shows the server count.
     void api
@@ -819,12 +813,12 @@ export function Weekly({
   const uploading = counted.filter(
     (entry) => entry.status === "sending",
   ).length;
-  const provisional = uploading + ownAwaiting;
+  const provisional = uploading + ownQuestioned;
   const settleLine = own
     ? [
         `${Math.max(0, own.completedWorkoutCount - provisional)} settled`,
         uploading > 0 && `${uploading} uploading`,
-        ownAwaiting > 0 && `${ownAwaiting} awaiting review`,
+        ownQuestioned > 0 && `${ownQuestioned} questioned`,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -834,11 +828,6 @@ export function Weekly({
       href: "/week#needs-consequences",
       text: `Consequence card${cardAttention === 1 ? "" : "s"} to settle`,
       count: cardAttention,
-    },
-    feedTasks.reviews > 0 && {
-      href: "#needs-review",
-      text: `Workout${feedTasks.reviews === 1 ? "" : "s"} to review`,
-      count: feedTasks.reviews,
     },
     feedTasks.votes > 0 && {
       href: "#needs-review",
@@ -1016,7 +1005,7 @@ export function Weekly({
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
           <p className="lead">
             {route === "/target"
-              ? "Every workout needs proof photos. Only workouts your friends verify, or that go unquestioned for 24 hours, count."
+              ? "Every workout needs proof photos. A workout counts once it’s posted; friends can question it for 24 hours."
               : "Each plate is a finished week, marked met or missed."}
           </p>
         </>
@@ -1248,7 +1237,7 @@ export function Weekly({
                             const status = groupOwed[item.membershipId]
                               ? `Owes ${groupOwed[item.membershipId]} card${groupOwed[item.membershipId] === 1 ? "" : "s"}`
                               : awaitingReview.has(item.membershipId)
-                                ? "Needs your review"
+                                ? "Needs your vote"
                                 : weekOffPending.has(item.membershipId)
                                   ? "Week off requested"
                                   : excused.has(item.membershipId)

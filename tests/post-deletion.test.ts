@@ -28,10 +28,6 @@ describe("Post deletion", { timeout: 30_000 }, () => {
     const db = await database([2, 1, 1]);
     const first = await submitProof(db, 0);
     await as(db, 1);
-    await db.query(
-      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T11:00Z')",
-      [first],
-    );
     await as(db, 2);
     await db.query(
       "select app_private.react_to_proof($1, '🔥', true, '2026-03-05T11:00Z')",
@@ -118,10 +114,6 @@ describe("Post deletion", { timeout: 30_000 }, () => {
       [rejected],
     );
     await as(db, 1);
-    await db.query(
-      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T12:00Z')",
-      [verified],
-    );
     await db.query(
       "select app_private.finalize_ended_member_weeks('2026-03-09T01:00Z')",
     );

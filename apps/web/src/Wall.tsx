@@ -176,11 +176,10 @@ export function ProofFeed({
   const [busy, setBusy] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const fresh = useFreshness();
-  const [stamped, setStamped] = useState<string | null>(null);
   // Posts the viewer just acted on; their buttons hide before the refetch lands.
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useNotice();
-  // Per-photo load state; a review can only verify proof the viewer has seen.
+  // Per-photo load state; a vote can only accept proof the viewer has seen.
   const [photoState, setPhotoState] = useState<Record<string, PhotoState>>({});
   const [photoRetry, setPhotoRetry] = useState<Record<string, number>>({});
   const avatars = useAvatars();
@@ -286,10 +285,7 @@ export function ProofFeed({
                 acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
                 rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
               }
-            : {
-                ...item,
-                reviewStatus: choice === "verify" ? "verified" : "questioned",
-              };
+            : { ...item, reviewStatus: "questioned", canReview: false };
       const swap = (next: ProofItem) =>
         setItems((current) =>
           current.map((entry) =>
@@ -298,13 +294,7 @@ export function ProofFeed({
         );
       setBusy(id);
       setDecided((ids) => new Set(ids).add(id));
-      const confirm = () => {
-        if (action === "review" && choice === "verify") {
-          setStamped(id);
-          window.setTimeout(() => setStamped(null), 900);
-        }
-        setNotice({ kind: "success", text: done });
-      };
+      const confirm = () => setNotice({ kind: "success", text: done });
       if (instant) {
         swap(optimistic);
         confirm();
@@ -474,11 +464,11 @@ export function ProofFeed({
   }, [items]);
 
   // A choice already made, here or on another device, needs no buttons.
-  const needsReview = (item: ProofItem) =>
+  const canQuestion = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canReview;
   const needsVote = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canVote && !item.myVote;
-  const toReview = items.filter((item) => needsReview(item) || needsVote(item));
+  const toReview = items.filter(needsVote);
   const days = new Map<string, ProofItem[]>();
   for (const item of items.filter((entry) => !toReview.includes(entry))) {
     const key = dayLabel(item.submittedAt);
@@ -660,13 +650,9 @@ export function ProofFeed({
           <span className={`proof-status proof-${item.reviewStatus}`}>
             {item.hidden
               ? "Reported"
-              : item.reviewStatus === "pending"
-                ? item.canReview
-                  ? `Review · ${remaining(item.reviewClosesAt)}`
-                  : "Awaiting review"
-                : item.reviewStatus === "questioned"
-                  ? "Questioned"
-                  : "Verified ✓"}
+              : item.reviewStatus === "questioned"
+                ? "Questioned"
+                : "Verified ✓"}
           </span>
           {item.mine && ownMenu(item, disabled)}
         </header>
@@ -702,62 +688,56 @@ export function ProofFeed({
             {label(item.activityType)} · {item.durationMinutes} min ·{" "}
             {label(item.perceivedIntensity)}
           </span>
-          {stamped === item.workoutCheckinId && (
-            <span className="proof-stamp" aria-hidden="true">
-              Verified
-            </span>
-          )}
         </div>
         {item.details && (
           <p className="proof-details">{detailLine(item.details)}</p>
         )}
-        {(needsReview(item) || needsVote(item)) && (
-          // Review base: continues the photo frame; Verify in chalk, Question in red.
-          <fieldset
-            className="proof-decide"
-            aria-label={needsReview(item) ? "Review" : "Your vote"}
-          >
+        {needsVote(item) && (
+          // Vote base: continues the photo frame; Accept in chalk, Reject in red.
+          <fieldset className="proof-decide" aria-label="Your vote">
             <button
               type="button"
               className="lamp-good"
               disabled={disabled || !photosSeen}
               onClick={() =>
-                void (needsReview(item)
-                  ? act(item, "review", "verify", "Workout verified.")
-                  : act(item, "vote", "accept", "Vote saved: accept."))
+                void act(item, "vote", "accept", "Vote saved: accept.")
               }
             >
-              <span className="lamp" aria-hidden="true" />
-              {needsReview(item) ? "Verify workout" : "Accept workout"}
+              Accept workout
             </button>
             <button
               type="button"
               className="lamp-no"
               disabled={disabled}
               onClick={() =>
-                void (needsReview(item)
-                  ? act(
-                      item,
-                      "review",
-                      "question",
-                      "Workout questioned. The Group votes for 48 hours.",
-                    )
-                  : act(item, "vote", "reject", "Vote saved: reject."))
+                void act(item, "vote", "reject", "Vote saved: reject.")
               }
             >
-              <span className="lamp" aria-hidden="true" />
-              {needsReview(item) ? "Question workout" : "Reject workout"}
+              Reject workout
             </button>
             <p className="proof-decide-hint">
-              {!photosSeen
-                ? needsReview(item)
-                  ? "Verify unlocks once both photos load. Question it if you can’t see the proof."
-                  : "Accept unlocks once both photos load."
-                : needsReview(item)
-                  ? "Questioning opens a 48-hour Group vote."
-                  : "The Group settles this by vote."}
+              {photosSeen
+                ? "The Group settles this by vote."
+                : "Accept unlocks once both photos load."}
             </p>
           </fieldset>
+        )}
+        {canQuestion(item) && (
+          <button
+            type="button"
+            className="proof-report"
+            disabled={disabled}
+            onClick={() =>
+              void act(
+                item,
+                "review",
+                "question",
+                "Workout questioned. The Group votes for 48 hours.",
+              )
+            }
+          >
+            Question workout · {remaining(item.reviewClosesAt)}
+          </button>
         )}
         {needsVote(item) && (
           <button
@@ -923,7 +903,7 @@ export function ProofFeed({
           {toReview.length > 0 && (
             <section id="needs-review" aria-labelledby="feed-review-heading">
               <h2 id="feed-review-heading" className="feed-day">
-                Needs your review
+                Needs your vote
                 <span className="feed-badge">{toReview.length}</span>
               </h2>
               <ul className="proof-list">{toReview.map(post)}</ul>
