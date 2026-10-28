@@ -93,6 +93,7 @@ const defaults = (call: ApiCall): unknown => {
     };
   if (path.endsWith("/pending-invitations")) return [];
   if (path === "/v1/proof/feed") return [];
+  if (path === "/v1/proof/seen") return { marked: 0 };
   if (path === "/v1/consequences")
     return { owed: 0, offer: null, attempt: null, reviews: [], groupOwed: {} };
   if (path === "/v1/nudges") return [];

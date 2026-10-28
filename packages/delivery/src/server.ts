@@ -953,6 +953,7 @@ async function proof(request: Request, path: string): Promise<Response> {
             canReview: row.can_review,
             canVote: row.can_vote,
             canDelete: row.can_delete,
+            seen: row.seen,
             details: details.get(row.workout_checkin_id) ?? null,
             caption: text.get(row.workout_checkin_id)?.caption ?? null,
             messages: text.get(row.workout_checkin_id)?.messages ?? [],
@@ -966,6 +967,23 @@ async function proof(request: Request, path: string): Promise<Response> {
           })),
         ),
       );
+    }
+    // Seen posts: many ids per call; the database ignores ids the viewer can't see.
+    if (path === "/v1/proof/seen" && request.method === "POST") {
+      const ids = body.ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.length > 100 ||
+        !ids.every(uuid)
+      )
+        return reply(fail("invalid_request", 400));
+      const marked = await query(
+        actor,
+        "select app_private.mark_posts_seen($1::uuid[],$2) as added",
+        [[...new Set(ids)], now],
+      );
+      return reply(ok({ marked: marked.rows[0]?.added ?? 0 }));
     }
     const reactors = proofReactors.exec(path);
     if (reactors && request.method === "GET") {

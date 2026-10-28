@@ -73,6 +73,7 @@ describe("migrations", () => {
       { version: 48 },
       { version: 49 },
       { version: 50 },
+      { version: 51 },
     ]);
     await db.close();
   });
