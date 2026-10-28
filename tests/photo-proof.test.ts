@@ -23,13 +23,16 @@ const memberships = [
 ];
 const week = "50000000-0000-4000-8000-000000000001";
 
-async function database() {
+const switchOver = "20261115000000_proof_counts_on_submit.sql";
+
+async function database(before?: string) {
   const db = new PGlite();
   opened.push(db);
   await db.exec(
     "create role anon; create role authenticated; create role service_role;",
   );
   for (const file of (await readdir(migrationsDirectory)).sort()) {
+    if (before && file >= before) break;
     await db.exec(await readFile(new URL(file, migrationsDirectory), "utf8"));
   }
   await db.exec(`
@@ -108,6 +111,14 @@ const status = async (db: PGlite, id: string) =>
     )
   ).rows[0]?.review_status;
 
+const progress = async (db: PGlite, member: number) =>
+  (
+    await db.query<{ n: number }>(
+      "select count(*)::integer as n from app_private.workout_checkins c join app_private.memberships m using (membership_id) where m.membership_id = $1 and c.review_status = 'verified'",
+      [memberships[member]],
+    )
+  ).rows[0]?.n;
+
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("Photo proof", { timeout: 30_000 }, () => {
@@ -127,37 +138,82 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       submit(db, 0, { activity: presence, presence }),
     ).rejects.toThrow("both proof photos required");
     const id = await submit(db, 0);
-    expect(await status(db, id)).toBe("pending");
+    expect(await status(db, id)).toBe("verified");
   });
 
-  it("verifies on one peer approval or after 24 unquestioned hours", async () => {
+  it("counts a report at once and offers no single-peer Verify", async () => {
     const db = await database();
-    const first = await submit(db, 0);
-    const second = await submit(db, 1);
-    await as(db, 0);
+    const id = await submit(db, 0);
+    expect(await status(db, id)).toBe("verified");
+    expect(
+      (
+        await db.query(
+          "select verified_at = submitted_at as same from app_private.workout_checkins where workout_checkin_id = $1",
+          [id],
+        )
+      ).rows,
+    ).toEqual([{ same: true }]);
+    expect(await progress(db, 0)).toBe(1);
+    await as(db, 1);
     await expect(
       db.query(
         "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T11:00Z')",
-        [first],
+        [id],
       ),
-    ).rejects.toThrow("review unavailable");
-    await as(db, 1);
-    await db.query(
-      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T11:00Z')",
-      [first],
-    );
-    expect(await status(db, first)).toBe("verified");
-    await db.query(
-      "select app_private.advance_proof_reviews('2026-03-06T09:59Z')",
-    );
-    expect(await status(db, second)).toBe("pending");
-    await db.query(
-      "select app_private.advance_proof_reviews('2026-03-06T10:00Z')",
-    );
-    expect(await status(db, second)).toBe("verified");
+    ).rejects.toThrow("unknown review action");
+    expect(
+      await db.query(
+        "select app_private.advance_proof_reviews('2026-03-07T10:00Z') as n",
+      ),
+    ).toMatchObject({ rows: [{ n: 0 }] });
+    expect(await status(db, id)).toBe("verified");
   });
 
-  it("rejects by strict majority and owes a Consequence card", async () => {
+  it("accepts a question until 24 hours after submission and keeps the credit", async () => {
+    const db = await database();
+    const early = await submit(db, 0);
+    const late = await submit(db, 1);
+    await as(db, 0);
+    await expect(
+      db.query(
+        "select app_private.review_proof_checkin($1, 'question', '2026-03-05T11:00Z')",
+        [early],
+      ),
+    ).rejects.toThrow("review unavailable");
+    await expect(
+      db.query(
+        "select app_private.review_proof_checkin($1, 'question', '2026-03-06T10:00Z')",
+        [late],
+      ),
+    ).rejects.toThrow("review window closed");
+    await as(db, 1);
+    expect(
+      (
+        await db.query<{ s: string }>(
+          "select app_private.review_proof_checkin($1, 'question', '2026-03-06T09:59Z')::text as s",
+          [early],
+        )
+      ).rows[0]?.s,
+    ).toBe("questioned");
+    await as(db, 2);
+    await expect(
+      db.query(
+        "select app_private.review_proof_checkin($1, 'question', '2026-03-06T09:59Z')",
+        [early],
+      ),
+    ).rejects.toThrow("review window closed");
+    expect(await status(db, early)).toBe("verified");
+    expect(await progress(db, 0)).toBe(1);
+    const feed = (
+      await db.query<{ review_status: string; can_vote: boolean }>(
+        "select review_status, can_vote from app_private.proof_feed('2026-03-06T10:30Z') where workout_checkin_id = $1",
+        [early],
+      )
+    ).rows;
+    expect(feed).toEqual([{ review_status: "questioned", can_vote: true }]);
+  });
+
+  it("rejects by strict majority, owes a Consequence card and removes the credit", async () => {
     const db = await database();
     const id = await submit(db, 0);
     await as(db, 1);
@@ -169,13 +225,14 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       "select app_private.vote_proof_checkin($1, 'reject', '2026-03-05T12:00Z')",
       [id],
     );
-    expect(await status(db, id)).toBe("questioned");
+    expect(await status(db, id)).toBe("verified");
     await as(db, 2);
     await db.query(
       "select app_private.vote_proof_checkin($1, 'reject', '2026-03-05T12:30Z')",
       [id],
     );
     expect(await status(db, id)).toBe("rejected");
+    expect(await progress(db, 0)).toBe(0);
     expect(
       (
         await db.query(
@@ -186,9 +243,10 @@ describe("Photo proof", { timeout: 30_000 }, () => {
     ).toEqual([{ source_kind: "rejected_report" }]);
   });
 
-  it("ends without a majority as Unsupported and lets the author withdraw", async () => {
+  it("stays Verified without a strict majority, and withdraw makes it Unsupported", async () => {
     const db = await database();
     const split = await submit(db, 0);
+    const timedOut = await submit(db, 2);
     const withdrawn = await submit(db, 1);
     await as(db, 1);
     await db.query(
@@ -196,7 +254,11 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       [split],
     );
     await db.query(
-      "select app_private.vote_proof_checkin($1, 'accept', '2026-03-05T12:00Z')",
+      "select app_private.review_proof_checkin($1, 'question', '2026-03-05T11:00Z')",
+      [timedOut],
+    );
+    await db.query(
+      "select app_private.vote_proof_checkin($1, 'reject', '2026-03-05T12:00Z')",
       [split],
     );
     await as(db, 2);
@@ -204,7 +266,25 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       "select app_private.vote_proof_checkin($1, 'cannot_assess', '2026-03-05T12:00Z')",
       [split],
     );
-    expect(await status(db, split)).toBe("unsupported");
+    expect(await status(db, split)).toBe("verified");
+    await expect(
+      db.query(
+        "select app_private.vote_proof_checkin($1, 'accept', '2026-03-05T12:10Z')",
+        [split],
+      ),
+    ).rejects.toThrow("decision closed");
+    await db.query(
+      "select app_private.advance_proof_reviews('2026-03-07T11:00Z')",
+    );
+    expect(await status(db, timedOut)).toBe("verified");
+    expect(
+      (
+        await db.query(
+          "select decided_at is not null as closed from app_private.workout_checkins where workout_checkin_id = $1",
+          [timedOut],
+        )
+      ).rows,
+    ).toEqual([{ closed: true }]);
 
     await as(db, 0);
     await db.query(
@@ -217,12 +297,14 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       [withdrawn],
     );
     expect(await status(db, withdrawn)).toBe("unsupported");
+    expect(await progress(db, 1)).toBe(0);
   });
 
-  it("counts only Verified completions and waits for open reviews to settle", async () => {
+  it("waits for open question windows and decisions, and finished weeks never change", async () => {
     const db = await database();
-    const pending = await submit(db, 0);
+    const late = await submit(db, 0);
     const rejected = await submit(db, 1);
+    const questioned = await submit(db, 2);
     await as(db, 0);
     await db.query(
       "select app_private.review_proof_checkin($1, 'question', '2026-03-05T11:00Z')",
@@ -238,11 +320,13 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       [rejected],
     );
     await db.exec(
-      `update app_private.workout_checkins set submitted_at = '2026-03-08T23:00Z'
-       where workout_checkin_id = '${pending}'`,
+      `update app_private.workout_checkins set submitted_at = '2026-03-08T23:00Z',
+         verified_at = '2026-03-08T23:00Z' where workout_checkin_id in ('${late}', '${questioned}')`,
     );
+    await as(db, 0);
     await db.query(
-      "select app_private.finalize_ended_member_weeks('2026-03-09T00:01Z')",
+      "select app_private.review_proof_checkin($1, 'question', '2026-03-08T23:30Z')",
+      [questioned],
     );
     const outcomes = async () =>
       (
@@ -250,11 +334,66 @@ describe("Photo proof", { timeout: 30_000 }, () => {
           "select membership_id, status::text from app_private.member_weeks order by membership_id",
         )
       ).rows.map((row) => row.status);
-    expect(await outcomes()).toEqual(["active", "missed", "missed"]);
+    await db.query(
+      "select app_private.finalize_ended_member_weeks('2026-03-09T00:01Z')",
+    );
+    expect(await outcomes()).toEqual(["active", "missed", "active"]);
     await db.query(
       "select app_private.finalize_ended_member_weeks('2026-03-09T23:00Z')",
     );
-    expect(await outcomes()).toEqual(["attained", "missed", "missed"]);
+    expect(await outcomes()).toEqual(["attained", "missed", "active"]);
+    await db.query(
+      "select app_private.finalize_ended_member_weeks('2026-03-10T23:30Z')",
+    );
+    expect(await outcomes()).toEqual(["attained", "missed", "attained"]);
+    await as(db, 1);
+    await expect(
+      db.query(
+        "select app_private.review_proof_checkin($1, 'question', '2026-03-09T23:30Z')",
+        [late],
+      ),
+    ).rejects.toThrow("review window closed");
+    expect(await outcomes()).toEqual(["attained", "missed", "attained"]);
+  });
+
+  it("shows a post on the Wall for 90 days from submission, to later joiners too", async () => {
+    const db = await database();
+    const id = await submit(db, 0);
+    await db.exec(
+      `update app_private.memberships set joined_at = '2026-03-06Z' where membership_id = '${memberships[2]}'`,
+    );
+    const seen = async (at: string) => {
+      await as(db, 2);
+      return (
+        await db.query(
+          "select workout_checkin_id from app_private.proof_feed($1)",
+          [at],
+        )
+      ).rows.length;
+    };
+    expect(await seen("2026-03-06T12:00Z")).toBe(1);
+    expect(await seen("2026-06-03T09:59Z")).toBe(1);
+    expect(await seen("2026-06-03T10:00Z")).toBe(0);
+    expect(id).toBeTruthy();
+  });
+
+  it("expires a legacy auto-verified post 90 days from submission, not verification", async () => {
+    const db = await database();
+    const id = await submit(db, 0);
+    await db.exec(
+      `update app_private.workout_checkins set verified_at = submitted_at + interval '24 hours',
+         decided_at = submitted_at + interval '24 hours' where workout_checkin_id = '${id}'`,
+    );
+    await as(db, 1);
+    const shown = async (at: string) =>
+      (
+        await db.query(
+          "select workout_checkin_id from app_private.proof_feed($1)",
+          [at],
+        )
+      ).rows.length;
+    expect(await shown("2026-06-03T09:00Z")).toBe(1);
+    expect(await shown("2026-06-03T11:00Z")).toBe(0);
   });
 
   it("hides reported proof from members until an admin restores or removes it", async () => {
@@ -309,12 +448,8 @@ describe("Photo proof", { timeout: 30_000 }, () => {
 
   it("keeps Verified Wall media and expires abandoned uploads after a day", async () => {
     const db = await database();
-    const id = await submit(db, 0);
+    await submit(db, 0);
     await as(db, 1);
-    await db.query(
-      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T11:00Z')",
-      [id],
-    );
     await upload(db, "activity", "2026-03-05T11:00Z");
     const due = async (at: string) =>
       (
@@ -326,5 +461,62 @@ describe("Photo proof", { timeout: 30_000 }, () => {
     expect(await due("2026-03-06T10:59Z")).toBe(0);
     expect(await due("2026-03-06T11:00Z")).toBe(1);
     expect(await due("2027-03-05T11:00Z")).toBe(1);
+  });
+
+  it("switches over: pending becomes Verified, open decisions close under the new rule", async () => {
+    const db = await database(switchOver);
+    const pending = await submit(db, 0);
+    const open = await submit(db, 1);
+    const closed = await submit(db, 2);
+    await as(db, 2);
+    await db.query(
+      "select app_private.review_proof_checkin($1, 'question', '2026-03-05T11:00Z')",
+      [open],
+    );
+    await as(db, 0);
+    await db.query(
+      "select app_private.review_proof_checkin($1, 'question', '2026-03-05T11:00Z')",
+      [closed],
+    );
+    await db.query(
+      "select app_private.vote_proof_checkin($1, 'accept', '2026-03-05T11:30Z')",
+      [closed],
+    );
+    await as(db, 1);
+    await db.query(
+      "select app_private.vote_proof_checkin($1, 'cannot_assess', '2026-03-05T11:30Z')",
+      [closed],
+    );
+    expect(await status(db, pending)).toBe("pending");
+    expect(await status(db, closed)).toBe("unsupported");
+    await db.exec(
+      await readFile(new URL(switchOver, migrationsDirectory), "utf8"),
+    );
+    expect(await status(db, pending)).toBe("verified");
+    expect(await status(db, open)).toBe("verified");
+    expect(await status(db, closed)).toBe("unsupported");
+    expect(
+      (
+        await db.query(
+          "select verified_at = submitted_at as kept from app_private.workout_checkins where workout_checkin_id = $1",
+          [pending],
+        )
+      ).rows,
+    ).toEqual([{ kept: true }]);
+    await as(db, 1);
+    await db.query(
+      "select app_private.review_proof_checkin($1, 'question', '2026-03-06T09:00Z')",
+      [pending],
+    );
+    await as(db, 0);
+    await db.query(
+      "select app_private.vote_proof_checkin($1, 'reject', '2026-03-05T12:00Z')",
+      [open],
+    );
+    expect(await status(db, open)).toBe("verified");
+    await db.query(
+      "select app_private.advance_proof_reviews('2026-03-07T11:00Z')",
+    );
+    expect(await status(db, open)).toBe("verified");
   });
 });

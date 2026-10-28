@@ -561,7 +561,7 @@ const weeklyLoop = async (
   }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText(
-    "Workout logged. 3 of 4 this week. It counts once a friend verifies it or 24 hours pass.",
+    "Workout logged. 3 of 4 this week. It counts now; friends can question it for 24 hours.",
   );
   expect(uploads).toBe(2);
   // Logging refreshes the Home feed so the new proof appears.

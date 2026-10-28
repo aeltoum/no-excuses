@@ -1615,18 +1615,6 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   background: rgb(0 0 0 / 62%);
   font-size: 0.75rem;
 }
-.proof-stamp {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgb(0 0 0 / 35%);
-  color: var(--activity-sport);
-  font-size: 2.6rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
 .proof-tally {
   margin: 0;
   color: var(--muted);
@@ -4609,9 +4597,9 @@ h1 {
   background: var(--surface);
 }
 
-/* Proof photo and its review base share one width.
+/* Proof photo and its vote base share one width.
    RULE: whenever the photo's size or side margin changes, change
-   --proof-bleed (and nothing else) so the review buttons keep matching it. */
+   --proof-bleed (and nothing else) so the vote buttons keep matching it. */
 :root {
   --proof-bleed: 12px;
   --proof-radius: 12px;
@@ -4638,8 +4626,8 @@ h1 {
   border-radius: var(--proof-radius) var(--proof-radius) 0 0;
 }
 
-/* Review base: continues the photo's frame, like the floor under a rack.
-   Verify is the chalk primary; Question is a red outline. */
+/* Vote base on a Questioned post: continues the photo's frame, like the floor
+   under a rack. Accept is the chalk primary; Reject is a red outline. */
 .proof-decide {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -4677,10 +4665,6 @@ h1 {
 }
 .proof-decide button:disabled {
   opacity: 0.45;
-}
-/* The old referee lamps stay in markup for tests; the label carries the call. */
-.proof-decide .lamp {
-  display: none;
 }
 .proof-decide-hint {
   grid-column: 1 / -1;

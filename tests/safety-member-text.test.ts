@@ -66,6 +66,11 @@ describe("Safety and member text", { timeout: 30_000 }, () => {
       [verified],
     );
     const pending = await submitProof(db, 0, "2026-03-05T10:00Z");
+    // An open Group decision stays visible so the blocker can still vote.
+    await db.query(
+      "update app_private.workout_checkins set questioned_at = '2026-03-05T10:10Z' where workout_checkin_id = $1",
+      [pending],
+    );
     await as(db, 1);
     await db.query(
       "select app_private.set_safety_block($1, true, '2026-03-05T10:30Z')",

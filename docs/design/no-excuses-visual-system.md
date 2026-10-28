@@ -161,20 +161,20 @@ floor.
 
 ## Proof post
 
-- The proof photo and its review base are one object: the base continues the photo's frame
+- On a Questioned post, the proof photo and its vote base are one object: the base continues the photo's frame
   (same width, border and corner radius) with a dashed seam between them.
 - Both take their width from `--proof-bleed` and their corners from `--proof-radius`. Any change
-  to the photo's size or side margin goes through those tokens, so the review buttons always
+  to the photo's size or side margin goes through those tokens, so the vote buttons always
   match the photo.
-- Verify and Accept are the chalk primary; Question and Reject are a red outline. Both meet the
+- Accept is the chalk primary; Reject is a red outline. Both meet the
   `48px` target floor.
 
 ## Vocabulary
 
 One visible noun per concept: **Group** for the shared space (friends in supporting prose),
 **Account** for the member's settings destination, **Log workout** for the logging action.
-Review actions are **Verify workout** / **Question workout** on first review and
-**Accept workout** / **Reject workout** / **Can't assess** on a disputed workout.
+A post counts once posted; others may **Question workout** for its first 24 hours, and a
+disputed workout takes **Accept workout** / **Reject workout** / **Can't assess**.
 
 ## Motion
 

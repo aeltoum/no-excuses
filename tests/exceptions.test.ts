@@ -152,12 +152,8 @@ describe("Exceptions", { timeout: 30_000 }, () => {
     const { id } = await request(db, 0);
     await respond(db, 1, id, "approve");
     await respond(db, 2, id, "approve");
-    const proof = await submitProof(db, 0);
+    await submitProof(db, 0);
     await as(db, 1);
-    await db.query(
-      "select app_private.review_proof_checkin($1, 'verify', '2026-03-05T11:00Z')",
-      [proof],
-    );
     const progress = await db.query<{ workout_streak: number }>(
       "select workout_streak from app_private.current_week_progress('10000000-0000-4000-8000-000000000001', '2026-03-05T12:00Z') where display_name = 'Alex'",
     );
