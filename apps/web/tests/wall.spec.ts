@@ -262,7 +262,11 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
   await expect(question).toHaveCount(0);
   // Maya's post leaves the day rows for Needs you, where the questioner votes too.
   await closePost(page);
-  await expect(page.getByRole("button", { name: /^Maya,/ })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("list", { name: "Posts by day" })
+      .getByRole("button", { name: /^Maya,/ }),
+  ).toHaveCount(0);
   await expect(page.locator(".needs-post")).toHaveCount(2);
   await expect(page.getByRole("group", { name: "Your vote" })).toHaveCount(2);
 

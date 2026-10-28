@@ -76,7 +76,11 @@ test("returning to the app shows friends' new progress and posts without a reloa
   await leaveAndReturn(page);
   await expect(friends).toContainText("3 of 3 workouts");
   await openHome(page);
-  await expect(page.getByRole("button", { name: /^Maya,/ })).toBeVisible();
+  await expect(
+    page
+      .getByRole("list", { name: "Posts by day" })
+      .getByRole("button", { name: /^Maya,/ }),
+  ).toBeVisible();
   // No loading state replaces what was already on screen.
   await expect(page.getByRole("status", { name: /Loading/ })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("resume.png") });

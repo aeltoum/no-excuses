@@ -1765,6 +1765,8 @@ export function Weekly({
                   onRevoked={feedRevoked}
                   onItems={feedItems}
                   windowEndsAt={targetContext?.nextWeekStartsAt}
+                  members={progress}
+                  viewerId={membership.membershipId}
                   needsExtraCount={cardAttention + ballotAttention}
                   needsExtraShown={
                     cardSummary.shown || extras.exceptions.toDecide.length > 0
