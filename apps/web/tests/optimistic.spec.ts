@@ -1,5 +1,5 @@
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
-import { openHome, openWeek } from "./member";
+import { closePost, openHome, openPost, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -214,8 +214,8 @@ async function mockServer(page: Page, options: { member?: boolean } = {}) {
           activityType: "strength",
           durationMinutes: 45,
           perceivedIntensity: "high",
-          completedAt: "2026-10-12T15:00:00.000Z",
-          submittedAt: "2026-10-12T15:05:00.000Z",
+          completedAt: new Date(Date.now() - 3_600_000).toISOString(),
+          submittedAt: new Date(Date.now() - 3_600_000).toISOString(),
           reviewStatus: "verified",
           reviewClosesAt: null,
           decisionClosesAt: null,
@@ -483,8 +483,9 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
     page.getByText(/^Pause requested: 0 of 2 approvals/),
   );
 
-  // Wall restore by the Group admin, on Home's feed.
+  // Wall restore by the Group admin, from the post opened on Home's feed.
   await openHome(page);
+  await openPost(page, "Maya");
   await timed(
     page,
     testInfo,
@@ -498,6 +499,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
   });
 
   // Cached cards render at once on reload while the API is still slow.
+  await closePost(page);
   await openWeek(page);
   await page.reload();
   await expect(cards.locator(".consequence-strip")).toBeVisible({

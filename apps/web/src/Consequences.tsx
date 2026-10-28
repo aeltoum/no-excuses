@@ -193,7 +193,13 @@ export function useCardSummary(
   cacheKey: string,
   enabled: boolean,
   onRevoked: () => void,
-): { attention: number; blocked: boolean; title: string | null } {
+): {
+  attention: number;
+  blocked: boolean;
+  title: string | null;
+  // Whether the Consequence card block has anything to show.
+  shown: boolean;
+} {
   const [home, setHome] = useState<ConsequenceHome | null>(
     () => homeCache.get(cacheKey) ?? null,
   );
@@ -222,8 +228,12 @@ export function useCardSummary(
         attention: cardAttention(home),
         blocked: home.logBlocked,
         title: home.attempt?.title ?? null,
+        shown:
+          home.owed > 0 ||
+          home.reviews.length > 0 ||
+          home.pauseReviews.length > 0,
       }
-    : { attention: 0, blocked: false, title: null };
+    : { attention: 0, blocked: false, title: null, shown: false };
 }
 
 export function Consequences({
@@ -234,10 +244,13 @@ export function Consequences({
   onAttention,
   onLogBlock,
   cacheKey,
+  autoPick = true,
 }: {
   apiBaseUrl: string;
   token: string;
   cacheKey: string;
+  // Open the card picker by itself when a new offer arrives (Week does; Home waits for a tap).
+  autoPick?: boolean;
   onRevoked: () => void;
   onGroupOwed: (owed: Record<string, number>) => void;
   onAttention: (count: number) => void;
@@ -285,7 +298,7 @@ export function Consequences({
         setHome(next);
         onGroupOwed(next.groupOwed);
         const offerId = next.offer?.offerId;
-        if (offerId && readSeen() !== offerId) {
+        if (autoPick && offerId && readSeen() !== offerId) {
           writeSeen(offerId);
           setPicking(true);
         }
@@ -298,7 +311,7 @@ export function Consequences({
     return () => {
       active = false;
     };
-  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed, fresh]);
+  }, [apiBaseUrl, token, cacheKey, onRevoked, onGroupOwed, fresh, autoPick]);
 
   useEffect(() => {
     if (!home) return;

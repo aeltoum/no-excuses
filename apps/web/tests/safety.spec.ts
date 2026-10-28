@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { friendId, membershipId, signIn } from "./member";
+import { closePost, friendId, membershipId, openPost, signIn } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const post = (overrides: Record<string, unknown>) => ({
@@ -62,6 +62,7 @@ test("messages need the conduct rules once, then send instantly; reports hide at
     if (path.endsWith("/caption")) return { caption: "PR day" };
     if (path === "/v1/safety/report-message") return { reported: true };
   });
+  await openPost(page, "Maya");
   const maya = page.getByRole("listitem").filter({ hasText: "Leg day" });
   await expect(maya.getByText("Let's go")).toBeVisible();
   await maya.getByRole("button", { name: "Comment", exact: true }).click();
@@ -77,7 +78,9 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   expect(sent).toBeLessThanOrEqual(100);
 
   // Own fresh post takes a caption without asking again.
-  const mine = page.locator(".proof-post").nth(1);
+  await closePost(page);
+  await openPost(page, "You");
+  const mine = page.locator(".proof-post");
   // Caption lives in the author's post menu.
   await mine.getByRole("button", { name: "Post options" }).click();
   await mine.getByRole("menuitem", { name: "Add caption" }).click();
@@ -90,6 +93,8 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   await mine.getByRole("textbox", { name: "Caption" }).fill("PR day");
   await mine.getByRole("button", { name: "Add" }).click();
   await expect(page.getByText("PR day")).toBeVisible();
+  await closePost(page);
+  await openPost(page, "Maya");
 
   await maya.getByRole("button", { name: "Report message from Jo" }).click();
   await page

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   friendId,
   membershipId,
+  openPost,
   openWeek,
   progressItem,
   signIn,
@@ -86,6 +87,7 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
   });
 
   await delayRoute(page, "**/v1/proof/*/delete", 1000);
+  await openPost(page, "You");
   await page.getByRole("button", { name: "Post options" }).first().click();
   await page.getByRole("menuitem", { name: "Delete post" }).click();
   const dialog = page.getByRole("dialog", { name: "Delete this post?" });
@@ -129,7 +131,8 @@ test("after its week, a verified post's photos come down and the count stays", a
       return [
         post({
           canDelete: false,
-          submittedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+          // Last week: still on Home, past its own delete window.
+          submittedAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
         }),
       ];
     if (path.endsWith("/remove-photos"))
@@ -140,6 +143,7 @@ test("after its week, a verified post's photos come down and the count stays", a
     0,
   );
   await delayRoute(page, "**/v1/proof/*/remove-photos", 1000);
+  await openPost(page, "You");
   await page.getByRole("button", { name: "Post options" }).first().click();
   await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
     0,

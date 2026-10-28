@@ -171,3 +171,20 @@ export async function openHome(page: Page) {
     .click();
   await expect(page).toHaveURL(/\/home$/);
 }
+
+// Home's feed is day rows of tiles; a tile opens its post full screen.
+export async function openPost(page: Page, author: string) {
+  await page
+    .getByRole("list", { name: "Posts by day" })
+    .getByRole("button", { name: new RegExp(`^${author},`) })
+    .first()
+    .click();
+  const viewer = page.getByRole("dialog", { name: /post$/ });
+  await expect(viewer).toBeVisible();
+  return viewer;
+}
+
+export async function closePost(page: Page) {
+  await page.getByRole("button", { name: "Close post" }).click();
+  await expect(page.getByRole("dialog", { name: /post$/ })).toHaveCount(0);
+}

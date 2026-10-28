@@ -424,7 +424,6 @@ export function Weekly({
   const [docked, setDocked] = useState(false);
   const [groupOwed, setGroupOwed] = useState<Record<string, number>>({});
   const [feedAttention, setFeedAttention] = useState(0);
-  const [feedTasks, setFeedTasks] = useState({ votes: 0 });
   const [ownQuestioned, setOwnQuestioned] = useState(0);
   const [cardAttention, setCardAttention] = useState(0);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -468,7 +467,6 @@ export function Weekly({
     // Only a Group decision waits on the member; questioning is optional.
     const waiting = items.filter((item) => item.canVote && !item.myVote);
     setFeedAttention(waiting.length);
-    setFeedTasks({ votes: waiting.length });
     setOwnQuestioned(
       items.filter((item) => item.mine && item.reviewStatus === "questioned")
         .length,
@@ -836,23 +834,6 @@ export function Weekly({
         .filter(Boolean)
         .join(" · ")
     : "";
-  const needsYou = [
-    cardAttention > 0 && {
-      href: "/week#needs-consequences",
-      text: `Consequence card${cardAttention === 1 ? "" : "s"} to settle`,
-      count: cardAttention,
-    },
-    feedTasks.votes > 0 && {
-      href: "#needs-review",
-      text: `Disputed workout${feedTasks.votes === 1 ? "" : "s"} to vote on`,
-      count: feedTasks.votes,
-    },
-    ballotAttention > 0 && {
-      href: "#needs-ballots",
-      text: `Week-off request${ballotAttention === 1 ? "" : "s"} to decide`,
-      count: ballotAttention,
-    },
-  ].filter(Boolean) as { href: string; text: string; count: number }[];
   // Week shows the week's status; Home keeps the feed and logging.
   const week = route === "/week";
   const home = route === "/home" || week;
@@ -1303,31 +1284,6 @@ export function Weekly({
               )}
               {!week && own && (
                 <div className="home-tasks">
-                  {needsYou.length > 0 && (
-                    <nav className="needs-you" aria-label="Needs you">
-                      <h2>Needs you</h2>
-                      <ul>
-                        {needsYou.map((task) => (
-                          <li key={task.text}>
-                            <a
-                              href={task.href}
-                              onClick={
-                                task.href.startsWith("/week")
-                                  ? (event) => {
-                                      onNavigate(event, "/week");
-                                      focusCards();
-                                    }
-                                  : undefined
-                              }
-                            >
-                              <span>{task.text}</span>
-                              <strong>{task.count}</strong>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </nav>
-                  )}
                   {<div className="home-actions">{sessionCard()}</div>}
                 </div>
               )}
@@ -1342,20 +1298,6 @@ export function Weekly({
                   onRevoked={feedRevoked}
                   onHistory={(event) => onNavigate(event, "/history")}
                 />
-              )}
-              {!week && own && (
-                <div id="needs-ballots" className="needs-anchor">
-                  <Exceptions
-                    part="ballots"
-                    apiBaseUrl={apiBaseUrl}
-                    token={token}
-                    extras={extras}
-                    apply={applyExtras}
-                    reload={reloadExtras}
-                    onNotice={setNotice}
-                    onRevoked={feedRevoked}
-                  />
-                </div>
               )}
               {!week && own && (
                 <>
@@ -1822,6 +1764,41 @@ export function Weekly({
                   cacheKey={cacheKey}
                   onRevoked={feedRevoked}
                   onItems={feedItems}
+                  windowEndsAt={targetContext?.nextWeekStartsAt}
+                  needsExtraCount={cardAttention + ballotAttention}
+                  needsExtraShown={
+                    cardSummary.shown || extras.exceptions.toDecide.length > 0
+                  }
+                  needsExtra={
+                    <>
+                      {cardSummary.shown && (
+                        <div id="needs-consequences" className="needs-anchor">
+                          <Consequences
+                            apiBaseUrl={apiBaseUrl}
+                            token={token}
+                            onRevoked={feedRevoked}
+                            onGroupOwed={setGroupOwed}
+                            onAttention={setCardAttention}
+                            onLogBlock={setLogBlock}
+                            cacheKey={cacheKey}
+                            autoPick={false}
+                          />
+                        </div>
+                      )}
+                      <div id="needs-ballots" className="needs-anchor">
+                        <Exceptions
+                          part="ballots"
+                          apiBaseUrl={apiBaseUrl}
+                          token={token}
+                          extras={extras}
+                          apply={applyExtras}
+                          reload={reloadExtras}
+                          onNotice={setNotice}
+                          onRevoked={feedRevoked}
+                        />
+                      </div>
+                    </>
+                  }
                   onDeleted={(count) => {
                     setProgress((items) =>
                       items.map((item) =>

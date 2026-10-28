@@ -24,7 +24,9 @@ export function Result({ notice }: { notice: Notice }) {
   const [dismissed, setDismissed] = useState<Notice>(null);
   useLayoutEffect(() => {
     void notice;
-    setTarget(document.querySelector('[role="dialog"]') ?? document.body);
+    // The innermost open dialog, e.g. a sheet over a full-screen post.
+    const dialogs = document.querySelectorAll('[role="dialog"]');
+    setTarget(dialogs[dialogs.length - 1] ?? document.body);
   }, [notice]);
   if (!notice || dismissed === notice) return null;
   const message = (
