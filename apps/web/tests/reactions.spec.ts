@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { homeExtras } from "./member";
+import { homeExtras, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -479,7 +479,8 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
   await expect(drawer).toHaveCount(0);
   await expect(add).toBeFocused();
 
-  // Only members behind target can be nudged, once.
+  // Only members behind target can be nudged, once, from Week.
+  await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(
     friends.getByRole("button", { name: "Nudge Jordan" }),

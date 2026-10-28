@@ -18,7 +18,7 @@ import {
 } from "./api-client";
 import { Avatar, useAvatars } from "./avatars";
 import { Barbell } from "./Barbell";
-import { Consequences, type LogBlock } from "./Consequences";
+import { Consequences, type LogBlock, useCardSummary } from "./Consequences";
 import {
   type DetailsDraft,
   DetailsFields,
@@ -51,7 +51,7 @@ import { Result, useNotice } from "./Result";
 import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
 import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
-import { ProofFeed } from "./Wall";
+import { ProofFeed, useFeedItems } from "./Wall";
 import { WeekRecap } from "./WeekRecap";
 
 // Snapshots cached before streaks shipped lack the fields; hide until refreshed.
@@ -100,7 +100,7 @@ function WeekCountdown({ endsAt }: { endsAt: string | null }) {
 }
 
 type Api = ReturnType<typeof createApiClient>;
-type Route = "/home" | "/target" | "/history";
+type Route = "/home" | "/week" | "/target" | "/history";
 export type WeeklySnapshot = {
   progress: CurrentWeekProgressItem[];
   history: FinalizedWeeklyHistoryItem[];
@@ -298,7 +298,7 @@ export function Weekly({
   onUnread?: (count: number) => void;
   onOperator?: (operator: boolean) => void;
   onNavigate: (
-    event: React.MouseEvent<HTMLAnchorElement>,
+    event: React.MouseEvent<HTMLElement>,
     destination: string,
   ) => void;
   route: Route;
@@ -315,6 +315,10 @@ export function Weekly({
   );
   const [progress, setProgress] = useState<CurrentWeekProgressItem[]>(
     saved?.progress ?? [],
+  );
+  // Week cards and feed exist only once this member has a bar.
+  const hasOwn = progress.some(
+    (item) => item.membershipId === membership?.membershipId,
   );
   const [history, setHistory] = useState<FinalizedWeeklyHistoryItem[]>(
     saved?.history ?? [],
@@ -428,7 +432,8 @@ export function Weekly({
     apiBaseUrl,
     token,
     cacheKey,
-    (route === "/home" || route === "/history") && Boolean(membership),
+    (route === "/home" || route === "/week" || route === "/history") &&
+      Boolean(membership),
     feedRevoked,
   );
   const ballotAttention = extras.exceptions.toDecide.filter(
@@ -463,6 +468,14 @@ export function Weekly({
     );
     setAwaitingReview(new Set(waiting.map((item) => item.authorMembershipId)));
   }, []);
+  useFeedItems(
+    apiBaseUrl,
+    token,
+    cacheKey,
+    route === "/week" && hasOwn,
+    feedItems,
+    feedRevoked,
+  );
   // The big barbell docks into a slim header once it scrolls out of view.
   useEffect(() => {
     const hero = heroRef.current;
@@ -505,6 +518,19 @@ export function Weekly({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [logBlock, setLogBlock] = useState<LogBlock>(null);
+  // Cards live on Week; Home still counts them and honours the log gate.
+  const cardSummary = useCardSummary(
+    apiBaseUrl,
+    token,
+    cacheKey,
+    route === "/home" && hasOwn,
+    feedRevoked,
+  );
+  useEffect(() => {
+    if (route !== "/home") return;
+    setCardAttention(cardSummary.attention);
+    setLogBlock(cardSummary.blocked ? { title: cardSummary.title } : null);
+  }, [route, cardSummary.attention, cardSummary.blocked, cardSummary.title]);
   const [lockOpen, setLockOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [historyLimit, setHistoryLimit] = useState(12);
@@ -700,7 +726,7 @@ export function Weekly({
   );
   useEffect(() => {
     void fresh;
-    if (route !== "/home" || !groupId || !nudgeable) return;
+    if (route !== "/week" || !groupId || !nudgeable) return;
     let active = true;
     loadNudged(apiBaseUrl, token)
       .then(
@@ -805,7 +831,7 @@ export function Weekly({
     : "";
   const needsYou = [
     cardAttention > 0 && {
-      href: "#needs-consequences",
+      href: "/week#needs-consequences",
       text: `Consequence card${cardAttention === 1 ? "" : "s"} to settle`,
       count: cardAttention,
     },
@@ -825,7 +851,9 @@ export function Weekly({
       count: ballotAttention,
     },
   ].filter(Boolean) as { href: string; text: string; count: number }[];
-  const home = route === "/home";
+  // Week shows the week's status; Home keeps the feed and logging.
+  const week = route === "/week";
+  const home = route === "/home" || week;
   const boundary = targetContext?.nextWeekStartsAt
     ? new Date(targetContext.nextWeekStartsAt)
     : null;
@@ -952,7 +980,7 @@ export function Weekly({
       {home ? (
         <header className="home-header">
           <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
-          {own && (
+          {week && own && (
             <button
               type="button"
               className="week-tools-button"
@@ -979,10 +1007,10 @@ export function Weekly({
           {route === "/target" && (
             <a
               className="back-home"
-              href="/home"
-              onClick={(event) => onNavigate(event, "/home")}
+              href="/week"
+              onClick={(event) => onNavigate(event, "/week")}
             >
-              <span aria-hidden="true">←</span> Back to Home
+              <span aria-hidden="true">←</span> Back to Week
             </a>
           )}
           <h1>{route === "/target" ? "Weekly target" : "Your history"}</h1>
@@ -1066,10 +1094,10 @@ export function Weekly({
         )
       ) : (
         <>
-          {route === "/home" && (
+          {home && (
             <>
-              <InstallPrompt />
-              {own && (
+              {!week && <InstallPrompt />}
+              {week && own && (
                 <div
                   className={`week-dock${docked ? " on" : ""}`}
                   aria-hidden="true"
@@ -1085,7 +1113,7 @@ export function Weekly({
                   </strong>
                 </div>
               )}
-              {own ? (
+              {week && own ? (
                 <div className="own-progress" ref={heroRef}>
                   <a
                     className="own-target-link"
@@ -1117,36 +1145,18 @@ export function Weekly({
                     />
                   </div>
                   <UnlockNote unlocks={extras.unlocks} />
-                  {needsYou.length > 0 && (
-                    <nav className="needs-you" aria-label="Needs you">
-                      <h2>Needs you</h2>
-                      <ul>
-                        {needsYou.map((task) => (
-                          <li key={task.text}>
-                            <a href={task.href}>
-                              <span>{task.text}</span>
-                              <strong>{task.count}</strong>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </nav>
-                  )}
-                  {
-                    <div className="home-actions">
-                      {sessionCard()}
-                      <Exceptions
-                        part="own-status"
-                        apiBaseUrl={apiBaseUrl}
-                        token={token}
-                        extras={extras}
-                        apply={applyExtras}
-                        reload={reloadExtras}
-                        onNotice={setNotice}
-                        onRevoked={feedRevoked}
-                      />
-                    </div>
-                  }
+                  <div className="home-actions">
+                    <Exceptions
+                      part="own-status"
+                      apiBaseUrl={apiBaseUrl}
+                      token={token}
+                      extras={extras}
+                      apply={applyExtras}
+                      reload={reloadExtras}
+                      onNotice={setNotice}
+                      onRevoked={feedRevoked}
+                    />
+                  </div>
                   <Sheet
                     open={toolsOpen}
                     title="This week"
@@ -1182,7 +1192,7 @@ export function Weekly({
                     </div>
                   </Sheet>
                 </div>
-              ) : (
+              ) : own ? null : (
                 <div className="solo-week">
                   <Barbell count={0} target={0} size="big" />
                   <h2>Waiting for a second member</h2>
@@ -1199,7 +1209,7 @@ export function Weekly({
                   </a>
                 </div>
               )}
-              {own && progress.length > 1 && (
+              {week && own && progress.length > 1 && (
                 <ul
                   className="friend-cards"
                   aria-label="Friends this week"
@@ -1273,7 +1283,7 @@ export function Weekly({
                     ))}
                 </ul>
               )}
-              {own && (
+              {week && own && (
                 <div id="needs-consequences" className="needs-anchor">
                   <Consequences
                     apiBaseUrl={apiBaseUrl}
@@ -1286,7 +1296,37 @@ export function Weekly({
                   />
                 </div>
               )}
-              {own && (
+              {!week && own && (
+                <div className="home-tasks">
+                  {needsYou.length > 0 && (
+                    <nav className="needs-you" aria-label="Needs you">
+                      <h2>Needs you</h2>
+                      <ul>
+                        {needsYou.map((task) => (
+                          <li key={task.text}>
+                            <a
+                              href={task.href}
+                              onClick={
+                                task.href.startsWith("/week")
+                                  ? (event) => {
+                                      onNavigate(event, "/week");
+                                      focusCards();
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <span>{task.text}</span>
+                              <strong>{task.count}</strong>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </nav>
+                  )}
+                  {<div className="home-actions">{sessionCard()}</div>}
+                </div>
+              )}
+              {!week && own && (
                 <WeekRecap
                   apiBaseUrl={apiBaseUrl}
                   token={token}
@@ -1298,7 +1338,7 @@ export function Weekly({
                   onHistory={(event) => onNavigate(event, "/history")}
                 />
               )}
-              {own && (
+              {!week && own && (
                 <div id="needs-ballots" className="needs-anchor">
                   <Exceptions
                     part="ballots"
@@ -1312,7 +1352,7 @@ export function Weekly({
                   />
                 </div>
               )}
-              {own && (
+              {!week && own && (
                 <>
                   <button
                     className={`home-log-button${logBlock ? " is-locked" : ""}`}
@@ -1362,21 +1402,10 @@ export function Weekly({
                       </p>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(event) => {
                           setLockOpen(false);
-                          requestAnimationFrame(() => {
-                            const cards =
-                              document.getElementById("consequence-cards");
-                            cards?.scrollIntoView({
-                              behavior: window.matchMedia(
-                                "(prefers-reduced-motion: reduce)",
-                              ).matches
-                                ? "auto"
-                                : "smooth",
-                              block: "center",
-                            });
-                            cards?.focus({ preventScroll: true });
-                          });
+                          onNavigate(event, "/week");
+                          focusCards();
                         }}
                       >
                         {logBlock?.title ? "Go to my card" : "Choose my card"}
@@ -1687,7 +1716,7 @@ export function Weekly({
                   {busy ? "Refreshing…" : "Refresh count"}
                 </button>
               )}
-              {own && sending.length > 0 && (
+              {!week && own && sending.length > 0 && (
                 <ul
                   className="proof-list proof-outbox"
                   aria-label="Your workouts sending"
@@ -1780,7 +1809,7 @@ export function Weekly({
                   ))}
                 </ul>
               )}
-              {own && (
+              {!week && own && (
                 <ProofFeed
                   apiBaseUrl={apiBaseUrl}
                   token={token}
@@ -2120,6 +2149,26 @@ export function Weekly({
       )}
     </section>
   );
+}
+
+// Cards live on Week: once it renders them, bring them into view and focus.
+function focusCards() {
+  const until = Date.now() + 4000;
+  const find = () => {
+    const cards = document.getElementById("consequence-cards");
+    if (!cards) {
+      if (Date.now() < until) window.setTimeout(find, 100);
+      return;
+    }
+    cards.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "center",
+    });
+    cards.focus({ preventScroll: true });
+  };
+  requestAnimationFrame(find);
 }
 
 export async function loadWeekly(

@@ -64,7 +64,7 @@ test("a timed workout keeps photos on the phone, then logs the picked pair", asy
     .getByRole("button", { name: "Session photo 3" })
     .click();
   await dialog.getByRole("button", { name: "Log workout" }).click();
-  await expect(page.getByText("2 of 3 this week")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
   await expect
     .poll(() => calls.some((c) => c.path.endsWith("/link")))
     .toBe(true);

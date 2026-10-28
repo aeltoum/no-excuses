@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
-import { homeExtras } from "./member";
+import { homeExtras, openHome, openWeek } from "./member";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const friendMembershipId = "30000000-0000-4000-8000-000000000002";
@@ -430,6 +430,7 @@ const weeklyLoop = async (
     await page.getByLabel(`Code digit ${index + 1}`).fill(digit);
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
+  await openWeek(page);
   await expect(page.getByText("2 of 4 this week")).toBeVisible();
   await expect(
     page.getByText("2-week streak · 5 workouts since last miss"),
@@ -443,7 +444,6 @@ const weeklyLoop = async (
       name: /^(Our week|Week ends in|Week closing)/,
     }),
   ).toBeVisible();
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
   await expect(page.getByRole("link", { name: "Home" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -451,6 +451,10 @@ const weeklyLoop = async (
   await expect(page.getByRole("heading", { name: "Your history" })).toHaveCount(
     0,
   );
+  // The week's status sits on Week, not Home.
+  await expect(page.getByText("2 of 4 this week")).toHaveCount(0);
+  await openWeek(page);
+  await expect(page.getByText("2 of 4 this week")).toBeVisible();
   await expect(page.getByText("Maya")).toBeVisible();
   // The colour key lives on the target screen, off the Home feed.
   await expect(
@@ -467,6 +471,7 @@ const weeklyLoop = async (
     page.getByRole("img", { name: "2 of 4 workouts" }),
   ).toBeVisible();
   await expect(page.getByText("Every rep counts.")).toHaveCount(0);
+  await openHome(page);
   const opener = page.getByRole("button", { name: "Log workout" });
   await opener.click();
   let dialog = page.getByRole("dialog", { name: "Log workout" });
@@ -547,10 +552,6 @@ const weeklyLoop = async (
       "Action failed. Try again.",
     );
     await expect(sending.getByText("Couldn’t upload")).toBeVisible();
-    // The count rolls back while the workout is unsent.
-    await expect(
-      page.getByText("2 of 4 this week", { exact: true }),
-    ).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("persistent-workout-failure.png"),
@@ -570,6 +571,9 @@ const weeklyLoop = async (
     path: testInfo.outputPath("workout-success.png"),
   });
   expect(keys).toHaveLength(workoutFailures + 1);
+  await page.getByRole("button", { name: "Refresh count" }).click();
+  expect(keys).toHaveLength(workoutFailures + 1);
+  await openWeek(page);
   await expect(
     page.getByText("3 of 4 this week", { exact: true }),
   ).toBeVisible();
@@ -581,8 +585,6 @@ const weeklyLoop = async (
       .getByRole("img", { name: "3 of 4 workouts" })
       .locator('rect[fill="var(--activity-strength)"]'),
   ).toHaveCount(4);
-  await page.getByRole("button", { name: "Refresh count" }).click();
-  expect(keys).toHaveLength(workoutFailures + 1);
   expect(new Set(keys).size).toBe(1);
   const targetLink = page.getByRole("link", {
     name: "3 of 4 workouts. Change weekly target.",

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { friendId, homeExtras, membershipId, signIn } from "./member";
+import { friendId, homeExtras, membershipId, openWeek, signIn } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const endsAt = new Date(Date.now() - 3 * 3_600_000).toISOString();
@@ -161,6 +161,8 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
   ).not.toBe("none");
 
   // The colour key moved to the target screen; the count sits under the bar.
+  await openWeek(page);
+  expect(await overflow()).toEqual({ scroll: 0, wide: [] });
   const bar = await page.locator(".own-progress .barbell-big").boundingBox();
   const count = await page.getByText(/of 3 this week/).boundingBox();
   expect(bar && count).toBeTruthy();

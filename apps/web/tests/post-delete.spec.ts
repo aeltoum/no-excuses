@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { friendId, membershipId, progressItem, signIn } from "./member";
+import {
+  friendId,
+  membershipId,
+  openWeek,
+  progressItem,
+  signIn,
+} from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const photo =
@@ -70,7 +76,7 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
     }
     if (path.endsWith("/vote")) return { status: "questioned", body };
   });
-  await expect(page.getByText("2 of 3 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
 
   // Only the vote's own status changes; "Can't tell" hides the ballot.
   await page.getByRole("button", { name: "Can’t assess" }).click();
@@ -90,11 +96,12 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
     page.getByText("Deleting…"),
   );
   expect(pending).toBeLessThanOrEqual(100);
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
   await expect(page.getByText(/Post deleted/)).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
     0,
   );
+  await openWeek(page);
+  await expect(page.getByText("1 of 3 this week")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -128,7 +135,7 @@ test("after its week, a verified post's photos come down and the count stays", a
     if (path.endsWith("/remove-photos"))
       return { workoutCheckinId: "70000000-0000-4000-8000-000000000001" };
   });
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Delete post" })).toHaveCount(
     0,
   );
@@ -149,6 +156,7 @@ test("after its week, a verified post's photos come down and the count stays", a
   await expect(
     page.getByText(/Photos removed. The workout still counts./),
   ).toBeVisible();
+  await openWeek(page);
   await expect(page.getByText("1 of 3 this week")).toBeVisible();
   expect(calls.filter((c) => c.path.endsWith("/remove-photos"))).toHaveLength(
     1,

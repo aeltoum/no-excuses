@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { friendId, homeExtras, membershipId, signIn } from "./member";
+import {
+  friendId,
+  homeExtras,
+  membershipId,
+  openHome,
+  openWeek,
+  signIn,
+} from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const photo =
@@ -67,8 +74,10 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
   await expect(title).toBeVisible();
   const first = await title.textContent();
   await expect.poll(() => title.textContent()).not.toBe(first);
+  await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.locator(".avatar img")).toHaveAttribute("src", photo);
+  await openHome(page);
 
   const card = page.locator(".proof-post").filter({ hasText: "Leg day" });
   await expect(card.locator(".post-caption")).toHaveText("Maya Leg day");
@@ -203,10 +212,15 @@ test("a nudge from yesterday clears at the day change, even if the refresh fails
   await page.clock.install({ time: new Date("2026-10-27T23:58:00Z") });
   await page.setViewportSize({ width: 390, height: 844 });
   let failNudges = false;
-  const { errors } = await signIn(page, ({ path, method }) => {
-    if (path === "/v1/nudges" && method === "GET") return failNudges ? 503 : [];
-    if (path === "/v1/nudges") return { membershipId: friendId };
-  });
+  const { errors } = await signIn(
+    page,
+    ({ path, method }) => {
+      if (path === "/v1/nudges" && method === "GET")
+        return failNudges ? 503 : [];
+      if (path === "/v1/nudges") return { membershipId: friendId };
+    },
+    "/week",
+  );
   const friends = page.getByRole("list", { name: "Friends this week" });
   await friends.getByRole("button", { name: "Nudge Maya" }).click();
   await expect(

@@ -52,7 +52,7 @@ test("a cardio workout carries optional distance and time details", async ({
     dialog.getByRole("img", { name: "Your presence preview" }),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Log workout" }).click();
-  await expect(page.getByText("2 of 3 this week")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
   await expect
     .poll(() => calls.find((c) => c.path.endsWith("/details"))?.body)
     .toEqual({

@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { homeExtras } from "./member";
+import { homeExtras, openHome, openWeek } from "./member";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
 const groupId = "40000000-0000-4000-8000-000000000001";
@@ -187,6 +187,8 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   ).toBeVisible();
   const homeTab = page.getByRole("link", { name: /^Home/ });
   await expect(homeTab).toHaveAccessibleName("Home 2 waiting on you");
+  // The week's status, friends and docking bar live on Week.
+  await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.getByRole("listitem")).toHaveText([
     "MAMaya2 of 3 workoutsNeeds your reviewNudge",
@@ -194,15 +196,8 @@ test("Home feed reviews, votes on, and reports friends' proof", async ({
   await expect(
     page.getByRole("img", { name: "1 of 3 workouts" }),
   ).toBeVisible();
-  const dock = page.locator(".week-dock");
-  await expect(dock).not.toHaveClass(/\bon\b/);
-  await page
-    .getByRole("img", { name: "Maya at the workout" })
-    .scrollIntoViewIfNeeded();
-  await page.mouse.wheel(0, 900);
-  await expect(dock).toHaveClass(/\bon\b/);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(dock).not.toHaveClass(/\bon\b/);
+  // The docking bar is covered in week.spec.ts.
+  await openHome(page);
   await expect(
     page.getByRole("img", { name: "Maya at the workout" }),
   ).toBeVisible();

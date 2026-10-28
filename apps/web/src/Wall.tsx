@@ -113,6 +113,43 @@ const dayLabel = (iso: string) => {
 };
 
 // The Wall feed rendered on Home: proof waiting on the viewer first, then everything by day.
+// Feed state without the posts, for Week's review status and settle line.
+export function useFeedItems(
+  apiBaseUrl: string,
+  token: string,
+  cacheKey: string,
+  enabled: boolean,
+  onItems: (items: ProofItem[]) => void,
+  onRevoked: () => void,
+) {
+  const fresh = useFreshness();
+  useEffect(() => {
+    void fresh;
+    if (!enabled) return;
+    let active = true;
+    const previous = cachedFeed(cacheKey);
+    if (previous) onItems(previous);
+    loadProofFeed(apiBaseUrl, token)
+      .then((loaded) => {
+        if (!active) return;
+        const next = keepPhotoUrls(feedCache.get(cacheKey) ?? [], loaded);
+        feedCache.set(cacheKey, next);
+        onItems(next);
+      })
+      .catch((error) => {
+        if (
+          active &&
+          error instanceof ApiError &&
+          error.kind === "unauthorized"
+        )
+          onRevoked();
+      });
+    return () => {
+      active = false;
+    };
+  }, [apiBaseUrl, token, cacheKey, enabled, onItems, onRevoked, fresh]);
+}
+
 export function ProofFeed({
   apiBaseUrl,
   token,

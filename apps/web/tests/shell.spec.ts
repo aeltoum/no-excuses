@@ -79,6 +79,7 @@ for (const route of [
   "/sign-in",
   "/group",
   "/home",
+  "/week",
   "/target",
   "/history",
   "/account",

@@ -179,6 +179,53 @@ function ClipPlayer({ url, label }: { url?: string | null; label: string }) {
 }
 
 // Owed Consequence cards on Home: pick, complete, and approve friends' claims.
+// What a card hand asks of this member right now.
+const cardAttention = (home: ConsequenceHome) =>
+  (home.offer ? 1 : 0) +
+  home.reviews.filter((review) => review.myResponse === null).length +
+  home.pauseReviews.filter((review) => review.myVote === null).length;
+
+// Card attention and the log gate without the cards, for pages that only
+// need to know what waits (Home's badge and Log button).
+export function useCardSummary(
+  apiBaseUrl: string,
+  token: string,
+  cacheKey: string,
+  enabled: boolean,
+  onRevoked: () => void,
+): { attention: number; blocked: boolean; title: string | null } {
+  const [home, setHome] = useState<ConsequenceHome | null>(
+    () => homeCache.get(cacheKey) ?? null,
+  );
+  const fresh = useFreshness();
+  useEffect(() => {
+    void fresh;
+    if (!enabled) return;
+    let active = true;
+    request(apiBaseUrl, token, "/v1/consequences")
+      .then((next) => {
+        if (!active) return;
+        homeCache.set(cacheKey, next);
+        setHome(next);
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.kind === "unauthorized")
+          onRevoked();
+      });
+    return () => {
+      active = false;
+    };
+  }, [apiBaseUrl, token, cacheKey, enabled, onRevoked, fresh]);
+  return home && enabled
+    ? {
+        attention: cardAttention(home),
+        blocked: home.logBlocked,
+        title: home.attempt?.title ?? null,
+      }
+    : { attention: 0, blocked: false, title: null };
+}
+
 export function Consequences({
   apiBaseUrl,
   token,
@@ -255,11 +302,7 @@ export function Consequences({
 
   useEffect(() => {
     if (!home) return;
-    onAttention(
-      (home.offer ? 1 : 0) +
-        home.reviews.filter((review) => review.myResponse === null).length +
-        home.pauseReviews.filter((review) => review.myVote === null).length,
-    );
+    onAttention(cardAttention(home));
     onLogBlock(home.logBlocked ? { title: home.attempt?.title ?? null } : null);
   }, [home, onAttention, onLogBlock]);
 
