@@ -285,7 +285,13 @@ export function ProofFeed({
                 acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
                 rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
               }
-            : { ...item, reviewStatus: "questioned", canReview: false };
+            : // The questioner is in the decision audience, so they can vote next.
+              {
+                ...item,
+                reviewStatus: "questioned",
+                canReview: false,
+                canVote: true,
+              };
       const swap = (next: ProofItem) =>
         setItems((current) =>
           current.map((entry) =>
@@ -293,7 +299,7 @@ export function ProofFeed({
           ),
         );
       setBusy(id);
-      setDecided((ids) => new Set(ids).add(id));
+      if (action !== "review") setDecided((ids) => new Set(ids).add(id));
       const confirm = () => setNotice({ kind: "success", text: done });
       if (instant) {
         swap(optimistic);
