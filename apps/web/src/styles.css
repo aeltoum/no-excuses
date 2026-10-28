@@ -4919,6 +4919,16 @@ h1 {
 .day-tile-open:focus-visible {
   outline-offset: 2px;
 }
+.day-tile-new {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--chalk);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 40%);
+}
 .day-tile-photo {
   display: block;
   width: 100%;

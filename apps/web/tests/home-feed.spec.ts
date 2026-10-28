@@ -32,6 +32,7 @@ const post = (id: string, overrides: Record<string, unknown>) => ({
   presencePhotoUrl: photo,
   reactions: [],
   myReactions: [],
+  seen: true,
   ...overrides,
 });
 

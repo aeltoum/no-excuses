@@ -2,6 +2,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -27,6 +28,13 @@ import {
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
 import { useConduct } from "./Safety";
+import {
+  isSeen,
+  markSeen,
+  useSeenFlush,
+  useSeenVersion,
+  useSeenWatch,
+} from "./seen";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
 
@@ -340,6 +348,20 @@ export function ProofFeed({
       document.removeEventListener("keydown", close);
     };
   }, [menuFor]);
+  // Seen posts: a mark shows at once and syncs in the background.
+  useSeenVersion();
+  useSeenFlush(apiBaseUrl, token, cacheKey);
+  useSeenWatch(useCallback((id: string) => markSeen(cacheKey, id), [cacheKey]));
+  // Order within a day uses seen state as loaded, so a tile never jumps while watched.
+  const seenAtLoad = useMemo(
+    () =>
+      new Set(
+        items
+          .filter((item) => isSeen(cacheKey, item))
+          .map((item) => item.workoutCheckinId),
+      ),
+    [items, cacheKey],
+  );
   const [confirmSheet, ask] = useConfirm();
   const [conductSheet, ensureConduct] = useConduct(apiBaseUrl, token);
   const confirmReport = useCallback(
@@ -628,6 +650,11 @@ export function ProofFeed({
     const key = dayLabel(item.submittedAt);
     days.set(key, [...(days.get(key) ?? []), item]);
   }
+  // Within a day, unseen posts first, then newest first.
+  const unseenFirst = (left: ProofItem, right: ProofItem) =>
+    Number(seenAtLoad.has(left.workoutCheckinId)) -
+      Number(seenAtLoad.has(right.workoutCheckinId)) || byNewest(left, right);
+  for (const posts of days.values()) posts.sort(unseenFirst);
   // Only what waits on the viewer counts; voted and own questioned posts stay listed.
   const needsCount = questioned.filter(needsVote).length + needsExtraCount;
   const needsShown = questioned.length > 0 || needsExtraShown;
@@ -805,6 +832,7 @@ export function ProofFeed({
         className="proof-post"
         key={item.workoutCheckinId}
         data-post={item.workoutCheckinId}
+        data-unseen={isSeen(cacheKey, item) ? undefined : item.workoutCheckinId}
       >
         <header>
           <Avatar name={who} url={avatars[item.authorMembershipId]} />
@@ -1158,13 +1186,15 @@ export function ProofFeed({
     const id = item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
     const workout = `${label(item.activityType)} · ${item.durationMinutes} min`;
+    const unseen = !isSeen(cacheKey, item);
     return (
       <li key={id} className="day-tile">
         <button
           type="button"
           className="day-tile-open"
           data-post={id}
-          aria-label={`${who}, ${workout}. Open post`}
+          data-unseen={unseen ? id : undefined}
+          aria-label={`${who}, ${workout}${unseen ? ", new" : ""}. Open post`}
           onClick={(event) => openPost(id, event.currentTarget)}
         >
           {item.activityPhotoUrl ? (
@@ -1185,6 +1215,7 @@ export function ProofFeed({
               {item.hidden ? "Reported" : workout}
             </span>
           </span>
+          {unseen && <span className="day-tile-new" aria-hidden="true" />}
           <i
             className={`day-tile-plate activity-swatch activity-${item.activityType}`}
             aria-hidden="true"

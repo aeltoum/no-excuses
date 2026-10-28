@@ -180,6 +180,7 @@ test("Home reacts to friends' proof and nudges members behind target", async ({
         status: 200,
         json: { contractVersion: 1, data: homeExtras() },
       });
+    if (path === "/v1/proof/seen") return ok({ marked: 0 });
     return route.fulfill({ status: 404, json: {} });
   });
   await page.goto("/sign-in");

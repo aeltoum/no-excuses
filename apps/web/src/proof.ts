@@ -29,6 +29,8 @@ export type ProofItem = {
   canVote: boolean;
   // Feeds cached before post deletion lack it.
   canDelete?: boolean;
+  // Feeds cached before seen posts lack it; own posts are always seen.
+  seen?: boolean;
   details?: WorkoutDetails | null;
   caption?: string | null;
   messages?: ProofMessage[];
@@ -62,7 +64,7 @@ let freshToken: (() => Promise<string>) | null = null;
 export const setTokenSource = (source: () => Promise<string>) => {
   freshToken = source;
 };
-const currentToken = (fallback: string) =>
+export const currentToken = (fallback: string) =>
   freshToken ? freshToken().catch(() => fallback) : Promise.resolve(fallback);
 
 export async function call<T>(
