@@ -967,7 +967,7 @@ test("exact Account deletion confirmation cuts off browser session", async ({
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByText("0 of 3 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.goto("/account");
   await page.getByRole("button", { name: "Delete account…" }).click();
   const deletionSheet = page.getByRole("dialog", { name: "Delete account" });
@@ -1080,7 +1080,7 @@ test("pending Auth deletion still ends browser access", async ({ page }) => {
   await page.getByRole("button", { name: "Send code" }).click();
   await fillCode(page, "123456");
   await page.getByRole("button", { name: "Verify code" }).click();
-  await expect(page.getByText("0 of 3 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.goto("/account");
   await page.getByRole("button", { name: "Delete account…" }).click();
   await page.getByRole("button", { name: "Email me a code" }).click();

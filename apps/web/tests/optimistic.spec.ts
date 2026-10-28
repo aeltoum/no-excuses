@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo, test } from "@playwright/test";
+import { openHome, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -351,9 +352,7 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
   const errors = watchErrors(page);
   const server = await mockServer(page);
   await signIn(page);
-  await expect(
-    page.getByText("2 of 4 this week", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await delayRoute(page, "http://127.0.0.1:8787/v1/**", 1000);
   await delayRoute(page, "http://127.0.0.1:54321/storage/v1/**", 1000);
   const sending = page.getByRole("list", { name: "Your workouts sending" });
@@ -368,9 +367,6 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
     sending.getByText("Uploading…"),
   );
   await expect(dialog).toHaveCount(0);
-  await expect(
-    page.getByText("3 of 4 this week", { exact: true }),
-  ).toBeVisible();
   // The rest of Home stays usable while the workout uploads.
   await page.getByRole("button", { name: "Log workout" }).click();
   await expect(page.getByRole("dialog", { name: "Log workout" })).toBeVisible();
@@ -384,27 +380,18 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
   await expect(
     page.getByText(/^Workout logged\. 3 of 4 this week\./),
   ).toBeVisible();
-  await expect(
-    page.getByText("3 of 4 this week", { exact: true }),
-  ).toBeVisible();
   expect(server.uploads).toBe(2);
 
   // Failure: the entry offers Retry; Retry reuses the uploaded photos.
   server.checkInMode = "fail";
   dialog = await fillWorkout(page);
   await dialog.getByRole("button", { name: "Log workout" }).click();
-  await expect(
-    page.getByText("4 of 4 this week", { exact: true }),
-  ).toBeVisible();
   await expect(sending.getByText("Couldn’t upload")).toBeVisible({
     timeout: 10_000,
   });
   await expect(sending.getByRole("alert")).toHaveText(
     "Action failed. Try again.",
   );
-  await expect(
-    page.getByText("3 of 4 this week", { exact: true }),
-  ).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("check-in-failed.png"),
@@ -419,13 +406,7 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
     () => sending.getByRole("button", { name: "Retry" }).click(),
     sending.getByText("Uploading…"),
   );
-  await expect(
-    page.getByText("4 of 4 this week", { exact: true }),
-  ).toBeVisible();
   await expect(sending).toHaveCount(0, { timeout: 10_000 });
-  await expect(
-    page.getByText("4 of 4 this week", { exact: true }),
-  ).toBeVisible();
   expect(server.uploads).toBe(uploadsBeforeRetry);
   expect(keysBeforeRetry.size).toBe(1);
   expect(new Set(server.checkIns.slice(1)).size).toBe(1);
@@ -438,11 +419,10 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
     "Finish your Consequence card before logging workouts.",
     { timeout: 10_000 },
   );
-  await expect(
-    page.getByText("4 of 4 this week", { exact: true }),
-  ).toBeVisible();
   await sending.getByRole("button", { name: "Discard" }).click();
   await expect(sending).toHaveCount(0);
+  // The count lives on Week: the retried workout counts, the discarded one not.
+  await openWeek(page);
   await expect(
     page.getByText("4 of 4 this week", { exact: true }),
   ).toBeVisible();
@@ -456,6 +436,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
   const errors = watchErrors(page);
   const server = await mockServer(page);
   await signIn(page);
+  await openWeek(page);
   const cards = page.getByRole("region", { name: "Consequence cards" });
   await expect(cards.getByText("Maya")).toBeVisible();
   await delayRoute(page, "http://127.0.0.1:8787/v1/**", 1000);
@@ -502,7 +483,8 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
     page.getByText(/^Pause requested: 0 of 2 approvals/),
   );
 
-  // Wall restore by the Group admin.
+  // Wall restore by the Group admin, on Home's feed.
+  await openHome(page);
   await timed(
     page,
     testInfo,
@@ -516,6 +498,7 @@ test("Home decisions, pause, target and Wall restore show at once and undo on fa
   });
 
   // Cached cards render at once on reload while the API is still slow.
+  await openWeek(page);
   await page.reload();
   await expect(cards.locator(".consequence-strip")).toBeVisible({
     timeout: 900,
@@ -565,9 +548,7 @@ test("Group and Account actions are instant, per control, and sign-out clears ca
   const errors = watchErrors(page);
   const server = await mockServer(page);
   await signIn(page);
-  await expect(
-    page.getByText("2 of 4 this week", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.getByRole("link", { name: "Group", exact: true }).click();
   await expect(page.getByRole("heading", { name: "6AM Crew" })).toBeVisible();
   await page.getByRole("button", { name: "Manage", exact: true }).click();
@@ -726,7 +707,7 @@ test("signing back in during a slow sign-out stays signed in", async ({
   const logouts = { count: 0 };
   await holdLogout(page, "slow", logouts);
   await signIn(page);
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.getByRole("link", { name: "Account" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(
@@ -737,10 +718,10 @@ test("signing back in during a slow sign-out stays signed in", async ({
   await expect(page).toHaveURL("http://127.0.0.1:4174/home", {
     timeout: 10_000,
   });
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   expect(logouts.count).toBe(1);
   await page.reload();
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath("signed-back-in.png"),
@@ -757,7 +738,9 @@ for (const mode of ["slow", "error", "abort"] as const)
     const logouts = { count: 0 };
     await holdLogout(page, mode, logouts);
     await signIn(page);
-    await expect(page.getByText("2 of 4 this week")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Log workout" }),
+    ).toBeVisible();
     await page.getByRole("link", { name: "Account" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
     const signedOut = page.getByRole("heading", { name: "Sign in required" });
@@ -771,7 +754,9 @@ for (const mode of ["slow", "error", "abort"] as const)
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.reload();
     await expect(signedOut).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("2 of 4 this week")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Log workout" })).toHaveCount(
+      0,
+    );
   });
 
 test("sign-out reaches other tabs and leaves other projects' sessions", async ({
@@ -781,7 +766,7 @@ test("sign-out reaches other tabs and leaves other projects' sessions", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await mockServer(page);
   await signIn(page);
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.evaluate(() =>
     localStorage.setItem("sb-otherproj-auth-token", '{"other":true}'),
   );
@@ -789,7 +774,9 @@ test("sign-out reaches other tabs and leaves other projects' sessions", async ({
   await other.setViewportSize({ width: 390, height: 844 });
   await mockServer(other);
   await other.goto("/home");
-  await expect(other.getByText("2 of 4 this week")).toBeVisible();
+  await expect(
+    other.getByRole("button", { name: "Log workout" }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Account" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(
@@ -798,7 +785,9 @@ test("sign-out reaches other tabs and leaves other projects' sessions", async ({
   await expect(
     other.getByRole("heading", { name: "Sign in required" }),
   ).toBeVisible({ timeout: 3000 });
-  await expect(other.getByText("2 of 4 this week")).toHaveCount(0);
+  await expect(other.getByRole("button", { name: "Log workout" })).toHaveCount(
+    0,
+  );
   expect(
     await page.evaluate(() => localStorage.getItem("sb-otherproj-auth-token")),
   ).toBe('{"other":true}');
@@ -832,7 +821,7 @@ test("a token refresh landing during sign-out keeps the member signed out", asyn
     }),
   );
   await signIn(page);
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   await page.getByRole("link", { name: "Account" }).click();
   // Bring the session inside the refresh window, then start a refresh.
   await page.clock.fastForward(150_000);
@@ -855,9 +844,7 @@ test("discarding a workout whose response was lost reconciles the count", async 
   const errors = watchErrors(page);
   const server = await mockServer(page);
   await signIn(page);
-  await expect(
-    page.getByText("2 of 4 this week", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
   server.checkInMode = "lost";
   const dialog = await fillWorkout(page);
   await dialog.getByRole("button", { name: "Log workout" }).click();
@@ -874,6 +861,7 @@ test("discarding a workout whose response was lost reconciles the count", async 
   ).toBeVisible();
   // The server logged it once; the count catches up.
   expect(server.count).toBe(3);
+  await openWeek(page);
   await expect(
     page.getByText("3 of 4 this week", { exact: true }),
   ).toBeVisible();

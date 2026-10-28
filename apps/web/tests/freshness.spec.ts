@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { friendId, progressItem, signIn } from "./member";
+import { friendId, openHome, progressItem, signIn } from "./member";
 
 const photo =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='3' height='4'><rect width='3' height='4' fill='%23555'/></svg>";
@@ -59,12 +59,15 @@ test("returning to the app shows friends' new progress and posts without a reloa
 }, info) => {
   let maya = 2;
   let feed: unknown[] = [];
-  const { errors } = await signIn(page, ({ path }) =>
-    path.endsWith("/current-week-progress")
-      ? friendsAt(maya)
-      : path === "/v1/proof/feed"
-        ? feed
-        : undefined,
+  const { errors } = await signIn(
+    page,
+    ({ path }) =>
+      path.endsWith("/current-week-progress")
+        ? friendsAt(maya)
+        : path === "/v1/proof/feed"
+          ? feed
+          : undefined,
+    "/week",
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends).toContainText("2 of 3 workouts");
@@ -72,6 +75,7 @@ test("returning to the app shows friends' new progress and posts without a reloa
   feed = [post()];
   await leaveAndReturn(page);
   await expect(friends).toContainText("3 of 3 workouts");
+  await openHome(page);
   await expect(page.getByAltText("Maya's workout activity")).toBeVisible();
   // No loading state replaces what was already on screen.
   await expect(page.getByRole("status", { name: /Loading/ })).toHaveCount(0);
@@ -84,8 +88,11 @@ test("an open Home picks up friends' activity on its own", async ({
 }, info) => {
   await page.clock.install();
   let maya = 2;
-  await signIn(page, ({ path }) =>
-    path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
+  await signIn(
+    page,
+    ({ path }) =>
+      path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
+    "/week",
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends).toContainText("2 of 3 workouts");
@@ -105,7 +112,7 @@ test("a token that expired in the background refreshes Home without an access ch
     page,
     ({ path }) =>
       path.endsWith("/current-week-progress") ? friendsAt(maya) : undefined,
-    "/home",
+    "/week",
     { expires_at: undefined },
   );
   const friends = page.getByRole("list", { name: "Friends this week" });
@@ -226,7 +233,7 @@ test("a focus refresh restarts the minute instead of stretching it", async ({
   page,
 }) => {
   await page.clock.install();
-  const { calls } = await signIn(page);
+  const { calls } = await signIn(page, undefined, "/week");
   await expect(
     page.getByRole("list", { name: "Friends this week" }),
   ).toBeVisible();

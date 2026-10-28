@@ -154,3 +154,20 @@ export async function signIn(
       .click();
   return { calls, errors };
 }
+
+// The week's status (barbell, friends, cards) lives on the Week tab.
+export async function openWeek(page: Page) {
+  await page
+    .getByRole("navigation", { name: "Member destinations" })
+    .getByRole("link", { name: "Week", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/week$/);
+}
+
+export async function openHome(page: Page) {
+  await page
+    .getByRole("navigation", { name: "Member destinations" })
+    .getByRole("link", { name: /^Home/ })
+    .click();
+  await expect(page).toHaveURL(/\/home$/);
+}

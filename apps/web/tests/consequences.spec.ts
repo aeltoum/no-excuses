@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { homeExtras } from "./member";
+import { homeExtras, openHome, openWeek } from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const membershipId = "30000000-0000-4000-8000-000000000001";
@@ -308,6 +308,31 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
 
+  // An owed card racks the bar: Log opens the warning instead of the form.
+  const logButton = page.getByRole("button", { name: /^Log workout/ });
+  await expect(logButton).toHaveAccessibleName(
+    "Log workout, locked until your Consequence card is done",
+  );
+  await logButton.click();
+  let lock = page.getByRole("dialog", { name: "Bar’s racked" });
+  await expect(lock).toContainText("Pick your card");
+  await expect(page.getByRole("dialog", { name: "Log workout" })).toHaveCount(
+    0,
+  );
+  await page.waitForTimeout(400);
+  expect(
+    (
+      await new AxeBuilder({ page }).include("[role=dialog]").analyze()
+    ).violations.filter((item) =>
+      ["serious", "critical"].includes(item.impact ?? ""),
+    ),
+  ).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("log-locked.png") });
+  // Cards live on Week: the lock sheet takes the member there.
+  await lock.getByRole("button", { name: "Choose my card" }).click();
+  await expect(lock).toHaveCount(0);
+  await expect(page).toHaveURL(/\/week$/);
+
   // The hand pops up on its own, like an augment round.
   let dialog = page.getByRole("dialog", { name: "Choose your punishment" });
   await expect(dialog).toBeVisible();
@@ -349,30 +374,6 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
   ).toContainText("1/5");
 
-  // An owed card racks the bar: Log opens the warning instead of the form.
-  const logButton = page.getByRole("button", { name: /^Log workout/ });
-  await expect(logButton).toHaveAccessibleName(
-    "Log workout, locked until your Consequence card is done",
-  );
-  await logButton.click();
-  let lock = page.getByRole("dialog", { name: "Bar’s racked" });
-  await expect(lock).toContainText("Pick your card");
-  await expect(page.getByRole("dialog", { name: "Log workout" })).toHaveCount(
-    0,
-  );
-  await page.waitForTimeout(400);
-  expect(
-    (
-      await new AxeBuilder({ page }).include("[role=dialog]").analyze()
-    ).violations.filter((item) =>
-      ["serious", "critical"].includes(item.impact ?? ""),
-    ),
-  ).toEqual([]);
-  await page.screenshot({ path: testInfo.outputPath("log-locked.png") });
-  await lock.getByRole("button", { name: "Choose my card" }).click();
-  await expect(lock).toHaveCount(0);
-  await expect(page.locator("#consequence-cards")).toBeFocused();
-
   await page.reload();
   await expect(dialog).toHaveCount(0);
   const strip = page.getByRole("button", {
@@ -400,12 +401,15 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
   await expect(page.getByText(/Due in 4[78] hours\. Miss it/)).toBeVisible();
 
+  await openHome(page);
   await logButton.click();
   lock = page.getByRole("dialog", { name: "Bar’s racked" });
   await expect(lock.getByText("5 km run")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("log-locked-card.png") });
   await lock.getByRole("button", { name: "Go to my card" }).click();
   await expect(lock).toHaveCount(0);
+  await expect(page).toHaveURL(/\/week$/);
+  await expect(page.locator("#consequence-cards")).toBeFocused();
 
   await expect(page.getByText("Can’t do it safely")).toHaveCount(0);
   await page.getByRole("button", { name: "Request a pause" }).click();
@@ -551,7 +555,9 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     /#t=0\.1$/,
   );
   // Proof is in: logging unlocks without waiting for approvals.
+  await openHome(page);
   await expect(logButton).toHaveAccessibleName("Log workout");
+  await openWeek(page);
 
   const pauseReview = page
     .getByRole("list", { name: "Pause requests to approve" })

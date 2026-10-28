@@ -1189,7 +1189,7 @@ button:disabled {
   display: block;
 }
 .tab-indicator {
-  width: 25%;
+  width: 20%;
   height: 3px;
   position: absolute;
   top: -1px;
@@ -4363,7 +4363,7 @@ h1 {
 .member-nav {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   position: sticky;
   bottom: 0;
   padding-inline: max(0px, calc((100% - var(--content-width)) / 2));
@@ -4487,7 +4487,7 @@ h1 {
 /* The indicator follows the column-aligned tabs. */
 .member-nav .tab-indicator {
   left: max(0px, calc((100% - var(--content-width)) / 2));
-  width: calc(min(100%, var(--content-width)) / 4);
+  width: calc(min(100%, var(--content-width)) / 5);
 }
 .home-header h1 {
   white-space: nowrap;

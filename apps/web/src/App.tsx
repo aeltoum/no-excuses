@@ -38,6 +38,7 @@ type Route =
   | "/sign-in"
   | "/group"
   | "/home"
+  | "/week"
   | "/target"
   | "/history"
   | "/account"
@@ -52,6 +53,7 @@ type Access =
 const codePositions = [1, 2, 3, 4, 5, 6] as const;
 const memberRoutes: Array<[Route, string]> = [
   ["/home", "Home"],
+  ["/week", "Week"],
   ["/group", "Group"],
   ["/history", "History"],
   ["/account", "Account"],
@@ -62,6 +64,11 @@ function TabIcon({ route }: { route: Route }) {
   const shape =
     route === "/home" ? (
       <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    ) : route === "/week" ? (
+      <>
+        <rect x="3.5" y="5" width="17" height="15.5" rx="1.5" />
+        <path d="M3.5 10h17M8 3v4M16 3v4M8 14.5h2M14 14.5h2" />
+      </>
     ) : route === "/group" ? (
       <>
         <circle cx="9" cy="8.5" r="3.3" />
@@ -402,6 +409,7 @@ export function App({
       !session ||
       !membership ||
       (destination !== "/home" &&
+        destination !== "/week" &&
         destination !== "/target" &&
         destination !== "/history")
     )
@@ -416,7 +424,7 @@ export function App({
     );
   };
   const navigate = (
-    event: React.MouseEvent<HTMLAnchorElement>,
+    event: React.MouseEvent<HTMLElement>,
     destination: string,
   ) => {
     if (
@@ -877,6 +885,7 @@ export function App({
       "/sign-in",
       "/group",
       "/home",
+      "/week",
       "/target",
       "/history",
       "/account",
@@ -885,8 +894,8 @@ export function App({
   ).includes(path)
     ? (path as Route)
     : null;
-  // Target is a Home subpage: Home stays the selected tab.
-  const tabRoute = route === "/target" ? "/home" : route;
+  // Target is a Week subpage: Week stays the selected tab.
+  const tabRoute = route === "/target" ? "/week" : route;
   const currentMemberIsAdmin = Boolean(
     membership &&
       groupRoster?.members.some(
@@ -2581,7 +2590,7 @@ export function App({
             onUnread={setUnread}
             onOperator={setOperator}
             key={`${session?.user.id}:${membership?.groupId}:${membership?.membershipId}:${route}`}
-            route={route as "/home" | "/target" | "/history"}
+            route={route as "/home" | "/week" | "/target" | "/history"}
             api={api}
             token={session?.access_token ?? ""}
             membership={membership}

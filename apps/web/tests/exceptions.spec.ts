@@ -1,6 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { friendId, homeExtras, membershipId, signIn } from "./member";
+import {
+  friendId,
+  homeExtras,
+  membershipId,
+  openHome,
+  openWeek,
+  signIn,
+} from "./member";
 import { delayRoute, msUntilVisible } from "./timing";
 
 const ballot = {
@@ -61,11 +68,13 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
       });
     }
   });
-  // Excused friends show it and cannot be nudged.
+  // Excused friends show it on Week and cannot be nudged.
+  await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends).toContainText("Excused this week");
   await expect(friends.getByRole("button", { name: /Nudge/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Home 1/ })).toBeVisible();
+  await openHome(page);
 
   await delayRoute(page, "**/v1/exceptions/**", 1000);
   // A failed vote rolls back; the retry sticks.
@@ -89,7 +98,8 @@ test("ask for a week off and vote on a friend's request, both instantly", async 
   );
   expect(voted).toBeLessThanOrEqual(100);
 
-  // Week off lives under Week options in the header.
+  // Week off lives under Week options in Week's header.
+  await openWeek(page);
   await page.getByRole("button", { name: "Week options" }).click();
   const opened = await msUntilVisible(
     page,

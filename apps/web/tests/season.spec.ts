@@ -37,23 +37,26 @@ const season = {
   champions: [{ season: 1, names: ["Akrum", "Maya"], crowns: 3 }],
 };
 
-test("Crowns stay hidden on Home and History while the feature is paused", async ({
+test("Crowns stay hidden on Week and History while the feature is paused", async ({
   page,
 }) => {
-  const { errors } = await signIn(page, ({ path }) =>
-    path === "/v1/home/extras"
-      ? homeExtras({
-          season,
-          unlocks: [
-            {
-              title: "1 mile time trial",
-              milestone: 2,
-              unlockedAt: new Date().toISOString(),
-              recent: true,
-            },
-          ],
-        })
-      : undefined,
+  const { errors } = await signIn(
+    page,
+    ({ path }) =>
+      path === "/v1/home/extras"
+        ? homeExtras({
+            season,
+            unlocks: [
+              {
+                title: "1 mile time trial",
+                milestone: 2,
+                unlockedAt: new Date().toISOString(),
+                recent: true,
+              },
+            ],
+          })
+        : undefined,
+    "/week",
   );
   await expect(
     page.getByText(/2-week streak: you added “1 mile time trial”/),
