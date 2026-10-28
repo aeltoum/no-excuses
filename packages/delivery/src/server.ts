@@ -1406,12 +1406,19 @@ const homeExtras = (request: Request, path: string) =>
   memberRoute(request, async ({ actor, method, now, data }) => {
     if (path !== "/v1/home/extras" || method !== "GET")
       return fail("not_found", 404);
-    const [extras, avatars] = await Promise.all([
+    const [extras, notices, avatars] = await Promise.all([
       data("select app_private.home_extras($1) as data", [now]),
+      data("select app_private.notices() as data", []),
       // Photos are decoration: a storage hiccup must not blank Home.
       groupAvatars(actor, now).catch(() => ({})),
     ]);
-    return ok({ ...(extras as Record<string, unknown>), avatars });
+    return ok({
+      ...(extras as Record<string, unknown>),
+      countNotice:
+        (notices as { countsRightAway?: boolean } | null)?.countsRightAway ===
+        true,
+      avatars,
+    });
   });
 
 const exceptionCategories = [
@@ -1484,6 +1491,19 @@ const recapRoutes = (request: Request, path: string) =>
     );
     setImmediate(() => void deliverPush());
     return ok(value);
+  });
+
+// One-time Home notices: shown through Home extras, dismissed here.
+const noticeRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ method, data }) => {
+    if (path === "/v1/notices/dismiss" && method === "POST")
+      return ok({
+        dismissed: await data(
+          "select app_private.dismiss_count_notice() as data",
+          [],
+        ),
+      });
+    return fail("not_found", 404);
   });
 
 const notificationRoutes = (request: Request, path: string) =>
@@ -1783,6 +1803,7 @@ function dispatch(request: Request, path: string): Promise<Response> {
     );
   if (path === "/v1/operator" || path.startsWith("/v1/operator/"))
     return operatorRoutes(request, path);
+  if (path === "/v1/notices/dismiss") return noticeRoutes(request, path);
   if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
     return notificationRoutes(request, path);
   if (path === "/v1/avatars") return avatarRoutes(request, path);

@@ -84,6 +84,8 @@ export type HomeExtras = {
   season: SeasonState | null;
   unlocks: CardUnlock[];
   unreadNotifications: number;
+  // One-time "posts count right away" notice for members present at release.
+  countNotice: boolean;
   safety: { conductAccepted: boolean; blocked: string[]; operator?: boolean };
   session: { id: string; startedAt: string } | null;
   // Signed profile photo URLs by membership id.
@@ -95,6 +97,7 @@ export const emptyExtras: HomeExtras = {
   season: null,
   unlocks: [],
   unreadNotifications: 0,
+  countNotice: false,
   safety: { conductAccepted: false, blocked: [] },
   session: null,
 };

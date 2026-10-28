@@ -44,7 +44,7 @@ describe("Notification center", { timeout: 30_000 }, () => {
       center.items.map(({ title, unread, kind }) => ({ title, unread, kind })),
     ).toEqual([
       { title: "Casey nudged you", unread: true, kind: "social" },
-      { title: "Blair logged a workout", unread: true, kind: "workout" },
+      { title: "Blair posted a cardio workout", unread: true, kind: "workout" },
     ]);
     expect(center.prefs).toEqual({
       socialPush: true,
@@ -77,7 +77,7 @@ describe("Notification center", { timeout: 30_000 }, () => {
       "select title, muted from app_private.pending_push(10) order by outbox_id",
     );
     expect(pending.rows).toEqual([
-      { title: "Blair logged a workout", muted: false },
+      { title: "Blair posted a cardio workout", muted: false },
       { title: "Casey nudged you", muted: true },
     ]);
   });
