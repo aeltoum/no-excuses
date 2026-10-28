@@ -5228,3 +5228,70 @@ html.post-viewer-open body {
     transition: none;
   }
 }
+
+/* Quiet empty Home states: outlines, caught-up divider, gap rows, solo line. */
+.feed-empty {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  color: var(--muted);
+}
+.feed-empty h2,
+.feed-empty p {
+  margin: 0;
+}
+.feed-empty h2 {
+  color: var(--chalk);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.feed-solo {
+  color: var(--muted);
+}
+.feed-ghosts {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Three outlines share the row, so none reaches past the screen edge. */
+.feed-ghosts span {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 168px;
+  aspect-ratio: 9 / 16;
+  border: 2px dashed var(--empty-slot);
+  border-radius: 12px;
+}
+.feed-ghosts span:nth-child(2) {
+  opacity: 0.6;
+}
+.feed-ghosts span:nth-child(3) {
+  opacity: 0.3;
+}
+.feed-caught {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.feed-caught::before,
+.feed-caught::after {
+  content: "";
+  flex: 1;
+  border-top: 2px dashed var(--empty-slot);
+}
+.day-gap {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.day-gap + .day-row {
+  border-top: 1px solid var(--rule);
+}

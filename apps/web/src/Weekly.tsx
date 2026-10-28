@@ -1195,6 +1195,11 @@ export function Weekly({
                   </a>
                 </div>
               )}
+              {!week && !own && targetContext?.memberCount === 1 && (
+                <p className="feed-empty feed-solo">
+                  Your crew’s posts land here.
+                </p>
+              )}
               {week && own && progress.length > 1 && (
                 <ul
                   className="friend-cards"
@@ -1767,6 +1772,7 @@ export function Weekly({
                   windowEndsAt={targetContext?.nextWeekStartsAt}
                   members={progress}
                   viewerId={membership.membershipId}
+                  solo={targetContext?.memberCount === 1}
                   needsExtraCount={cardAttention + ballotAttention}
                   needsExtraShown={
                     cardSummary.shown || extras.exceptions.toDecide.length > 0
