@@ -356,7 +356,7 @@ describe("Photo proof", { timeout: 30_000 }, () => {
     expect(await outcomes()).toEqual(["attained", "missed", "attained"]);
   });
 
-  it("shows a post on the Wall for 90 days from submission, to later joiners too", async () => {
+  it("keeps a Verified post on the Wall with no time limit, to later joiners too", async () => {
     const db = await database();
     const id = await submit(db, 0);
     await db.exec(
@@ -372,12 +372,12 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       ).rows.length;
     };
     expect(await seen("2026-03-06T12:00Z")).toBe(1);
-    expect(await seen("2026-06-03T09:59Z")).toBe(1);
-    expect(await seen("2026-06-03T10:00Z")).toBe(0);
+    expect(await seen("2026-06-03T10:00Z")).toBe(1);
+    expect(await seen("2027-04-09T10:00Z")).toBe(1);
     expect(id).toBeTruthy();
   });
 
-  it("expires a legacy auto-verified post 90 days from submission, not verification", async () => {
+  it("keeps a legacy auto-verified post on the Wall past 400 days", async () => {
     const db = await database();
     const id = await submit(db, 0);
     await db.exec(
@@ -392,8 +392,8 @@ describe("Photo proof", { timeout: 30_000 }, () => {
           [at],
         )
       ).rows.length;
-    expect(await shown("2026-06-03T09:00Z")).toBe(1);
-    expect(await shown("2026-06-03T11:00Z")).toBe(0);
+    expect(await shown("2026-06-03T11:00Z")).toBe(1);
+    expect(await shown("2027-04-09T11:00Z")).toBe(1);
   });
 
   it("hides reported proof from members until an admin restores or removes it", async () => {

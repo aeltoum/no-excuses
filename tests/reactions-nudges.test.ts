@@ -252,6 +252,30 @@ describe("Reactions and nudges", { timeout: 30_000 }, () => {
     ).rejects.toThrow("Reactions unavailable");
   });
 
+  it("keeps reactions and reactors on a post 400 days old", async () => {
+    const db = await database();
+    const id = await submit(db, 0);
+    await react(db, 2, id, "🔥");
+    await as(db, 1);
+    const later = "2027-04-09T12:00Z";
+    expect(
+      (
+        await db.query<{ workout_checkin_id: string }>(
+          "select workout_checkin_id from app_private.proof_reaction_summary($1)",
+          [later],
+        )
+      ).rows.map((row) => row.workout_checkin_id),
+    ).toEqual([id]);
+    expect(
+      (
+        await db.query(
+          "select reaction, display_name from app_private.proof_reactors($1, $2)",
+          [id, later],
+        )
+      ).rows,
+    ).toEqual([{ reaction: "🔥", display_name: "Casey" }]);
+  });
+
   it("nudges only members behind target, once per day", async () => {
     const db = await database();
     await submit(db, 2);
