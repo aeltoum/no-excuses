@@ -5206,6 +5206,7 @@ html.post-viewer-open body {
   min-height: 48px;
 }
 .home-header > .week-countdown-title {
+  margin-inline: auto;
   font-size: clamp(2.5rem, 12vw, 3.5rem);
   line-height: 1;
   text-align: center;

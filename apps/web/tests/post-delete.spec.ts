@@ -103,7 +103,9 @@ test("deleting your own post drops it from this week's count; can't-tell votes",
     0,
   );
   await openWeek(page);
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -161,7 +163,9 @@ test("after its week, a verified post's photos come down and the count stays", a
     page.getByText(/Photos removed. The workout still counts./),
   ).toBeVisible();
   await openWeek(page);
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toBeVisible();
   expect(calls.filter((c) => c.path.endsWith("/remove-photos"))).toHaveLength(
     1,
   );

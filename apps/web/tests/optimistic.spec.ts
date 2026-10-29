@@ -424,7 +424,7 @@ test("check-in shows at once, then confirms, retries and discards in the backgro
   // The count lives on Week: the retried workout counts, the discarded one not.
   await openWeek(page);
   await expect(
-    page.getByText("4 of 4 this week", { exact: true }),
+    page.getByRole("link", { name: /^4 of 4 workouts/ }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -865,7 +865,7 @@ test("discarding a workout whose response was lost reconciles the count", async 
   expect(server.count).toBe(3);
   await openWeek(page);
   await expect(
-    page.getByText("3 of 4 this week", { exact: true }),
+    page.getByRole("link", { name: /^3 of 4 workouts/ }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

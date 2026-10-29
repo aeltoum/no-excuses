@@ -1119,9 +1119,6 @@ export function Weekly({
                       provisional={provisional}
                     />
                   </a>
-                  <p className="home-count">
-                    {own.completedWorkoutCount} of {own.lockedTarget} this week
-                  </p>
                   {provisional > 0 && (
                     <p className="home-settle">{settleLine}</p>
                   )}
