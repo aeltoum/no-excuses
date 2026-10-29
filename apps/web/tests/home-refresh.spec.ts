@@ -110,7 +110,7 @@ test("Week shows the countdown, Home drops it; friends' photos, and posts with a
   expect(errors).toEqual([]);
 });
 
-test("Log opens the editor before the camera; several activities log as mixed with a slider effort", async ({
+test("Log opens the editor before the camera; several activities log as mixed", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -158,9 +158,7 @@ test("Log opens the editor before the camera; several activities log as mixed wi
     dialog.getByRole("button", { name: "Strength" }),
   ).toHaveAttribute("aria-pressed", "true");
   await dialog.getByRole("button", { name: "45 min" }).click();
-  const effort = dialog.getByRole("slider", { name: /How hard/ });
-  await effort.fill("2");
-  await expect(dialog.getByText("Brutal")).toBeVisible();
+  await expect(dialog.getByText("How hard did it feel?")).toHaveCount(0);
   await dialog.locator('input[type="file"]').nth(1).setInputFiles({
     name: "presence.png",
     mimeType: "image/png",
@@ -169,7 +167,7 @@ test("Log opens the editor before the camera; several activities log as mixed wi
   await dialog.getByRole("button", { name: "Log workout" }).click();
   await expect
     .poll(() => calls.find((c) => c.path === "/v1/workout-check-ins")?.body)
-    .toMatchObject({ activityType: "mixed", perceivedIntensity: "high" });
+    .toMatchObject({ activityType: "mixed" });
   expect(errors).toEqual([]);
 });
 
