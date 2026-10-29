@@ -66,13 +66,6 @@ const streakText = (item: CurrentWeekProgressItem) =>
 
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
-const intensityLevels = ["low", "moderate", "high"] as const;
-const intensityLabels = {
-  low: { emoji: "😌", text: "Easy" },
-  moderate: { emoji: "😅", text: "Solid" },
-  high: { emoji: "🥵", text: "Brutal" },
-};
-
 // Time left before the week closes, as the Week title, ticking each second.
 function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
@@ -81,7 +74,7 @@ function WeekCountdown({ endsAt }: { endsAt: string | null }) {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [endsAt]);
-  if (!endsAt) return <h1>Our week</h1>;
+  if (!endsAt) return <h1 className="week-countdown-title">Our week</h1>;
   const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000));
   // The server rolls the week over within a minute or so.
   if (seconds === 0)
@@ -1615,38 +1608,6 @@ export function Weekly({
                           />
                         </label>
                       )}
-                      <label className="intensity-slider">
-                        <span className="intensity-title">
-                          How hard did it feel?
-                          <strong>{intensityLabels[intensity].text}</strong>
-                        </span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="2"
-                          step="1"
-                          value={intensityLevels.indexOf(intensity)}
-                          aria-valuetext={intensityLabels[intensity].text}
-                          onChange={(event) =>
-                            setIntensity(
-                              intensityLevels[Number(event.target.value)] ??
-                                "moderate",
-                            )
-                          }
-                        />
-                        <span className="intensity-marks" aria-hidden="true">
-                          {intensityLevels.map((level) => (
-                            <span
-                              key={level}
-                              className={
-                                intensity === level ? "is-on" : undefined
-                              }
-                            >
-                              {intensityLabels[level].emoji}
-                            </span>
-                          ))}
-                        </span>
-                      </label>
                       <DetailsFields
                         activity={activityType}
                         draft={detailsDraft}

@@ -3912,56 +3912,17 @@ svg {
   vertical-align: middle;
 }
 
-/* Log sheet: intensity slider with effort faces. */
+/* Log sheet. */
 .legend-hint {
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 500;
 }
-.intensity-slider {
-  display: grid;
-  gap: 8px;
-}
-.intensity-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.intensity-title strong {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.25rem;
-  font-weight: 800;
-}
-.intensity-slider input[type="range"] {
-  width: 100%;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  accent-color: var(--chalk);
-  background: transparent;
-}
-.intensity-marks {
-  display: flex;
-  justify-content: space-between;
-  font-size: 1.5rem;
-  line-height: 1;
-}
-.intensity-marks span {
-  opacity: 0.35;
-  transition:
-    opacity 120ms,
-    transform 120ms;
-}
-.intensity-marks span.is-on {
-  opacity: 1;
-  transform: scale(1.2);
-}
 @media (prefers-reduced-motion: reduce) {
   .sheet,
   .switch-label input[role="switch"],
   .switch-label input[role="switch"]::after,
-  .consequence-strip-chevron,
-  .intensity-marks span {
+  .consequence-strip-chevron {
     transition: none;
   }
 }
@@ -4422,6 +4383,13 @@ h1 {
   border-radius: var(--radius-group);
   background: var(--surface);
   scroll-snap-align: start;
+}
+.friend-cards li:only-child {
+  flex: 1 1 auto;
+  max-width: none;
+}
+.friend-cards:has(> li:only-child) {
+  mask-image: none;
 }
 .friend-cards li.awaiting-review {
   border-color: var(--activity-class);
