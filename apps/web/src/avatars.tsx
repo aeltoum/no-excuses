@@ -1,12 +1,19 @@
 import { useSyncExternalStore } from "react";
 import { onClearPersisted, persistentMap } from "./persist";
 import { call, compressPhoto, uploadProofPhoto } from "./proof";
+import { keepSigned, markFailed, savedSigned } from "./signed";
 
 type Avatars = Record<string, string>;
 
 // Profile photos by membership id, kept across launches so faces show at once.
 const saved = persistentMap<Avatars>("avatars");
-let avatars: Avatars = saved.get("group") ?? {};
+// Saved URLs may have expired since: those never reach storage.
+let avatars: Avatars = Object.fromEntries(
+  Object.entries(saved.get("group") ?? {}).flatMap(([id, url]) => {
+    const shown = savedSigned(url);
+    return shown ? [[id, shown]] : [];
+  }),
+);
 const listeners = new Set<() => void>();
 const publish = (next: Avatars) => {
   avatars = next;
@@ -22,14 +29,12 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-// Home extras carry the Group's photos; keep a URL whose file is unchanged so
-// the browser reuses the cached image.
+// Home extras carry the Group's photos; keep a still-valid URL whose file is
+// unchanged so the browser reuses the cached image.
 export function publishAvatars(loaded: Record<string, unknown>) {
   const next: Avatars = {};
   for (const [id, url] of Object.entries(loaded))
-    if (typeof url === "string")
-      next[id] =
-        avatars[id]?.split("?")[0] === url.split("?")[0] ? avatars[id] : url;
+    if (typeof url === "string") next[id] = keepSigned(avatars[id], url) ?? url;
   if (JSON.stringify(next) !== JSON.stringify(avatars)) publish(next);
 }
 
@@ -80,7 +85,12 @@ export function Avatar({
   return (
     <span className={`avatar avatar-${size}`} aria-hidden="true">
       {url ? (
-        <img src={url} alt="" decoding="async" />
+        <img
+          src={url}
+          alt=""
+          decoding="async"
+          onError={(event) => markFailed(event.currentTarget.src)}
+        />
       ) : (
         name.slice(0, 2).toUpperCase()
       )}

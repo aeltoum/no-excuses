@@ -28,7 +28,6 @@ import {
 import { Reactions } from "./Reactions";
 import { Result, useNotice } from "./Result";
 import { useConduct } from "./Safety";
-import { type StoryMember, StoryRings } from "./Stories";
 import {
   isSeen,
   markSeen,
@@ -36,55 +35,37 @@ import {
   useSeenVersion,
   useSeenWatch,
 } from "./seen";
+import { keepSigned, markFailed, savedSigned } from "./signed";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
-
-// Expiry of a storage signed URL, read from its token; 0 when unknown.
-const urlExpiry = (url: string | null) => {
-  try {
-    const token = new URL(url ?? "").searchParams.get("token") ?? "";
-    const payload = token.split(".")[1] ?? "";
-    const claims = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    return typeof claims.exp === "number" ? claims.exp * 1000 : 0;
-  } catch {
-    return 0;
-  }
-};
-const usable = (url: string | null) =>
-  url !== null && urlExpiry(url) > Date.now() + 5 * 60_000;
-const photoPath = (url: string) => url.split("?")[0];
 
 // Each feed load re-signs photo URLs. Keeping a still-valid URL for the same
 // photo lets the browser reuse its cached image instead of downloading again.
 export function keepPhotoUrls(previous: ProofItem[], next: ProofItem[]) {
   const known = new Map(previous.map((item) => [item.workoutCheckinId, item]));
-  const keep = (old: string | null | undefined, fresh: string | null) =>
-    old && fresh && photoPath(old) === photoPath(fresh) && usable(old)
-      ? old
-      : fresh;
   return next.map((item) => {
     const old = known.get(item.workoutCheckinId);
     return {
       ...item,
-      activityPhotoUrl: keep(old?.activityPhotoUrl, item.activityPhotoUrl),
-      presencePhotoUrl: keep(old?.presencePhotoUrl, item.presencePhotoUrl),
+      activityPhotoUrl: keepSigned(
+        old?.activityPhotoUrl,
+        item.activityPhotoUrl,
+      ),
+      presencePhotoUrl: keepSigned(
+        old?.presencePhotoUrl,
+        item.presencePhotoUrl,
+      ),
     };
   });
 }
 
-// With the service worker in control, an expired URL still finds the photo
-// in its cache; without it, an expired URL would only show a broken image.
-const cachedFeed = (cacheKey: string) => {
-  const keep = (url: string | null) =>
-    usable(url) || navigator.serviceWorker?.controller ? url : null;
-  return feedCache.get(cacheKey)?.map((item) => ({
+// The saved feed shows at once; its expired photo URLs never reach storage.
+const cachedFeed = (cacheKey: string) =>
+  feedCache.get(cacheKey)?.map((item) => ({
     ...item,
-    activityPhotoUrl: keep(item.activityPhotoUrl),
-    presencePhotoUrl: keep(item.presencePhotoUrl),
+    activityPhotoUrl: savedSigned(item.activityPhotoUrl),
+    presencePhotoUrl: savedSigned(item.presencePhotoUrl),
   }));
-};
 
 type PhotoState = "loaded" | "failed";
 
@@ -262,8 +243,6 @@ export function ProofFeed({
   needsExtra,
   needsExtraCount = 0,
   needsExtraShown = false,
-  members = [],
-  viewerId = "",
   solo = false,
 }: {
   apiBaseUrl: string;
@@ -280,9 +259,6 @@ export function ProofFeed({
   // What in needsExtra waits on the viewer, and whether it shows at all.
   needsExtraCount?: number;
   needsExtraShown?: boolean;
-  // Current Group members for the story rings, and the viewer among them.
-  members?: StoryMember[];
-  viewerId?: string;
   // The viewer is the Group's only current member.
   solo?: boolean;
 }) {
@@ -809,8 +785,10 @@ export function ProofFeed({
       activity: item.activityPhotoUrl,
       presence: item.presencePhotoUrl,
     };
+    // State belongs to one URL: a fresh URL starts over and loads again.
+    const keyOf = (kind: keyof typeof urls) => `${id}:${kind}:${urls[kind]}`;
     const stateOf = (kind: keyof typeof urls) =>
-      urls[kind] ? photoState[`${id}:${kind}`] : undefined;
+      urls[kind] ? photoState[keyOf(kind)] : undefined;
     const photosSeen =
       stateOf("activity") === "loaded" && stateOf("presence") === "loaded";
     const photoFailed =
@@ -824,8 +802,8 @@ export function ProofFeed({
     const retryPhotos = () => {
       setPhotoState((current) => {
         const next = { ...current };
-        delete next[`${id}:activity`];
-        delete next[`${id}:presence`];
+        delete next[keyOf("activity")];
+        delete next[keyOf("presence")];
         return next;
       });
       setPhotoRetry((current) => ({
@@ -851,15 +829,16 @@ export function ProofFeed({
           onLoad={() =>
             setPhotoState((current) => ({
               ...current,
-              [`${id}:${kind}`]: "loaded",
+              [keyOf(kind)]: "loaded",
             }))
           }
-          onError={() =>
+          onError={() => {
+            markFailed(url);
             setPhotoState((current) => ({
               ...current,
-              [`${id}:${kind}`]: "failed",
-            }))
-          }
+              [keyOf(kind)]: "failed",
+            }));
+          }}
         />
       ) : null;
     return { photo, photosSeen, photoFailed, photoNote, retryPhotos };
@@ -1248,6 +1227,7 @@ export function ProofFeed({
               loading="lazy"
               decoding="async"
               crossOrigin="anonymous"
+              onError={(event) => markFailed(event.currentTarget.src)}
             />
           ) : (
             <span className="day-tile-photo" />
@@ -1271,14 +1251,6 @@ export function ProofFeed({
   return (
     <section className="proof-feed" aria-label="Proof feed">
       <Result notice={notice} />
-      <StoryRings
-        members={members}
-        viewerId={viewerId}
-        cacheKey={cacheKey}
-        posts={inScope}
-        ownSince={windowStart === null ? null : windowStart + weekMs}
-        seenAtLoad={seenAtLoad}
-      />
       {state === "loading" ? (
         <div
           className="day-rows-skeleton"

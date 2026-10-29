@@ -693,7 +693,7 @@ test("invalid code retains email and denied Group action hides private detail", 
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: /^(Our week|Week ends in|Week closing)/,
+      name: "Home",
     }),
   ).toBeVisible();
   await page.goto("/group");

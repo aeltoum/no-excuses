@@ -205,7 +205,7 @@ test("Home feed questions, votes on, and reports friends' proof", async ({
     "MAMaya2 of 3 workoutsNeeds your voteNudge",
   ]);
   await expect(
-    page.getByRole("img", { name: "1 of 3 workouts" }),
+    page.locator(".own-progress").getByRole("img", { name: "1 of 3 workouts" }),
   ).toBeVisible();
   // The docking bar is covered in week.spec.ts.
   await openHome(page);

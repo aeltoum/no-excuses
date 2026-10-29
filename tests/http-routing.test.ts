@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createV1HttpHandler,
+  readMemberBody,
   type V1HttpHandlers,
 } from "../packages/delivery/src/http.js";
 
@@ -207,5 +208,26 @@ describe("version 1 HTTP routing", () => {
     const response = await route(request("POST", "/v1/groups", {}));
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual(responseBody);
+  });
+});
+
+describe("member POST bodies", () => {
+  const post = (body?: string) =>
+    new Request("http://local.test/v1/notices/dismiss", {
+      method: "POST",
+      body,
+    });
+
+  it("reads an empty body as an empty object", async () => {
+    await expect(readMemberBody(post())).resolves.toEqual({});
+    await expect(readMemberBody(post(""))).resolves.toEqual({});
+  });
+
+  it("keeps JSON objects and rejects other bodies", async () => {
+    await expect(readMemberBody(post('{"a":1}'))).resolves.toEqual({ a: 1 });
+    await expect(readMemberBody(post("null"))).resolves.toEqual({});
+    await expect(readMemberBody(post("[1]"))).resolves.toBeNull();
+    await expect(readMemberBody(post("7"))).resolves.toBeNull();
+    await expect(readMemberBody(post("{bad"))).resolves.toBeNull();
   });
 });

@@ -44,7 +44,7 @@ const post = {
   myReactions: [],
 };
 
-test("Home shows the week countdown, friends' photos, and posts with a comment button", async ({
+test("Week shows the countdown, Home drops it; friends' photos, and posts with a comment button", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -67,7 +67,11 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
     if (path === "/v1/proof/feed") return [post];
     if (path.endsWith("/message")) return { id: "x" };
   });
-  // The countdown is the Home title, in hours:minutes:seconds, ticking.
+  // Home has no countdown; Week's title is the countdown, days:hours:minutes:seconds, ticking.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Home");
+  await expect(page.getByRole("timer")).toHaveCount(0);
+  await expect(page.locator(".week-countdown-title")).toHaveCount(0);
+  await openWeek(page);
   const title = page.getByRole("heading", {
     level: 1,
     name: /^Week ends in 2:03:0[01]:\d\d$/,
@@ -75,7 +79,6 @@ test("Home shows the week countdown, friends' photos, and posts with a comment b
   await expect(title).toBeVisible();
   const first = await title.textContent();
   await expect.poll(() => title.textContent()).not.toBe(first);
-  await openWeek(page);
   const friends = page.getByRole("list", { name: "Friends this week" });
   await expect(friends.locator(".avatar img")).toHaveAttribute("src", photo);
   await openHome(page);

@@ -20,7 +20,7 @@ import {
   submitWorkoutCheckinRequestSchema,
 } from "../../contracts/src/runtime.js";
 import type { ApiRequest, ApiResponse } from "./api.js";
-import { createV1HttpHandler } from "./http.js";
+import { createV1HttpHandler, readMemberBody } from "./http.js";
 
 const required = (name: string) => {
   const value = process.env[name];
@@ -1344,14 +1344,9 @@ async function memberRoute(
   if (!actor) return reply(fail("unauthorized", 401));
   let body: Record<string, unknown> = {};
   if (request.method === "POST") {
-    try {
-      const parsed = (await request.json()) ?? {};
-      if (typeof parsed !== "object" || Array.isArray(parsed))
-        return reply(fail("invalid_request", 400));
-      body = parsed as Record<string, unknown>;
-    } catch {
-      return reply(fail("invalid_request", 400));
-    }
+    const parsed = await readMemberBody(request).catch(() => null);
+    if (!parsed) return reply(fail("invalid_request", 400));
+    body = parsed;
   }
   const signed = actor;
   try {

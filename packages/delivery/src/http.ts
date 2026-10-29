@@ -246,3 +246,19 @@ export function createV1HttpHandler(handlers: V1HttpHandlers) {
     return json(apiResponse.status, apiResponse.body);
   };
 }
+
+// A member POST body: an empty body reads as {}; anything but a JSON object is null.
+export async function readMemberBody(
+  request: Request,
+): Promise<Record<string, unknown> | null> {
+  const text = await request.text();
+  if (!text.trim()) return {};
+  try {
+    const parsed: unknown = JSON.parse(text) ?? {};
+    return typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}

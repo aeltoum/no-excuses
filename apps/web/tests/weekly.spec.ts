@@ -441,7 +441,7 @@ const weeklyLoop = async (
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: /^(Our week|Week ends in|Week closing)/,
+      name: "Home",
     }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Home" })).toHaveAttribute(
@@ -455,7 +455,9 @@ const weeklyLoop = async (
   await expect(page.getByText("2 of 4 this week")).toHaveCount(0);
   await openWeek(page);
   await expect(page.getByText("2 of 4 this week")).toBeVisible();
-  await expect(page.getByText("Maya")).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Friends this week" }).getByText("Maya"),
+  ).toBeVisible();
   // The colour key lives on the target screen, off the Home feed.
   await expect(
     page.getByRole("list", { name: "Activity colours" }),
@@ -468,7 +470,7 @@ const weeklyLoop = async (
     page.getByText(`Member ${friendMembershipId.slice(0, 8)}`),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("img", { name: "2 of 4 workouts" }),
+    page.locator(".own-progress").getByRole("img", { name: "2 of 4 workouts" }),
   ).toBeVisible();
   await expect(page.getByText("Every rep counts.")).toHaveCount(0);
   await openHome(page);
@@ -578,10 +580,11 @@ const weeklyLoop = async (
     page.getByText("3 of 4 this week", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("img", { name: "3 of 4 workouts" }),
+    page.locator(".own-progress").getByRole("img", { name: "3 of 4 workouts" }),
   ).toBeVisible();
   await expect(
     page
+      .locator(".own-progress")
       .getByRole("img", { name: "3 of 4 workouts" })
       .locator('rect[fill="var(--activity-strength)"]'),
   ).toHaveCount(4);
