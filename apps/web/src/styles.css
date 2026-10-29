@@ -1686,7 +1686,7 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   margin: 0.5rem 0;
   padding-left: 0.625rem;
 }
-.clip-player,
+.clip-player-video,
 .clip-preview {
   aspect-ratio: 16 / 9;
   background: #000;
@@ -3434,7 +3434,7 @@ svg {
   color: var(--muted);
   font-size: 0.875rem;
 }
-.verdict .clip-player {
+.verdict .clip-player-video {
   aspect-ratio: 4 / 5;
   max-height: 46svh;
   object-fit: contain;
@@ -5100,4 +5100,119 @@ html.post-viewer-open body {
 }
 .day-gap + .day-row {
   border-top: 1px solid var(--rule);
+}
+
+/* Clip player: tap the frame to play or pause; the seek bar reads as a
+   loaded bar, chalk up to the playhead, with a collar for a thumb. */
+.clip-player {
+  position: relative;
+  display: grid;
+  gap: 10px;
+}
+.clip-player-video {
+  cursor: pointer;
+}
+.clip-player-toggle {
+  position: absolute;
+  inset: 0 0 26px;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--chalk);
+}
+.clip-player-toggle svg {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+}
+.clip-player-toggle:focus-visible {
+  outline: 3px solid var(--safety);
+  outline-offset: -3px;
+}
+.clip-player-seek {
+  --seek: 0%;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.clip-player-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--chalk) var(--seek),
+    var(--bar) var(--seek)
+  );
+}
+.clip-player-seek::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--chalk) var(--seek),
+    var(--bar) var(--seek)
+  );
+}
+.clip-player-seek::-webkit-slider-thumb {
+  width: 10px;
+  height: 16px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--bar-collar);
+  appearance: none;
+}
+.clip-player-seek::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--bar-collar);
+}
+.clip-player-seek:disabled {
+  opacity: 0.4;
+}
+
+/* Feed tiles carry both photos: the workout fills the tile, the selfie
+   rides inset in the corner, like the post viewer's pair. */
+.day-tile-inset {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 36%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 2px solid var(--rubber);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+}
+
+/* Week: the countdown is the screen's title, centred over the barbell;
+   the options button keeps the right edge. */
+.home-header:has(> .week-countdown-title) {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+.home-header > .week-countdown-title {
+  font-size: clamp(2.5rem, 12vw, 3.5rem);
+  line-height: 1;
+  text-align: center;
+}
+.home-header:has(> .week-countdown-title) .week-tools-button {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  translate: 0 -50%;
 }
