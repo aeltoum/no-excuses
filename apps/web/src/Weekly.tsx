@@ -74,7 +74,7 @@ function WeekCountdown({ endsAt }: { endsAt: string | null }) {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [endsAt]);
-  if (!endsAt) return <h1>Our week</h1>;
+  if (!endsAt) return <h1 className="week-countdown-title">Our week</h1>;
   const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000));
   // The server rolls the week over within a minute or so.
   if (seconds === 0)

@@ -4384,6 +4384,13 @@ h1 {
   background: var(--surface);
   scroll-snap-align: start;
 }
+.friend-cards li:only-child {
+  flex: 1 1 auto;
+  max-width: none;
+}
+.friend-cards:has(> li:only-child) {
+  mask-image: none;
+}
 .friend-cards li.awaiting-review {
   border-color: var(--activity-class);
 }
