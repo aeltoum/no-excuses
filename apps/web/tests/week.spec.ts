@@ -48,7 +48,9 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
 
   // Home: feed and Log stay; the week section is gone; the badge still counts.
   await expect(page.getByRole("button", { name: "Log workout" })).toBeVisible();
-  await expect(page.getByText("1 of 3 this week")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("list", { name: "Friends this week" }),
   ).toHaveCount(0);
@@ -73,7 +75,9 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
     "style",
     /translateX\(100%\)/,
   );
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "1 of 3 workouts. Change weekly target." }),
   ).toBeVisible();
@@ -115,7 +119,9 @@ test("Week tab holds the week's status; Home keeps the feed and Log", async ({
 
   // A deep link lands on Week, selected.
   await page.goto("/week");
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toBeVisible();
   await expect(week).toHaveAttribute("aria-current", "page");
   // Change target is a Week subpage.
   await page.getByRole("button", { name: "Week options" }).click();
@@ -166,7 +172,9 @@ test("switching to Week under a slow API answers at once with a placeholder", as
   );
   const held = await placeholder.boundingBox();
   expect(held?.height ?? 0).toBeGreaterThanOrEqual(150);
-  await expect(page.getByText("1 of 3 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
+  ).toBeVisible();
   // The tab itself answers the tap at once.
   await openHome(page);
   timings.tabFeedback = await msUntilVisible(
@@ -179,7 +187,7 @@ test("switching to Week under a slow API answers at once with a placeholder", as
   timings.cachedWeek = await msUntilVisible(
     page,
     () => week.click(),
-    page.getByText("1 of 3 this week"),
+    page.getByRole("link", { name: /^1 of 3 workouts/ }),
   );
   await expect(placeholder).toHaveCount(0);
   console.log(`[timing] ${JSON.stringify(timings)}`);

@@ -160,13 +160,10 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
     await page.evaluate(() => getComputedStyle(document.body).userSelect),
   ).not.toBe("none");
 
-  // The colour key moved to the target screen; the count sits under the bar.
+  // The colour key moved to the target screen; no count line under the bar.
   await openWeek(page);
   expect(await overflow()).toEqual({ scroll: 0, wide: [] });
-  const bar = await page.locator(".own-progress .barbell-big").boundingBox();
-  const count = await page.getByText(/of 3 this week/).boundingBox();
-  expect(bar && count).toBeTruthy();
-  if (bar && count) expect(count.y).toBeGreaterThan(bar.y + bar.height - 1);
+  await expect(page.locator(".own-progress .barbell-big")).toBeVisible();
 
   await page.getByRole("button", { name: /Notifications/ }).click();
   const sheet = page.getByRole("dialog", { name: "Notifications" });

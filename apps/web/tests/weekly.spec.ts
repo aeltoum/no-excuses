@@ -431,7 +431,9 @@ const weeklyLoop = async (
   await page.getByRole("button", { name: "Verify code" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:4174/home");
   await openWeek(page);
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^2 of 4 workouts/ }),
+  ).toBeVisible();
   await expect(
     page.getByText("2-week streak · 5 workouts since last miss"),
   ).toBeVisible();
@@ -452,9 +454,13 @@ const weeklyLoop = async (
     0,
   );
   // The week's status sits on Week, not Home.
-  await expect(page.getByText("2 of 4 this week")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: /^2 of 4 workouts/ }),
+  ).toHaveCount(0);
   await openWeek(page);
-  await expect(page.getByText("2 of 4 this week")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^2 of 4 workouts/ }),
+  ).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByText("Maya"),
   ).toBeVisible();
@@ -577,7 +583,7 @@ const weeklyLoop = async (
   expect(keys).toHaveLength(workoutFailures + 1);
   await openWeek(page);
   await expect(
-    page.getByText("3 of 4 this week", { exact: true }),
+    page.getByRole("link", { name: /^3 of 4 workouts/ }),
   ).toBeVisible();
   await expect(
     page.locator(".own-progress").getByRole("img", { name: "3 of 4 workouts" }),
