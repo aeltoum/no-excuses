@@ -50,7 +50,6 @@ import {
 } from "./proof";
 import { Result, useNotice } from "./Result";
 import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
-import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
 import { ProofFeed, useFeedItems } from "./Wall";
 import { WeekRecap } from "./WeekRecap";
@@ -125,7 +124,6 @@ type Outgoing = {
   activity: ProofPhoto;
   presence: ProofPhoto;
   details: WorkoutDetails | null;
-  sessionId?: string;
   paths: { activity?: string; presence?: string };
   status: "sending" | "failed" | "sent";
   error?: string;
@@ -161,7 +159,6 @@ const persistOutbox = (previous: Outgoing[], next: Outgoing[]) => {
       activity: { id: entry.activity.id, blob: entry.activity.blob },
       presence: { id: entry.presence.id, blob: entry.presence.blob },
       details: entry.details,
-      sessionId: entry.sessionId,
       paths: entry.paths,
     });
   }
@@ -246,12 +243,7 @@ function sendOutgoing(
           "failure",
           "Check-in response did not match this workout.",
         );
-      // The session link and details are extras: the workout counts either way.
-      if (entry.sessionId)
-        await call(apiBaseUrl, token, `/v1/sessions/${entry.sessionId}/link`, {
-          method: "POST",
-          body: { workoutCheckinId: entry.id },
-        }).catch(() => undefined);
+      // Details are extras: the workout counts either way.
       if (entry.details)
         await setProofDetails(apiBaseUrl, token, entry.id, entry.details).catch(
           () => undefined,
@@ -411,8 +403,6 @@ export function Weekly({
     setDetailsDraft(emptyDraft());
     logDraft = null;
   };
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const shots = useCandidates();
   const avatars = useAvatars();
   const sending = useSyncExternalStore(subscribeOutbox, () => outbox).filter(
     (entry) => entry.membershipId === membership?.membershipId,
@@ -501,12 +491,7 @@ export function Weekly({
       try {
         const blob = await compressPhoto(file);
         setPhotos((current) => {
-          // Session photos stay listed, so their previews stay alive.
-          if (
-            current[kind] &&
-            !shots.some((shot) => shot.id === current[kind]?.id)
-          )
-            URL.revokeObjectURL(current[kind].url);
+          if (current[kind]) URL.revokeObjectURL(current[kind].url);
           return {
             ...current,
             [kind]: {
@@ -939,23 +924,7 @@ export function Weekly({
       : activityType === null
         ? "Pick an activity."
         : "Pick how long you trained.";
-  const sessionCard = (onStart?: () => void) => (
-    <SessionCard
-      onStart={onStart}
-      apiBaseUrl={apiBaseUrl}
-      token={token}
-      extras={extras}
-      apply={applyExtras}
-      onNotice={setNotice}
-      onFinish={(id, minutes) => {
-        setSessionId(id);
-        setDuration(String(minutes));
-        setOtherDuration(![20, 30, 45, 60, 90].includes(minutes));
-        if (logBlock) setLockOpen(true);
-        else setSheetOpen(true);
-      }}
-    />
-  );
+
   return (
     <section
       className={`hero${home ? " home" : ""}${saved ? " data-cached" : ""}${changed ? " data-updated" : ""}`}
@@ -1326,12 +1295,6 @@ export function Weekly({
                   />
                 </div>
               )}
-              {/* Home has no way to start a timed workout; one already running still finishes here. */}
-              {!week && own && extras.session && (
-                <div className="home-tasks">
-                  <div className="home-actions">{sessionCard()}</div>
-                </div>
-              )}
               {!week && own && (
                 <WeekRecap
                   apiBaseUrl={apiBaseUrl}
@@ -1430,7 +1393,6 @@ export function Weekly({
                           activity: photos.activity,
                           presence: photos.presence,
                           details: draftDetails(detailsDraft, activityType),
-                          sessionId: sessionId ?? undefined,
                           paths: {},
                           status: "sending",
                         };
@@ -1439,11 +1401,6 @@ export function Weekly({
                         setOutbox([...outbox, entry]);
                         setSheetOpen(false);
                         resetDraft();
-                        setSessionId(null);
-                        clearCandidates([
-                          photos.activity.id,
-                          photos.presence.id,
-                        ]);
                         sendOutgoing(entry, api, apiBaseUrl, token, () =>
                           revokeRef.current(),
                         );
@@ -1506,32 +1463,6 @@ export function Weekly({
                                   }
                                 />
                               </label>
-                              {shots.length > 0 && (
-                                <fieldset
-                                  className="session-pick"
-                                  aria-label={`Use a session photo as ${title.toLowerCase()}`}
-                                >
-                                  {shots.map((shot, index) => (
-                                    <button
-                                      type="button"
-                                      key={shot.id}
-                                      aria-pressed={
-                                        photos[kind]?.id === shot.id
-                                      }
-                                      aria-label={`Session photo ${index + 1}`}
-                                      onClick={(event) => {
-                                        event.preventDefault();
-                                        setPhotos((current) => ({
-                                          ...current,
-                                          [kind]: shot,
-                                        }));
-                                      }}
-                                    >
-                                      <img src={shot.url} alt="" />
-                                    </button>
-                                  ))}
-                                </fieldset>
-                              )}
                             </div>
                           ))}
                         </div>

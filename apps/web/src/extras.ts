@@ -87,7 +87,6 @@ export type HomeExtras = {
   // One-time "posts count right away" notice for members present at release.
   countNotice: boolean;
   safety: { conductAccepted: boolean; blocked: string[]; operator?: boolean };
-  session: { id: string; startedAt: string } | null;
   // Signed profile photo URLs by membership id.
   avatars?: Record<string, string>;
 };
@@ -99,7 +98,6 @@ export const emptyExtras: HomeExtras = {
   unreadNotifications: 0,
   countNotice: false,
   safety: { conductAccepted: false, blocked: [] },
-  session: null,
 };
 
 const cache = persistentMap<HomeExtras>("extras");

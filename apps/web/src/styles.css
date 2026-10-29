@@ -3102,91 +3102,10 @@ textarea:focus-visible {
   gap: 8px;
 }
 
-/* Timed sessions */
-.session-start {
-  display: block;
-  margin: 4px auto 0;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-.session-card {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--chalk);
-  border-radius: 8px;
-  text-align: left;
-}
-.session-timer {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin: 0 0 8px;
-}
-.session-timer strong {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.75rem;
-  font-variant-numeric: tabular-nums;
-}
-.session-shots {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 0;
-  list-style: none;
-  overflow-x: auto;
-}
-.session-shots img,
-.session-pick img {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 4px;
-  display: block;
-}
-.session-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-}
-.session-snap {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 48px;
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.session-snap input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-}
-.session-pick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.session-pick button {
-  width: auto;
-  min-height: 0;
-  padding: 2px;
-  background: transparent;
-}
-.session-pick button[aria-pressed="true"] {
-  border-color: var(--chalk);
-  outline: 2px solid var(--chalk);
-}
 .proof-capture-cell {
   display: grid;
   gap: 6px;
   min-width: 0;
-}
-fieldset.session-pick {
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
 /* Update prompt */
@@ -3231,7 +3150,6 @@ fieldset.session-pick {
   margin-top: 4px;
 }
 .home-actions .home-target-link,
-.home-actions .session-start,
 .home-actions .text-button {
   margin: 0;
   min-height: 44px;
@@ -3242,7 +3160,6 @@ fieldset.session-pick {
   font-weight: 400;
   text-decoration: underline;
 }
-.home-actions .session-card,
 .home-actions .exception-status {
   flex-basis: 100%;
 }

@@ -14,7 +14,6 @@ export type StoredWorkout = {
   activity: { id: string; blob: Blob };
   presence: { id: string; blob: Blob };
   details: unknown;
-  sessionId?: string;
   paths: { activity?: string; presence?: string };
 };
 
