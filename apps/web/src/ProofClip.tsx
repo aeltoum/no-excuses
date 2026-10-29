@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { ApiError } from "./api-client";
+import { ClipPlayer } from "./ClipPlayer";
 import { call } from "./proof";
 import { Sheet } from "./Sheet";
 
@@ -188,7 +189,12 @@ export function ProofClip({
   }, [challenge, recording, clip, newChallenge]);
 
   useEffect(() => {
-    if (!clip) return;
+    // Clearing the clip on retake brings the live camera back on screen.
+    if (!clip) {
+      setClipUrl(null);
+      void preview.current?.play().catch(() => {});
+      return;
+    }
     const url = URL.createObjectURL(clip.blob);
     setClipUrl(url);
     return () => URL.revokeObjectURL(url);
@@ -325,16 +331,7 @@ export function ProofClip({
             playsInline
             aria-label="Camera preview"
           />
-          {clipUrl && (
-            // biome-ignore lint/a11y/useMediaCaption: member-recorded proof has no captions
-            <video
-              className="clip-preview"
-              src={clipUrl}
-              controls
-              playsInline
-              aria-label="Your recorded proof"
-            />
-          )}
+          {clipUrl && <ClipPlayer url={clipUrl} label="Your recorded proof" />}
         </div>
         <p className="clip-timer" aria-live="off">
           {recording

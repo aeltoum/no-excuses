@@ -41,6 +41,10 @@ const feedCache = persistentMap<ProofItem[]>("feed");
 
 // Each feed load re-signs photo URLs. Keeping a still-valid URL for the same
 // photo lets the browser reuse its cached image instead of downloading again.
+// A closing post viewer's history entry, unwound unless a reopen adopts it.
+let unwindingPost: string | null = null;
+let unwindTimer = 0;
+
 export function keepPhotoUrls(previous: ProofItem[], next: ProofItem[]) {
   const known = new Map(previous.map((item) => [item.workoutCheckinId, item]));
   return next.map((item) => {
@@ -339,9 +343,37 @@ export function ProofFeed({
         closePost();
     };
     document.addEventListener("keydown", onKey);
+    // The open post owns one history entry, so the device's Back closes it
+    // and returns to the feed. A StrictMode re-run adopts the pending entry.
+    const held = window.history.state?.post;
+    if (typeof held === "string" && unwindingPost === held) {
+      window.clearTimeout(unwindTimer);
+      unwindingPost = null;
+    } else
+      window.history.pushState(
+        { ...window.history.state, post: crypto.randomUUID() },
+        "",
+        window.location.href,
+      );
+    const entry = window.history.state?.post;
+    let popped = false;
+    const onPop = () => {
+      if (window.history.state?.post === entry) return;
+      popped = true;
+      closePost();
+    };
+    window.addEventListener("popstate", onPop);
     return () => {
       document.documentElement.classList.remove("post-viewer-open");
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", onPop);
+      if (popped || window.history.state?.post !== entry) return;
+      unwindingPost = entry;
+      unwindTimer = window.setTimeout(() => {
+        if (unwindingPost !== entry) return;
+        unwindingPost = null;
+        if (window.history.state?.post === entry) window.history.back();
+      }, 0);
     };
   }, [viewingOpen, closePost]);
   useEffect(() => {
@@ -1231,6 +1263,17 @@ export function ProofFeed({
             />
           ) : (
             <span className="day-tile-photo" />
+          )}
+          {item.presencePhotoUrl && (
+            <img
+              className="day-tile-inset"
+              src={item.presencePhotoUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              crossOrigin="anonymous"
+              onError={(event) => markFailed(event.currentTarget.src)}
+            />
           )}
           <span className="day-tile-cap" aria-hidden="true">
             <strong className="day-tile-name">{who}</strong>
