@@ -150,6 +150,23 @@ export const feedWindowStart = (endsAt: string | null | undefined) => {
   return end + weeks * weekMs - 2 * weekMs;
 };
 
+// Wall of shame posts this device dismissed; per-device convenience only.
+const shameKey = "wall-of-shame-dismissed";
+const readShameDismissed = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(shameKey) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+};
+const writeShameDismissed = (ids: Set<string>) => {
+  try {
+    localStorage.setItem(shameKey, JSON.stringify([...ids]));
+  } catch {
+    // Storage unavailable: the strip shows again next load.
+  }
+};
+
 const needsKey = "needs-you-collapsed";
 const readNeedsOpen = () => {
   try {
@@ -251,7 +268,9 @@ function Verdict({ item, who }: { item: ProofItem; who: string }) {
         {verdictReason(item)} Accept {item.acceptVotes} · Reject{" "}
         {item.rejectVotes} of {item.eligibleVoters}.
         {rejected
-          ? ` ${item.mine ? "You’re" : `${who} is`} officially a clown and owe${item.mine ? "" : "s"} a Consequence card.`
+          ? item.mine
+            ? " Here’s your Consequence card, clown."
+            : ` Here’s ${who}’s Consequence card, clown.`
           : " It stays on the Wall as Verified."}
       </p>
     </section>
@@ -350,6 +369,8 @@ export function ProofFeed({
   const [captioning, setCaptioning] = useState({ id: "", count: 0 });
   const [captioned, setCaptioned] = useState<ReadonlySet<string>>(new Set());
   const [needsOpen, setNeedsOpen] = useState(readNeedsOpen);
+  const [shameOpen, setShameOpen] = useState(false);
+  const [shameDismissed, setShameDismissed] = useState(readShameDismissed);
   // The post open full screen, and the tile that opened it for focus return.
   const [viewing, setViewing] = useState<string | null>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -749,8 +770,19 @@ export function ProofFeed({
         (inWindow(item) || needsVote(item)),
     )
     .sort(byNewest);
+  // Rejected posts sit in one collapsed Wall of shame strip, never in the day rows.
+  const shamed = items
+    .filter(
+      (entry) =>
+        entry.reviewStatus === "rejected" &&
+        !shameDismissed.has(entry.workoutCheckinId),
+    )
+    .sort(byNewest);
   const inScope = items.filter(
-    (entry) => entry.reviewStatus !== "questioned" && inWindow(entry),
+    (entry) =>
+      entry.reviewStatus !== "questioned" &&
+      entry.reviewStatus !== "rejected" &&
+      inWindow(entry),
   );
   const days = new Map<string, ProofItem[]>();
   // Local start of each post day, so empty days between them can collapse into one row.
@@ -1524,6 +1556,51 @@ export function ProofFeed({
             </ol>
           </>
         ))}
+      {state === "ready" && shamed.length > 0 && (
+        <section
+          className={`shame-strip${shameOpen ? " is-open" : ""}`}
+          aria-label="Wall of shame"
+        >
+          <div className="shame-strip-bar">
+            <button
+              type="button"
+              className="shame-strip-toggle"
+              aria-expanded={shameOpen}
+              onClick={() => setShameOpen(!shameOpen)}
+            >
+              <span aria-hidden="true">🤡</span>
+              <span>Wall of shame</span>
+              <span className="shame-strip-names">
+                {shamed
+                  .map((entry) => (entry.mine ? "You" : entry.authorName))
+                  .join(", ")}
+              </span>
+              <span className="needs-you-chevron" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="shame-strip-dismiss"
+              aria-label="Dismiss Wall of shame"
+              onClick={() => {
+                const next = new Set(shameDismissed);
+                for (const entry of shamed) next.add(entry.workoutCheckinId);
+                writeShameDismissed(next);
+                setShameDismissed(next);
+              }}
+            >
+              ×
+            </button>
+          </div>
+          {shameOpen && (
+            <ul
+              className="day-reel shame-strip-reel"
+              aria-label="Wall of shame posts"
+            >
+              {shamed.map(tile)}
+            </ul>
+          )}
+        </section>
+      )}
       {viewed && (
         <div
           className="post-viewer"

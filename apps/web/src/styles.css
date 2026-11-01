@@ -4686,6 +4686,57 @@ h1 {
 }
 
 /* Home feed: Needs you, then one row per day of tall 9:16 tiles. */
+/* Wall of shame: one quiet line under the feed; tiles only when opened. */
+.shame-strip {
+  margin: 20px 0 4px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.shame-strip-bar {
+  display: flex;
+  align-items: center;
+}
+.shame-strip-toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.shame-strip-names {
+  flex: 1;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shame-strip:not(.is-open) .needs-you-chevron {
+  transform: rotate(-45deg);
+}
+.shame-strip-dismiss {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.shame-strip-reel {
+  padding: 0 10px 10px;
+}
 .needs-you-panel {
   margin: 16px 0 4px;
   border-radius: 16px;
