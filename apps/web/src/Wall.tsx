@@ -150,6 +150,23 @@ export const feedWindowStart = (endsAt: string | null | undefined) => {
   return end + weeks * weekMs - 2 * weekMs;
 };
 
+// Wall of shame posts this device dismissed; per-device convenience only.
+const shameKey = "wall-of-shame-dismissed";
+const readShameDismissed = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(shameKey) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+};
+const writeShameDismissed = (ids: Set<string>) => {
+  try {
+    localStorage.setItem(shameKey, JSON.stringify([...ids]));
+  } catch {
+    // Storage unavailable: the strip shows again next load.
+  }
+};
+
 const needsKey = "needs-you-collapsed";
 const readNeedsOpen = () => {
   try {
@@ -194,6 +211,69 @@ function Lights({ item }: { item: ProofItem }) {
         />
       ))}
     </span>
+  );
+}
+
+// Why a closed decision closed, read from its final tally.
+const verdictReason = (item: ProofItem) => {
+  const voters = Math.max(item.eligibleVoters, 1);
+  const votes = item.acceptVotes + item.rejectVotes;
+  if (item.decisionOutcome === "rejected" || item.rejectVotes * 2 > voters)
+    return "A majority voted to reject.";
+  if (item.acceptVotes * 2 > voters) return "A majority voted to accept.";
+  if (votes >= voters) return "Everyone voted; no majority to reject.";
+  return "Voting time ran out; no majority to reject.";
+};
+
+// A vote that makes a strict majority closes the decision at once; the server settles it.
+const closeIfDecided = (item: ProofItem): ProofItem => {
+  const voters = item.eligibleVoters;
+  const closed = (outcome: "upheld" | "rejected"): ProofItem => ({
+    ...item,
+    reviewStatus: outcome === "rejected" ? "rejected" : "verified",
+    decisionOutcome: outcome,
+    decidedAt: new Date().toISOString(),
+    decisionClosesAt: null,
+    canVote: false,
+    ...(outcome === "rejected"
+      ? { activityPhotoUrl: null, presencePhotoUrl: null }
+      : {}),
+  });
+  if (item.rejectVotes * 2 > voters) return closed("rejected");
+  if (
+    item.acceptVotes * 2 > voters ||
+    item.acceptVotes + item.rejectVotes >= voters
+  )
+    return closed("upheld");
+  return item;
+};
+
+// Summary of a closed Group decision: what was decided, why, and what follows.
+function Verdict({ item, who }: { item: ProofItem; who: string }) {
+  const rejected = item.decisionOutcome === "rejected";
+  return (
+    <section
+      className={`proof-verdict${rejected ? " is-rejected" : ""}`}
+      aria-label="Group decision"
+    >
+      <p className="proof-verdict-head">
+        <strong>
+          {rejected
+            ? "🤡 Wall of shame · doesn’t count"
+            : "Upheld · still counts ✓"}
+        </strong>
+        <Lights item={item} />
+      </p>
+      <p className="proof-verdict-body">
+        {verdictReason(item)} Accept {item.acceptVotes} · Reject{" "}
+        {item.rejectVotes} of {item.eligibleVoters}.
+        {rejected
+          ? item.mine
+            ? " Here’s your Consequence card, clown."
+            : ` Here’s ${who}’s Consequence card, clown.`
+          : " It stays on the Wall as Verified."}
+      </p>
+    </section>
   );
 }
 
@@ -289,6 +369,8 @@ export function ProofFeed({
   const [captioning, setCaptioning] = useState({ id: "", count: 0 });
   const [captioned, setCaptioned] = useState<ReadonlySet<string>>(new Set());
   const [needsOpen, setNeedsOpen] = useState(readNeedsOpen);
+  const [shameOpen, setShameOpen] = useState(false);
+  const [shameDismissed, setShameDismissed] = useState(readShameDismissed);
   // The post open full screen, and the tile that opened it for focus return.
   const [viewing, setViewing] = useState<string | null>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -480,12 +562,12 @@ export function ProofFeed({
         : action === "moderate"
           ? { ...item, hidden: false }
           : action === "vote"
-            ? {
+            ? closeIfDecided({
                 ...item,
                 myVote: choice as ProofItem["myVote"],
                 acceptVotes: item.acceptVotes + (choice === "accept" ? 1 : 0),
                 rejectVotes: item.rejectVotes + (choice === "reject" ? 1 : 0),
-              }
+              })
             : // The questioner is in the decision audience, so they can vote next.
               {
                 ...item,
@@ -688,8 +770,19 @@ export function ProofFeed({
         (inWindow(item) || needsVote(item)),
     )
     .sort(byNewest);
+  // Rejected posts sit in one collapsed Wall of shame strip, never in the day rows.
+  const shamed = items
+    .filter(
+      (entry) =>
+        entry.reviewStatus === "rejected" &&
+        !shameDismissed.has(entry.workoutCheckinId),
+    )
+    .sort(byNewest);
   const inScope = items.filter(
-    (entry) => entry.reviewStatus !== "questioned" && inWindow(entry),
+    (entry) =>
+      entry.reviewStatus !== "questioned" &&
+      entry.reviewStatus !== "rejected" &&
+      inWindow(entry),
   );
   const days = new Map<string, ProofItem[]>();
   // Local start of each post day, so empty days between them can collapse into one row.
@@ -879,6 +972,31 @@ export function ProofFeed({
   const post = (item: ProofItem) => {
     const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
+    // A Rejected report keeps no photos: only its verdict sits on the Wall of shame for 48 hours.
+    if (item.reviewStatus === "rejected")
+      return (
+        <li
+          className="proof-post proof-post-rejected"
+          key={item.workoutCheckinId}
+          data-post={item.workoutCheckinId}
+        >
+          <header>
+            <Avatar name={who} url={avatars[item.authorMembershipId]} />
+            <span className="proof-byline">
+              <strong>{who}</strong>
+              <time dateTime={item.submittedAt}>{ago(item.submittedAt)}</time>
+            </span>
+            <span className="proof-status proof-rejected">
+              🤡 Wall of shame
+            </span>
+          </header>
+          <p className="proof-details">
+            {label(item.activityType)} · {item.durationMinutes} min ·{" "}
+            {label(item.perceivedIntensity)}
+          </p>
+          <Verdict item={{ ...item, decisionOutcome: "rejected" }} who={who} />
+        </li>
+      );
     const { photo, photosSeen, photoFailed, photoNote, retryPhotos } =
       photoKit(item);
     return (
@@ -1065,6 +1183,10 @@ export function ProofFeed({
             onReportPhotos={undefined}
           />
         )}
+        {item.decisionOutcome === "upheld" &&
+          item.reviewStatus !== "questioned" && (
+            <Verdict item={item} who={who} />
+          )}
         {item.reviewStatus === "questioned" && (
           <p className="proof-tally">
             Accept {item.acceptVotes} · Reject {item.rejectVotes} of{" "}
@@ -1241,6 +1363,12 @@ export function ProofFeed({
     const who = item.mine ? "You" : item.authorName;
     const workout = `${label(item.activityType)} · ${item.durationMinutes} min`;
     const unseen = !isSeen(cacheKey, item);
+    const verdict =
+      item.decisionOutcome === "rejected" || item.reviewStatus === "rejected"
+        ? "🤡 Shamed"
+        : item.decisionOutcome === "upheld"
+          ? "Upheld ✓"
+          : null;
     return (
       <li key={id} className="day-tile">
         <button
@@ -1248,7 +1376,7 @@ export function ProofFeed({
           className="day-tile-open"
           data-post={id}
           data-unseen={unseen ? id : undefined}
-          aria-label={`${who}, ${workout}${unseen ? ", new" : ""}. Open post`}
+          aria-label={`${who}, ${workout}${verdict ? `, ${verdict === "🤡 Shamed" ? "on the Wall of shame" : "Upheld by the Group"}` : ""}${unseen ? ", new" : ""}. Open post`}
           onClick={(event) => openPost(id, event.currentTarget)}
         >
           {item.activityPhotoUrl ? (
@@ -1281,6 +1409,14 @@ export function ProofFeed({
               {item.hidden ? "Reported" : workout}
             </span>
           </span>
+          {verdict && (
+            <span
+              className={`day-tile-verdict${verdict === "🤡 Shamed" ? " is-rejected" : ""}`}
+              aria-hidden="true"
+            >
+              {verdict}
+            </span>
+          )}
           {unseen && <span className="day-tile-new" aria-hidden="true" />}
           <i
             className={`day-tile-plate activity-swatch activity-${item.activityType}`}
@@ -1420,6 +1556,51 @@ export function ProofFeed({
             </ol>
           </>
         ))}
+      {state === "ready" && shamed.length > 0 && (
+        <section
+          className={`shame-strip${shameOpen ? " is-open" : ""}`}
+          aria-label="Wall of shame"
+        >
+          <div className="shame-strip-bar">
+            <button
+              type="button"
+              className="shame-strip-toggle"
+              aria-expanded={shameOpen}
+              onClick={() => setShameOpen(!shameOpen)}
+            >
+              <span aria-hidden="true">🤡</span>
+              <span>Wall of shame</span>
+              <span className="shame-strip-names">
+                {shamed
+                  .map((entry) => (entry.mine ? "You" : entry.authorName))
+                  .join(", ")}
+              </span>
+              <span className="needs-you-chevron" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="shame-strip-dismiss"
+              aria-label="Dismiss Wall of shame"
+              onClick={() => {
+                const next = new Set(shameDismissed);
+                for (const entry of shamed) next.add(entry.workoutCheckinId);
+                writeShameDismissed(next);
+                setShameDismissed(next);
+              }}
+            >
+              ×
+            </button>
+          </div>
+          {shameOpen && (
+            <ul
+              className="day-reel shame-strip-reel"
+              aria-label="Wall of shame posts"
+            >
+              {shamed.map(tile)}
+            </ul>
+          )}
+        </section>
+      )}
       {viewed && (
         <div
           className="post-viewer"

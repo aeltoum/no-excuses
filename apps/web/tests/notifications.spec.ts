@@ -90,6 +90,11 @@ test("Account mutes social pushes and moves the digest, instantly", async ({
   );
   await page.getByRole("button", { name: "Notification settings" }).click();
   const social = page.getByLabel(/Push reactions, nudges, and cheers/);
+  // The switch keeps its pill shape rather than the global input box.
+  await expect(social).toBeVisible();
+  const box = await social.boundingBox();
+  expect([box?.width, box?.height]).toEqual([50, 30]);
+  await page.screenshot({ path: test.info().outputPath("switches.png") });
   // The mocked failure can roll back before uncheck() would re-read the box.
   await social.click();
   await expect(

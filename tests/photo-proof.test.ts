@@ -241,6 +241,24 @@ describe("Photo proof", { timeout: 30_000 }, () => {
         )
       ).rows,
     ).toEqual([{ source_kind: "rejected_report" }]);
+    // The Wall of shame keeps a text-only verdict for 48 hours, never the photos.
+    const verdict = async (at: string) =>
+      (
+        await db.query(
+          "select decision_outcome, decided_at is not null as closed, activity_photo_path, presence_photo_path, reject_votes from app_private.proof_feed($2) where workout_checkin_id = $1",
+          [id, at],
+        )
+      ).rows;
+    expect(await verdict("2026-03-05T13:00Z")).toEqual([
+      {
+        decision_outcome: "rejected",
+        closed: true,
+        activity_photo_path: null,
+        presence_photo_path: null,
+        reject_votes: 2,
+      },
+    ]);
+    expect(await verdict("2026-03-07T12:31Z")).toEqual([]);
   });
 
   it("stays Verified without a strict majority, and withdraw makes it Unsupported", async () => {
@@ -277,6 +295,14 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       "select app_private.advance_proof_reviews('2026-03-07T11:00Z')",
     );
     expect(await status(db, timedOut)).toBe("verified");
+    expect(
+      (
+        await db.query<{ decision_outcome: string }>(
+          "select workout_checkin_id, decision_outcome from app_private.proof_feed('2026-03-07T11:00Z') where workout_checkin_id = any($1) order by decision_outcome",
+          [[split, timedOut]],
+        )
+      ).rows.map((row) => row.decision_outcome),
+    ).toEqual(["upheld", "upheld"]);
     expect(
       (
         await db.query(
