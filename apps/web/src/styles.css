@@ -1583,9 +1583,46 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   border-color: var(--activity-class);
   color: var(--activity-class);
 }
-.proof-questioned {
+.proof-questioned,
+.proof-rejected {
   border-color: var(--error);
   color: var(--error);
+}
+/* Closed Group decision: the outcome, its reason, and what follows. */
+.proof-verdict {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--activity-sport);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--activity-sport) 10%, transparent);
+}
+.proof-verdict.is-rejected {
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+}
+.proof-verdict p {
+  margin: 0;
+}
+.proof-verdict-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.9375rem;
+}
+.proof-verdict-head strong {
+  color: var(--activity-sport);
+}
+.proof-verdict.is-rejected .proof-verdict-head strong {
+  color: var(--error);
+}
+.proof-verdict-body {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .proof-main {
@@ -3819,11 +3856,17 @@ svg {
   position: relative;
   order: 2;
   flex: 0 0 auto;
+  box-sizing: border-box;
   width: 50px;
+  min-width: 50px;
   height: 30px;
+  min-height: 30px;
   margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: 15px;
   background: var(--empty-slot);
+  cursor: pointer;
   transition: background 160ms var(--ease-out);
 }
 .switch-label input[role="switch"]::after {
@@ -3835,6 +3878,7 @@ svg {
   height: 24px;
   border-radius: 50%;
   background: var(--chalk);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
   transition: transform 160ms var(--ease-out);
 }
 .switch-label input[role="switch"]:checked {
@@ -4896,6 +4940,24 @@ h1 {
   border-radius: 50%;
   background: var(--chalk);
   box-shadow: 0 0 0 3px rgb(0 0 0 / 40%);
+}
+/* A closed Group decision marks the tile with its outcome. */
+.day-tile-verdict {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--activity-sport);
+  color: #0b0c0d;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.day-tile-verdict.is-rejected {
+  background: var(--error);
+  color: #fff;
 }
 .day-tile-photo {
   display: block;

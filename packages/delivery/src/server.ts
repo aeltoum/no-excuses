@@ -913,10 +913,10 @@ async function proof(request: Request, path: string): Promise<Response> {
           ])
         ).rows.map((row) => [row.workout_checkin_id as string, row.details]),
       );
-      const paths = rows.flatMap((row) => [
-        row.activity_photo_path as string,
-        row.presence_photo_path as string,
-      ]);
+      // A Rejected verdict has no photos to sign.
+      const paths = rows
+        .flatMap((row) => [row.activity_photo_path, row.presence_photo_path])
+        .filter((value): value is string => typeof value === "string");
       const urls = new Map<string, string>();
       if (paths.length > 0) {
         // A day-long URL lets the app reuse it, and the cached image, across loads.
@@ -954,6 +954,8 @@ async function proof(request: Request, path: string): Promise<Response> {
             canVote: row.can_vote,
             canDelete: row.can_delete,
             seen: row.seen,
+            decisionOutcome: row.decision_outcome ?? null,
+            decidedAt: iso(row.decided_at),
             details: details.get(row.workout_checkin_id) ?? null,
             caption: text.get(row.workout_checkin_id)?.caption ?? null,
             messages: text.get(row.workout_checkin_id)?.messages ?? [],

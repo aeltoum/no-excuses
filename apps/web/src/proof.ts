@@ -17,7 +17,7 @@ export type ProofItem = {
   perceivedIntensity: string;
   completedAt: string;
   submittedAt: string;
-  reviewStatus: "verified" | "questioned";
+  reviewStatus: "verified" | "questioned" | "rejected";
   reviewClosesAt: string | null;
   decisionClosesAt: string | null;
   hidden: boolean;
@@ -31,6 +31,9 @@ export type ProofItem = {
   canDelete?: boolean;
   // Feeds cached before seen posts lack it; own posts are always seen.
   seen?: boolean;
+  // Set once a Group decision on this post closed; feeds cached before verdicts lack it.
+  decisionOutcome?: "upheld" | "rejected" | null;
+  decidedAt?: string | null;
   details?: WorkoutDetails | null;
   caption?: string | null;
   messages?: ProofMessage[];
