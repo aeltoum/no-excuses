@@ -71,8 +71,10 @@ test("closed Group decisions show their verdict on the Wall", async ({
   const rejected = (await openPost(page, "Jordan")).getByRole("region", {
     name: "Group decision",
   });
-  await expect(rejected).toContainText("Rejected · doesn’t count");
-  await expect(rejected).toContainText("Jordan owes a Consequence card.");
+  await expect(rejected).toContainText("🤡 Wall of shame · doesn’t count");
+  await expect(rejected).toContainText(
+    "Jordan is officially a clown and owes a Consequence card.",
+  );
   await page.screenshot({ path: testInfo.outputPath("rejected.png") });
   expect(errors).toEqual([]);
 });
@@ -98,7 +100,7 @@ test("a deciding vote shows the verdict at once", async ({
   const elapsed = await msUntilVisible(
     page,
     () => reject.click(),
-    page.getByRole("button", { name: /^Maya, .*Rejected by the Group/ }),
+    page.getByRole("button", { name: /^Maya, .*on the Wall of shame/ }),
   );
   expect(elapsed).toBeLessThanOrEqual(100);
   await page.screenshot({ path: testInfo.outputPath("deciding-vote.png") });

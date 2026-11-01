@@ -241,7 +241,7 @@ describe("Photo proof", { timeout: 30_000 }, () => {
         )
       ).rows,
     ).toEqual([{ source_kind: "rejected_report" }]);
-    // The Wall keeps a text-only verdict for a week, never the photos.
+    // The Wall of shame keeps a text-only verdict for 48 hours, never the photos.
     const verdict = async (at: string) =>
       (
         await db.query(
@@ -258,7 +258,7 @@ describe("Photo proof", { timeout: 30_000 }, () => {
         reject_votes: 2,
       },
     ]);
-    expect(await verdict("2026-03-12T13:00Z")).toEqual([]);
+    expect(await verdict("2026-03-07T12:31Z")).toEqual([]);
   });
 
   it("stays Verified without a strict majority, and withdraw makes it Unsupported", async () => {

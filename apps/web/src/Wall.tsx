@@ -234,7 +234,6 @@ const closeIfDecided = (item: ProofItem): ProofItem => {
 // Summary of a closed Group decision: what was decided, why, and what follows.
 function Verdict({ item, who }: { item: ProofItem; who: string }) {
   const rejected = item.decisionOutcome === "rejected";
-  const owes = item.mine ? "You owe" : `${who} owes`;
   return (
     <section
       className={`proof-verdict${rejected ? " is-rejected" : ""}`}
@@ -242,7 +241,9 @@ function Verdict({ item, who }: { item: ProofItem; who: string }) {
     >
       <p className="proof-verdict-head">
         <strong>
-          {rejected ? "Rejected · doesn’t count" : "Upheld · still counts ✓"}
+          {rejected
+            ? "🤡 Wall of shame · doesn’t count"
+            : "Upheld · still counts ✓"}
         </strong>
         <Lights item={item} />
       </p>
@@ -250,7 +251,7 @@ function Verdict({ item, who }: { item: ProofItem; who: string }) {
         {verdictReason(item)} Accept {item.acceptVotes} · Reject{" "}
         {item.rejectVotes} of {item.eligibleVoters}.
         {rejected
-          ? ` ${owes} a Consequence card.`
+          ? ` ${item.mine ? "You’re" : `${who} is`} officially a clown and owe${item.mine ? "" : "s"} a Consequence card.`
           : " It stays on the Wall as Verified."}
       </p>
     </section>
@@ -939,7 +940,7 @@ export function ProofFeed({
   const post = (item: ProofItem) => {
     const disabled = busy === item.workoutCheckinId;
     const who = item.mine ? "You" : item.authorName;
-    // A Rejected report keeps no photos: only its verdict stays on the Wall.
+    // A Rejected report keeps no photos: only its verdict sits on the Wall of shame for 48 hours.
     if (item.reviewStatus === "rejected")
       return (
         <li
@@ -953,7 +954,9 @@ export function ProofFeed({
               <strong>{who}</strong>
               <time dateTime={item.submittedAt}>{ago(item.submittedAt)}</time>
             </span>
-            <span className="proof-status proof-rejected">Rejected</span>
+            <span className="proof-status proof-rejected">
+              🤡 Wall of shame
+            </span>
           </header>
           <p className="proof-details">
             {label(item.activityType)} · {item.durationMinutes} min ·{" "}
@@ -1330,7 +1333,7 @@ export function ProofFeed({
     const unseen = !isSeen(cacheKey, item);
     const verdict =
       item.decisionOutcome === "rejected" || item.reviewStatus === "rejected"
-        ? "Rejected"
+        ? "🤡 Shamed"
         : item.decisionOutcome === "upheld"
           ? "Upheld ✓"
           : null;
@@ -1341,7 +1344,7 @@ export function ProofFeed({
           className="day-tile-open"
           data-post={id}
           data-unseen={unseen ? id : undefined}
-          aria-label={`${who}, ${workout}${verdict ? `, ${verdict.replace(" ✓", "")} by the Group` : ""}${unseen ? ", new" : ""}. Open post`}
+          aria-label={`${who}, ${workout}${verdict ? `, ${verdict === "🤡 Shamed" ? "on the Wall of shame" : "Upheld by the Group"}` : ""}${unseen ? ", new" : ""}. Open post`}
           onClick={(event) => openPost(id, event.currentTarget)}
         >
           {item.activityPhotoUrl ? (
@@ -1376,7 +1379,7 @@ export function ProofFeed({
           </span>
           {verdict && (
             <span
-              className={`day-tile-verdict${verdict === "Rejected" ? " is-rejected" : ""}`}
+              className={`day-tile-verdict${verdict === "🤡 Shamed" ? " is-rejected" : ""}`}
               aria-hidden="true"
             >
               {verdict}

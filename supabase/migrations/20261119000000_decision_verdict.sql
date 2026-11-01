@@ -1,7 +1,7 @@
 -- Closed Group decisions show their verdict on the Wall. A questioned post whose decision
 -- closed (strict majority, everyone responded, or 48 hours passed) reports decision_outcome:
 -- 'upheld' while it stays Verified, 'rejected' once a strict majority rejected it. A Rejected
--- post stays on the Wall as a text-only verdict: its photos are never returned.
+-- post sits on the Wall of shame for 48 hours as a text-only verdict: its photos are never returned.
 
 drop function app_private.proof_feed(timestamptz);
 create or replace function app_private.proof_feed(requested_at timestamptz)
@@ -97,9 +97,9 @@ begin
     and (c.hidden_at is null or admin or m.membership_id = viewer.membership_id)
     and (
       (c.review_status = 'verified' and c.media_deleted_at is null)
-      -- A Rejected verdict stays visible for a week after the decision closed.
+      -- A Rejected verdict sits on the Wall of shame for 48 hours after the decision closed.
       or (c.review_status = 'rejected' and c.questioned_at is not null
-        and requested_at < c.decided_at + interval '7 days')
+        and requested_at < c.decided_at + interval '48 hours')
     )
   order by c.submitted_at desc
   limit 100;
