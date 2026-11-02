@@ -343,6 +343,22 @@ describe("M5 Consequence system", () => {
         where obligation_id = '${obligationId}'`)
       ).rows,
     ).toEqual([{ status: "completed" }]);
+    // The approved clip joins the Group's Wall for every member.
+    await db.query("select set_config('app.auth_user_id', $1, false)", [
+      "84000000-0000-4000-8000-000000000002",
+    ]);
+    await db.query("select set_config('app.token_issued_at', $1, false)", [
+      "2026-03-01T00:00Z",
+    ]);
+    expect(
+      (
+        await db.query(
+          "select claim_id, mine, card_title is not null as titled, clip_path is not null as clipped from app_private.consequence_feed('2026-03-20Z')",
+        )
+      ).rows,
+    ).toEqual([
+      { claim_id: claimId, mine: false, titled: true, clipped: true },
+    ]);
 
     const next = await addObligation(db, memberships[3]);
     const nextOffer = await offer(db, next.obligationId);

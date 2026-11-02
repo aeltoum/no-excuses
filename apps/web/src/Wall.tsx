@@ -9,6 +9,14 @@ import {
 import { ApiError, overlappedWrite, writeMark } from "./api-client";
 import { Avatar, useAvatars } from "./avatars";
 import { useConfirm } from "./Confirm";
+import {
+  CardClearedPopup,
+  type ConsequencePost,
+  ConsequencePostView,
+  ConsequenceTile,
+  clipPostId,
+  useConsequencePosts,
+} from "./ConsequencePosts";
 import { detailLine } from "./details";
 import { useFreshness } from "./freshness";
 import { markViewed, viewedPost } from "./Notifications";
@@ -352,6 +360,7 @@ export function ProofFeed({
   const [needsOpen, setNeedsOpen] = useState(readNeedsOpen);
   // The post open full screen, and the tile that opened it for focus return.
   const [viewing, setViewing] = useState<string | null>(null);
+  const clips = useConsequencePosts(apiBaseUrl, token, cacheKey, revision);
   const opener = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openPost = (id: string, from: HTMLElement) => {
@@ -760,6 +769,19 @@ export function ProofFeed({
     days.set(key, [...(days.get(key) ?? []), item]);
     if (!dayStarts.has(key)) dayStarts.set(key, startOfDay(item.submittedAt));
   }
+  // Approved Consequence clips sit in the day the Group approved them.
+  const clipDays = new Map<string, ConsequencePost[]>();
+  for (const clip of clips) {
+    if (windowStart !== null && Date.parse(clip.approvedAt) < windowStart)
+      continue;
+    const key = dayLabel(clip.approvedAt);
+    clipDays.set(key, [...(clipDays.get(key) ?? []), clip]);
+    if (!days.has(key)) days.set(key, []);
+    if (!dayStarts.has(key)) dayStarts.set(key, startOfDay(clip.approvedAt));
+  }
+  const dayOrder = [...days.keys()].sort(
+    (left, right) => (dayStarts.get(right) ?? 0) - (dayStarts.get(left) ?? 0),
+  );
   const caughtUp =
     inScope.length > 0 && inScope.every((item) => isSeen(cacheKey, item));
   // Within a day, unseen posts first, then newest first.
@@ -771,6 +793,7 @@ export function ProofFeed({
   const needsCount = questioned.filter(needsVote).length + needsExtraCount;
   const needsShown = questioned.length > 0 || needsExtraShown;
   const viewed = items.find((item) => item.workoutCheckinId === viewing);
+  const viewedClip = clips.find((clip) => clipPostId(clip) === viewing);
 
   // Own posts only: caption and delete live in a menu at the post's top right.
   const ownMenu = (item: ProofItem, disabled: boolean) => {
@@ -1468,51 +1491,65 @@ export function ProofFeed({
               </p>
             )}
             <ol className="day-rows" aria-label="Posts by day">
-              {[...days.entries()].flatMap(([day, posts], index, all) => {
-                const row = (
-                  <li key={day} className="day-row">
-                    <h2 className="day-row-head">
-                      <span>{day}</span>
-                      <span className="day-row-count">
-                        {posts.length} {posts.length === 1 ? "post" : "posts"}
-                      </span>
-                    </h2>
-                    <ul
-                      className="day-reel"
-                      aria-label={`${day} posts`}
-                      // Scrolls sideways; keyboard users reach the tiles inside.
-                      // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
-                      tabIndex={0}
-                    >
-                      {posts.map(tile)}
-                    </ul>
-                  </li>
-                );
-                const next = all[index + 1];
-                if (!next) return [row];
-                const gap = gapLabel(
-                  dayStarts.get(day) ?? 0,
-                  dayStarts.get(next[0]) ?? 0,
-                );
-                return gap
-                  ? [
-                      row,
-                      <li key={`gap-${day}`} className="day-gap">
-                        <span>{gap}</span>
-                        <span>No posts</span>
-                      </li>,
-                    ]
-                  : [row];
-              })}
+              {dayOrder
+                .map((day) => [day, days.get(day) ?? []] as const)
+                .flatMap(([day, posts], index, all) => {
+                  const dayClips = clipDays.get(day) ?? [];
+                  const count = posts.length + dayClips.length;
+                  const row = (
+                    <li key={day} className="day-row">
+                      <h2 className="day-row-head">
+                        <span>{day}</span>
+                        <span className="day-row-count">
+                          {count} {count === 1 ? "post" : "posts"}
+                        </span>
+                      </h2>
+                      <ul
+                        className="day-reel"
+                        aria-label={`${day} posts`}
+                        // Scrolls sideways; keyboard users reach the tiles inside.
+                        // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region.
+                        tabIndex={0}
+                      >
+                        {dayClips.map((clip) => (
+                          <ConsequenceTile
+                            key={clip.claimId}
+                            post={clip}
+                            onOpen={(from) => openPost(clipPostId(clip), from)}
+                          />
+                        ))}
+                        {posts.map(tile)}
+                      </ul>
+                    </li>
+                  );
+                  const next = all[index + 1];
+                  if (!next) return [row];
+                  const gap = gapLabel(
+                    dayStarts.get(day) ?? 0,
+                    dayStarts.get(next[0]) ?? 0,
+                  );
+                  return gap
+                    ? [
+                        row,
+                        <li key={`gap-${day}`} className="day-gap">
+                          <span>{gap}</span>
+                          <span>No posts</span>
+                        </li>,
+                      ]
+                    : [row];
+                })}
             </ol>
           </>
         ))}
-      {viewed && (
+      {(viewed || viewedClip) && (
         <div
           className="post-viewer"
           role="dialog"
           aria-modal="true"
-          aria-label={`${viewed.mine ? "Your" : `${viewed.authorName}’s`} post`}
+          aria-label={(() => {
+            const author = viewed ?? viewedClip;
+            return `${author?.mine ? "Your" : `${author?.authorName}’s`} post`;
+          })()}
         >
           <div className="post-viewer-bar">
             <button
@@ -1536,9 +1573,20 @@ export function ProofFeed({
               </svg>
             </button>
           </div>
-          <ul className="proof-list post-viewer-list">{post(viewed)}</ul>
+          <ul className="proof-list post-viewer-list">
+            {viewed
+              ? post(viewed)
+              : viewedClip && (
+                  <ConsequencePostView
+                    post={viewedClip}
+                    avatarUrl={avatars[viewedClip.authorMembershipId]}
+                    ago={ago}
+                  />
+                )}
+          </ul>
         </div>
       )}
+      <CardClearedPopup posts={clips} />
       {confirmSheet}
       {conductSheet}
     </section>

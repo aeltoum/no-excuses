@@ -5407,3 +5407,92 @@ html.post-viewer-open body {
   background: none;
   opacity: 0.4;
 }
+
+/* Consequence clips on the Wall: a gold label, a play mark on the tile. */
+.day-tile-verdict.is-consequence,
+.proof-consequence-label {
+  background: var(--activity-class);
+  color: #0b0c0d;
+}
+.day-tile-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+  pointer-events: none;
+}
+.day-tile-play::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 17px;
+  border-style: solid;
+  border-width: 9px 0 9px 14px;
+  border-color: transparent transparent transparent #fff;
+}
+.proof-consequence {
+  border-color: var(--activity-class);
+  color: var(--activity-class);
+}
+.consequence-clip {
+  position: relative;
+}
+.proof-consequence-label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.consequence-clip-missing {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 9 / 16;
+  margin: 0;
+  border-radius: var(--proof-radius, 12px);
+  background: var(--surface);
+  color: var(--muted);
+}
+.consequence-card-title {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+}
+.consequence-card-title span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.card-cleared {
+  display: grid;
+  gap: 12px;
+}
+.card-cleared-verdict {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.card-cleared-verdict strong {
+  color: var(--activity-sport);
+  font-family: "Big Shoulders Display", sans-serif;
+  font-size: 2.5rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.card-cleared-verdict span {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.card-cleared-body {
+  margin: 0;
+  color: var(--muted);
+}
