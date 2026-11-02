@@ -110,6 +110,10 @@ select:focus-visible {
   outline: 3px solid var(--safety);
   outline-offset: 3px;
 }
+/* Titles and regions take focus only so screen readers announce them; no ring. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
 .app-shell {
   min-height: 100dvh;
   display: grid;
