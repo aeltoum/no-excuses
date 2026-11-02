@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
 import { Avatar } from "./avatars";
 import { ClipPlayer } from "./ClipPlayer";
@@ -69,6 +69,80 @@ export function useConsequencePosts(
   return posts;
 }
 
+// First frames as small JPEGs, per claim, so a reopened Wall shows tiles at once.
+const thumbs = persistentMap<string>("consequence-thumbs");
+const thumbLimit = 40;
+
+function grabFrame(video: HTMLVideoElement) {
+  const width = 240;
+  const height = Math.round((width * video.videoHeight) / video.videoWidth);
+  if (!height) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  try {
+    canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } catch {
+    // A cross-origin frame without CORS taints the canvas; keep the video.
+    return null;
+  }
+}
+
+// A cached frame shows at once; otherwise the clip loads only near the viewport.
+function ClipThumb({ post }: { post: ConsequencePost }) {
+  const [thumb, setThumb] = useState(() => thumbs.get(post.claimId));
+  const [near, setNear] = useState(false);
+  // Without CORS headers the clip still plays as a plain poster video.
+  const [plain, setPlain] = useState(false);
+  const holder = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (thumb || near || !post.clipUrl) return;
+    const element = holder.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setNear(true);
+      },
+      { rootMargin: "300px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [thumb, near, post.clipUrl]);
+  if (thumb) return <img className="day-tile-photo" src={thumb} alt="" />;
+  if (!post.clipUrl || !near)
+    return <span ref={holder} className="day-tile-photo" />;
+  return (
+    <video
+      className="day-tile-photo"
+      src={post.clipUrl}
+      crossOrigin={plain ? undefined : "anonymous"}
+      onError={() => setPlain(true)}
+      muted
+      playsInline
+      preload="auto"
+      // Seek past a black first frame; the frame is grabbed once it lands.
+      onLoadedData={(event) => {
+        event.currentTarget.currentTime = 0.1;
+      }}
+      onSeeked={(event) => {
+        const frame = grabFrame(event.currentTarget);
+        if (!frame) return;
+        for (const key of [...thumbs.keys()].slice(
+          0,
+          Math.max(0, thumbs.size - thumbLimit + 1),
+        ))
+          thumbs.delete(key);
+        thumbs.set(post.claimId, frame);
+        setThumb(frame);
+      }}
+    />
+  );
+}
+
 export function ConsequenceTile({
   post,
   onOpen,
@@ -85,18 +159,7 @@ export function ConsequenceTile({
         aria-label={`${who}, Consequence: ${post.cardTitle}. Open post`}
         onClick={(event) => onOpen(event.currentTarget)}
       >
-        {post.clipUrl ? (
-          // The first frame stands in for a poster.
-          <video
-            className="day-tile-photo"
-            src={`${post.clipUrl}#t=0.1`}
-            muted
-            playsInline
-            preload="metadata"
-          />
-        ) : (
-          <span className="day-tile-photo" />
-        )}
+        <ClipThumb post={post} />
         <span className="day-tile-play" aria-hidden="true" />
         <span className="day-tile-cap" aria-hidden="true">
           <strong className="day-tile-name">{who}</strong>

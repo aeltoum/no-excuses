@@ -104,3 +104,30 @@ test("Consequence clips take reactions and comments like workout posts", async (
   await expect(reactions.getByRole("button", { name: "🔥, 2" })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("a cached clip thumbnail shows at once without loading the video", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const frame =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+  const { errors } = await signIn(page, ({ path }) => {
+    if (path === "/v1/proof/feed") return [];
+    if (path === "/v1/consequences/feed")
+      return [clip({ clipUrl: "https://clips.example.test/clip.mp4" })];
+  });
+  await page.evaluate((thumb) => {
+    localStorage.setItem(
+      "no-excuses:cache:consequence-thumbs",
+      JSON.stringify([["80000000-0000-4000-8000-000000000001", thumb]]),
+    );
+  }, frame);
+  await page.reload();
+  const tile = page.getByRole("button", { name: /^Maya, Consequence/ });
+  await expect(tile.locator("img.day-tile-photo")).toHaveAttribute(
+    "src",
+    frame,
+  );
+  await expect(tile.locator("video")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
