@@ -237,6 +237,45 @@ export const reactToProof = (
     { method: "POST", body: { emoji, on } },
   );
 
+// An approved Consequence clip takes reactions and comments like a workout post.
+export const reactToClip = (
+  baseUrl: string,
+  token: string,
+  claimId: string,
+  emoji: string,
+  on: boolean,
+) =>
+  call<{ emoji: string; on: boolean }>(
+    baseUrl,
+    token,
+    `/v1/consequences/clip/${claimId}/react`,
+    { method: "POST", body: { emoji, on } },
+  );
+
+export const postClipMessage = (
+  baseUrl: string,
+  token: string,
+  claimId: string,
+  id: string,
+  body: string,
+) =>
+  call(baseUrl, token, `/v1/consequences/clip/${claimId}/message`, {
+    method: "POST",
+    body: { id, body },
+  });
+
+export const loadClipReactors = (
+  baseUrl: string,
+  token: string,
+  claimId: string,
+) =>
+  loadReactors(
+    baseUrl,
+    token,
+    `clip:${claimId}`,
+    `/v1/consequences/clip/${claimId}/reactions`,
+  );
+
 export type Reactor = { emoji: string; name: string; mine: boolean };
 
 // Names cached per proof for the session; one request per proof at a time.
@@ -252,13 +291,16 @@ onClearPersisted(() => {
 
 export const cachedReactors = (id: string) => reactorCache.get(id);
 
-export function loadReactors(baseUrl: string, token: string, id: string) {
+export function loadReactors(
+  baseUrl: string,
+  token: string,
+  id: string,
+  path = `/v1/proof/${id}/reactions`,
+) {
   const pending = reactorRequests.get(id);
   if (pending) return pending;
   const generation = reactorGeneration;
-  const request = call<unknown>(baseUrl, token, `/v1/proof/${id}/reactions`, {
-    method: "GET",
-  })
+  const request = call<unknown>(baseUrl, token, path, { method: "GET" })
     .then((rows) => {
       if (!Array.isArray(rows))
         throw new ApiError("failure", "Couldn’t load reactions.", true);

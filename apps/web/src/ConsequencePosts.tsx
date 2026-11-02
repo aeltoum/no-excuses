@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
+import { ApiError } from "./api-client";
 import { Avatar } from "./avatars";
 import { ClipPlayer } from "./ClipPlayer";
 import { useFreshness } from "./freshness";
+import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
-import { call } from "./proof";
+import {
+  cachedReactors,
+  call,
+  loadClipReactors,
+  type ProofMessage,
+  postClipMessage,
+  type ReactionCount,
+  reactToClip,
+} from "./proof";
+import { Reactions } from "./Reactions";
 import { Sheet } from "./Sheet";
 
 // An approved Consequence claim, shown on the Wall as a clip post.
@@ -16,7 +27,12 @@ export type ConsequencePost = {
   submittedAt: string;
   approvedAt: string;
   clipUrl: string | null;
+  reactions?: ReactionCount[];
+  myReactions?: string[];
+  messages?: ProofMessage[];
 };
+
+type Notice = { kind: "success" | "error"; text: string };
 
 export const clipPostId = (post: ConsequencePost) => `clip:${post.claimId}`;
 
@@ -98,14 +114,66 @@ export function ConsequencePostView({
   post,
   avatarUrl,
   ago,
+  apiBaseUrl,
+  token,
+  ensureConduct,
+  confirmReport,
+  onNotice,
+  onRevoked,
 }: {
   post: ConsequencePost;
   avatarUrl?: string;
   ago: (iso: string) => string;
+  apiBaseUrl: string;
+  token: string;
+  ensureConduct: () => Promise<boolean>;
+  confirmReport: () => Promise<boolean>;
+  onNotice: (notice: Notice) => void;
+  onRevoked: () => void;
 }) {
   const who = post.mine ? "You" : post.authorName;
+  const id = clipPostId(post);
+  // Optimistic reactions; a refetched post resets them to the server's.
+  const [reactions, setReactions] = useState(post.reactions ?? []);
+  const [mine, setMine] = useState(post.myReactions ?? []);
+  useEffect(() => {
+    setReactions(post.reactions ?? []);
+    setMine(post.myReactions ?? []);
+  }, [post.reactions, post.myReactions]);
+  const [askComment, setAskComment] = useState(0);
+  const apply = (emoji: string, add: boolean) => {
+    const step = add ? 1 : -1;
+    setReactions((current) =>
+      (current.some((entry) => entry.emoji === emoji)
+        ? current.map((entry) =>
+            entry.emoji === emoji
+              ? { ...entry, count: entry.count + step }
+              : entry,
+          )
+        : [...current, { emoji, count: 1 }]
+      ).filter((entry) => entry.count > 0),
+    );
+    setMine((current) =>
+      add ? [...current, emoji] : current.filter((entry) => entry !== emoji),
+    );
+  };
+  const react = (emoji: string, on: boolean) => {
+    apply(emoji, on);
+    reactToClip(apiBaseUrl, token, post.claimId, emoji, on).catch((error) => {
+      apply(emoji, !on);
+      if (error instanceof ApiError && error.kind === "unauthorized")
+        onRevoked();
+      onNotice({
+        kind: "error",
+        text:
+          error instanceof ApiError
+            ? error.message
+            : "Couldn’t save. Try again.",
+      });
+    });
+  };
   return (
-    <li className="proof-post consequence-post" data-post={clipPostId(post)}>
+    <li className="proof-post consequence-post" data-post={id}>
       <header>
         <Avatar name={who} url={avatarUrl} />
         <span className="proof-byline">
@@ -126,6 +194,48 @@ export function ConsequencePostView({
         <strong>{post.cardTitle}</strong>
         <span>Approved by the Group. Card cleared.</span>
       </p>
+      <Reactions
+        reactions={reactions}
+        mine={mine}
+        readOnly={post.mine}
+        onToggle={react}
+        loadReactors={() => loadClipReactors(apiBaseUrl, token, post.claimId)}
+        cachedReactors={() => cachedReactors(id)}
+        trailing={
+          <button
+            type="button"
+            className="proof-reaction proof-comment"
+            aria-label="Comment"
+            onClick={() => setAskComment((count) => count + 1)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20.5 11.5a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1.4-4.4A8.5 8.5 0 1 1 20.5 11.5Z" />
+            </svg>
+          </button>
+        }
+      />
+      <PostText
+        item={{ workoutCheckinId: id, caption: null, messages: post.messages }}
+        authorName={who}
+        askComment={askComment}
+        apiBaseUrl={apiBaseUrl}
+        token={token}
+        ensureConduct={ensureConduct}
+        confirmReport={confirmReport}
+        onNotice={onNotice}
+        postComment={(messageId, body) =>
+          postClipMessage(apiBaseUrl, token, post.claimId, messageId, body)
+        }
+      />
     </li>
   );
 }
