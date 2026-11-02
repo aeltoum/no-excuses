@@ -96,7 +96,7 @@ test("Week shows the countdown, Home drops it; friends' photos, and posts with a
   await delayRoute(page, "**/v1/proof/*/message", 1000);
   const opened = await msUntilVisible(
     page,
-    () => card.getByRole("button", { name: "Comment" }).click(),
+    () => card.getByRole("button", { name: "Comment", exact: true }).click(),
     card.getByRole("textbox", { name: "Comment" }),
   );
   expect(opened).toBeLessThanOrEqual(100);
@@ -104,7 +104,9 @@ test("Week shows the countdown, Home drops it; friends' photos, and posts with a
   const sent = await msUntilVisible(
     page,
     () => card.getByRole("button", { name: "Post" }).click(),
-    card.getByText("Strong"),
+    card
+      .getByRole("list", { name: "Comments", exact: true })
+      .getByText("Strong"),
   );
   expect(sent).toBeLessThanOrEqual(100);
   expect(errors).toEqual([]);

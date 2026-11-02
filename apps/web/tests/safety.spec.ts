@@ -73,9 +73,12 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   const sent = await msUntilVisible(
     page,
     () => maya.getByRole("button", { name: "Post" }).click(),
-    maya.getByText("Monster"),
+    maya
+      .getByRole("list", { name: "Comments", exact: true })
+      .getByText("Monster"),
   );
   expect(sent).toBeLessThanOrEqual(100);
+  await page.keyboard.press("Escape");
 
   // Own fresh post takes a caption without asking again.
   await closePost(page);
@@ -96,7 +99,8 @@ test("messages need the conduct rules once, then send instantly; reports hide at
   await closePost(page);
   await openPost(page, "Maya");
 
-  await maya.getByRole("button", { name: "Report message from Jo" }).click();
+  await maya.getByRole("button", { name: "Comment", exact: true }).click();
+  await maya.getByRole("button", { name: "Report comment from Jo" }).click();
   await page
     .getByRole("dialog", { name: "Report this message?" })
     .getByRole("button", { name: "Report message" })

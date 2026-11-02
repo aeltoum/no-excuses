@@ -126,6 +126,11 @@ export function NotificationBell({
   const revoked = useRef(onRevoked);
   revoked.current = onRevoked;
   account = { apiBaseUrl, token };
+  // Home's count can lag a notification just cleared by viewing its subject;
+  // the loaded list already dropped it.
+  const shown = center
+    ? Math.min(unread, center.items.filter((item) => item.unread).length)
+    : unread;
   useEffect(() => {
     listeners.add(setCenter);
     dismissViewed();
@@ -192,7 +197,7 @@ export function NotificationBell({
       <button
         type="button"
         className="masthead-bell"
-        aria-label={unread ? `Notifications, ${unread} new` : "Notifications"}
+        aria-label={shown ? `Notifications, ${shown} new` : "Notifications"}
         onClick={() => {
           setOpen(true);
           onSeen();
@@ -212,9 +217,9 @@ export function NotificationBell({
           <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" />
           <path d="M10 20a2 2 0 0 0 4 0" />
         </svg>
-        {unread > 0 && (
+        {shown > 0 && (
           <span className="tab-badge" aria-hidden="true">
-            {unread > 9 ? "9+" : unread}
+            {shown > 9 ? "9+" : shown}
           </span>
         )}
       </button>
