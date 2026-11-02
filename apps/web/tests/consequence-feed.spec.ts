@@ -131,3 +131,33 @@ test("a cached clip thumbnail shows at once without loading the video", async ({
   await expect(tile.locator("video")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("a clip's uploaded poster is its tile and player thumbnail", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const poster =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+  const { errors } = await signIn(page, ({ path }) => {
+    if (path === "/v1/proof/feed") return [];
+    if (path === "/v1/consequences/feed")
+      return [
+        clip({
+          clipUrl: "https://clips.example.test/clip.mp4",
+          posterUrl: poster,
+        }),
+      ];
+  });
+  const tile = page.getByRole("button", { name: /^Maya, Consequence/ });
+  await expect(tile.locator("img.day-tile-photo")).toHaveAttribute(
+    "src",
+    poster,
+  );
+  await expect(tile.locator("video")).toHaveCount(0);
+  const viewer = await openPost(page, "Maya");
+  await expect(viewer.locator("video.clip-player-video")).toHaveAttribute(
+    "poster",
+    poster,
+  );
+  expect(errors).toEqual([]);
+});

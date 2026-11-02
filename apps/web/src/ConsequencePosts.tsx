@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "./api-client";
 import { Avatar } from "./avatars";
-import { ClipPlayer } from "./ClipPlayer";
+import { ClipPlayer, grabFrame } from "./ClipPlayer";
 import { useFreshness } from "./freshness";
 import { PostText } from "./PostText";
 import { persistentMap } from "./persist";
@@ -27,6 +27,8 @@ export type ConsequencePost = {
   submittedAt: string;
   approvedAt: string;
   clipUrl: string | null;
+  // A JPEG frame the recording phone uploaded; older clips have none.
+  posterUrl?: string | null;
   reactions?: ReactionCount[];
   myReactions?: string[];
   messages?: ProofMessage[];
@@ -73,22 +75,6 @@ export function useConsequencePosts(
 const thumbs = persistentMap<string>("consequence-thumbs");
 const thumbLimit = 40;
 
-function grabFrame(video: HTMLVideoElement) {
-  const width = 240;
-  const height = Math.round((width * video.videoHeight) / video.videoWidth);
-  if (!height) return null;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  try {
-    canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
-    return canvas.toDataURL("image/jpeg", 0.7);
-  } catch {
-    // A cross-origin frame without CORS taints the canvas; keep the video.
-    return null;
-  }
-}
-
 // A cached frame shows at once; otherwise the clip loads only near the viewport.
 function ClipThumb({ post }: { post: ConsequencePost }) {
   const [thumb, setThumb] = useState(() => thumbs.get(post.claimId));
@@ -97,7 +83,7 @@ function ClipThumb({ post }: { post: ConsequencePost }) {
   const [plain, setPlain] = useState(false);
   const holder = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    if (thumb || near || !post.clipUrl) return;
+    if (post.posterUrl || thumb || near || !post.clipUrl) return;
     const element = holder.current;
     if (!element || typeof IntersectionObserver === "undefined") {
       setNear(true);
@@ -111,7 +97,17 @@ function ClipThumb({ post }: { post: ConsequencePost }) {
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [thumb, near, post.clipUrl]);
+  }, [post.posterUrl, thumb, near, post.clipUrl]);
+  if (post.posterUrl)
+    return (
+      <img
+        className="day-tile-photo"
+        src={post.posterUrl}
+        alt=""
+        decoding="async"
+        loading="lazy"
+      />
+    );
   if (thumb) return <img className="day-tile-photo" src={thumb} alt="" />;
   if (!post.clipUrl || !near)
     return <span ref={holder} className="day-tile-photo" />;
@@ -129,7 +125,7 @@ function ClipThumb({ post }: { post: ConsequencePost }) {
         event.currentTarget.currentTime = 0.1;
       }}
       onSeeked={(event) => {
-        const frame = grabFrame(event.currentTarget);
+        const frame = grabFrame(event.currentTarget, 240);
         if (!frame) return;
         for (const key of [...thumbs.keys()].slice(
           0,
@@ -248,7 +244,11 @@ export function ConsequencePostView({
       <div className="consequence-clip">
         <span className="proof-consequence-label">Consequence</span>
         {post.clipUrl ? (
-          <ClipPlayer url={post.clipUrl} label={`${who}’s Consequence clip`} />
+          <ClipPlayer
+            url={post.clipUrl}
+            poster={post.posterUrl}
+            label={`${who}’s Consequence clip`}
+          />
         ) : (
           <p className="consequence-clip-missing">Clip unavailable</p>
         )}

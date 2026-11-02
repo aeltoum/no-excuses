@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { ApiError } from "./api-client";
-import { ClipPlayer } from "./ClipPlayer";
+import { ClipPlayer, posterFromClip } from "./ClipPlayer";
 import { call } from "./proof";
 import { Sheet } from "./Sheet";
 
@@ -255,12 +255,14 @@ export function ProofClip({
     }
     setSending(true);
     try {
-      const target = await post<{ path: string; uploadUrl: string }>(
-        apiBaseUrl,
-        token,
-        "/v1/consequences/clip-upload",
-        { challengeId: challenge.challengeId, mimeType: clip.type },
-      );
+      const target = await post<{
+        path: string;
+        uploadUrl: string;
+        posterUploadUrl?: string | null;
+      }>(apiBaseUrl, token, "/v1/consequences/clip-upload", {
+        challengeId: challenge.challengeId,
+        mimeType: clip.type,
+      });
       let response: Response;
       try {
         response = await fetch(target.uploadUrl, {
@@ -279,6 +281,22 @@ export function ProofClip({
       }
       if (!response.ok)
         throw new ApiError("failure", "Video upload failed. Try again.", true);
+      // The poster lets the Wall show a thumbnail without loading video; best effort.
+      const posterUrl = target.posterUploadUrl;
+      if (posterUrl)
+        void posterFromClip(clip.blob).then((poster) =>
+          poster
+            ? fetch(posterUrl, {
+                method: "PUT",
+                headers: {
+                  "content-type": "image/jpeg",
+                  "x-upsert": "false",
+                  "cache-control": "max-age=31536000",
+                },
+                body: poster,
+              }).catch(() => undefined)
+            : undefined,
+        );
       if (await onSubmit(target.path)) onClose();
     } catch (error) {
       onError(error);

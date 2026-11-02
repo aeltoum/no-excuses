@@ -1,12 +1,60 @@
 import { type CSSProperties, useRef, useState } from "react";
 
+// One frame of a loaded clip as a JPEG data URL; null if the frame can't be read.
+export function grabFrame(video: HTMLVideoElement, width: number) {
+  const height = Math.round((width * video.videoHeight) / video.videoWidth);
+  if (!height) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  try {
+    canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } catch {
+    // A cross-origin frame without CORS taints the canvas.
+    return null;
+  }
+}
+
+// A JPEG poster from a just-recorded clip, read on the device; null on failure.
+export function posterFromClip(blob: Blob): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    const done = (result: Blob | null) => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      resolve(result);
+    };
+    const timer = setTimeout(() => done(null), 5000);
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.onloadeddata = () => {
+      video.currentTime = 0.1;
+    };
+    video.onseeked = () => {
+      const frame = grabFrame(video, 480);
+      if (!frame) return done(null);
+      void fetch(frame)
+        .then((response) => response.blob())
+        .then(done, () => done(null));
+    };
+    video.onerror = () => done(null);
+    video.src = url;
+  });
+}
+
 // A proof clip with only two controls: tap the frame to play or pause, drag
 // the bar to seek. It opens on a frame from the clip instead of a black box.
 export function ClipPlayer({
   url,
+  poster,
   label,
 }: {
   url?: string | null;
+  poster?: string | null;
   label: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -29,6 +77,7 @@ export function ClipPlayer({
         ref={video}
         className="clip-player-video"
         src={url}
+        poster={poster ?? undefined}
         playsInline
         preload="auto"
         aria-label={label}

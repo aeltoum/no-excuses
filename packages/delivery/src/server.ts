@@ -200,13 +200,18 @@ async function deleteExpiredProofMedia() {
 
 // Consequence clips stay for good; only uploads never attached to a claim go.
 const clipBucket = "consequence-clips";
+// A clip's optional poster frame sits beside it as a JPEG.
+const posterOf = (clipPath: string) =>
+  clipPath.replace(/\.(mp4|webm)$/, ".jpg");
 async function deleteAbandonedClips() {
   const due = await pool.query(
     "select path from app_private.consequence_clips_due(now())",
   );
   const paths = due.rows.map((row) => row.path as string);
   if (paths.length === 0) return;
-  await storage(`/object/${clipBucket}`, "DELETE", { prefixes: paths });
+  await storage(`/object/${clipBucket}`, "DELETE", {
+    prefixes: [...paths, ...paths.map(posterOf)],
+  });
   await pool.query(
     "select app_private.mark_consequence_clips_deleted($1, now())",
     [paths],
@@ -1200,10 +1205,12 @@ const clipExtensions: Record<string, string> = {
   "video/mp4": "mp4",
   "video/webm": "webm",
 };
-type ClipHome = {
-  attempt?: { clipPath?: string | null; clipUrl?: string | null } | null;
-  reviews?: { clipPath?: string | null; clipUrl?: string | null }[];
+type ClipItem = {
+  clipPath?: string | null;
+  clipUrl?: string | null;
+  posterUrl?: string | null;
 };
+type ClipHome = { attempt?: ClipItem | null; reviews?: ClipItem[] };
 // Swaps each clip path on the home state for a day-long signed URL the Group can play.
 async function withClipUrls(home: unknown) {
   const state = home as ClipHome | undefined;
@@ -1211,7 +1218,9 @@ async function withClipUrls(home: unknown) {
   const items = [state.attempt, ...(state.reviews ?? [])].filter(
     (item): item is NonNullable<typeof item> => Boolean(item),
   );
-  const paths = items.flatMap((item) => (item.clipPath ? [item.clipPath] : []));
+  const paths = items.flatMap((item) =>
+    item.clipPath ? [item.clipPath, posterOf(item.clipPath)] : [],
+  );
   const urls = new Map<string, string>();
   if (paths.length > 0) {
     const signed = (await storage(`/object/sign/${clipBucket}`, "POST", {
@@ -1224,6 +1233,9 @@ async function withClipUrls(home: unknown) {
   }
   for (const item of items) {
     item.clipUrl = item.clipPath ? (urls.get(item.clipPath) ?? null) : null;
+    item.posterUrl = item.clipPath
+      ? (urls.get(posterOf(item.clipPath)) ?? null)
+      : null;
     delete item.clipPath;
   }
   return state;
@@ -1378,10 +1390,19 @@ async function consequences(request: Request, path: string): Promise<Response> {
         {},
       )) as { url?: string };
       if (!signed.url) throw new Error("Storage sign failed");
+      // The poster is optional: a failed sign still lets the clip upload.
+      const poster = (await storage(
+        `/object/upload/sign/${clipBucket}/${posterOf(objectPath)}`,
+        "POST",
+        {},
+      ).catch(() => ({}))) as { url?: string };
       return reply(
         ok({
           path: objectPath,
           uploadUrl: `${authUrl}/storage/v1${signed.url}`,
+          posterUploadUrl: poster.url
+            ? `${authUrl}/storage/v1${poster.url}`
+            : null,
         }),
       );
     }
