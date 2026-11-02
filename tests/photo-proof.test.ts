@@ -259,6 +259,14 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       },
     ]);
     expect(await verdict("2026-03-07T12:31Z")).toHaveLength(1);
+    // Cleanup leaves a Rejected post's photos in place.
+    const due = await db.query<{ path: string }>(
+      "select path from app_private.proof_media_due('2026-03-07T12:31Z')",
+    );
+    const [kept] = await verdict("2026-03-07T12:31Z");
+    expect(due.rows.map((row) => row.path)).not.toContain(
+      (kept as { activity_photo_path: string }).activity_photo_path,
+    );
   });
 
   it("stays Verified without a strict majority, and withdraw makes it Unsupported", async () => {

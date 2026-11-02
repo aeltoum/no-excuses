@@ -1248,6 +1248,27 @@ async function consequences(request: Request, path: string): Promise<Response> {
       ).rows;
       return reply(ok(await withClipUrls(rows[0]?.home)));
     }
+    // Approved Consequence clips for the Wall, each with a day-long signed URL.
+    if (path === "/v1/consequences/feed" && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.consequence_feed($1)", [
+          now,
+        ])
+      ).rows;
+      const posts = rows.map((row) => ({
+        claimId: row.claim_id,
+        authorMembershipId: row.author_membership_id,
+        authorName: row.author_name,
+        mine: row.mine,
+        cardTitle: row.card_title,
+        submittedAt: new Date(String(row.submitted_at)).toISOString(),
+        approvedAt: new Date(String(row.approved_at)).toISOString(),
+        clipPath: row.clip_path as string | null,
+        clipUrl: null as string | null,
+      }));
+      const signed = await withClipUrls({ reviews: posts });
+      return reply(ok((signed as { reviews: typeof posts }).reviews));
+    }
     if (request.method !== "POST") return reply(fail("not_found", 404));
     let body: {
       target?: unknown;
