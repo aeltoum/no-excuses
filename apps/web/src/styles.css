@@ -3042,17 +3042,6 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 0.85rem;
 }
-.post-compose {
-  display: grid;
-  scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom));
-  grid-template-columns: 1fr auto auto;
-  gap: 6px;
-  margin-top: 6px;
-}
-.post-compose button {
-  width: auto;
-  padding-inline: 12px;
-}
 .row-more {
   font-size: 1.3rem;
   text-decoration: none;
@@ -3997,12 +3986,21 @@ svg {
   font-size: 0.875rem;
 }
 .recap-history {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-height: 44px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 0.875rem;
+  justify-content: space-between;
+  min-height: 48px;
+  margin-top: 16px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong, #44474c);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.recap-history:active {
+  background: var(--surface);
 }
 .recap-done {
   width: 100%;
@@ -4686,57 +4684,6 @@ h1 {
 }
 
 /* Home feed: Needs you, then one row per day of tall 9:16 tiles. */
-/* Wall of shame: one quiet line under the feed; tiles only when opened. */
-.shame-strip {
-  margin: 20px 0 4px;
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--rule);
-}
-.shame-strip-bar {
-  display: flex;
-  align-items: center;
-}
-.shame-strip-toggle {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-.shame-strip-names {
-  flex: 1;
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.shame-strip:not(.is-open) .needs-you-chevron {
-  transform: rotate(-45deg);
-}
-.shame-strip-dismiss {
-  width: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font-size: 1.25rem;
-  cursor: pointer;
-}
-.shame-strip-reel {
-  padding: 0 10px 10px;
-}
 .needs-you-panel {
   margin: 16px 0 4px;
   border-radius: 16px;
@@ -4996,7 +4943,7 @@ h1 {
 .day-tile-verdict {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--activity-sport);
@@ -5005,6 +4952,9 @@ h1 {
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+.day-tile-verdict ~ .day-tile-new {
+  top: 34px;
 }
 .day-tile-verdict.is-rejected {
   background: var(--error);
@@ -5297,4 +5247,163 @@ html.post-viewer-open body {
   top: 50%;
   right: 0;
   translate: 0 -50%;
+}
+
+/* A Rejected post keeps its photos in its day, stamped as not counting. */
+.proof-discounted {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Comments: a full sheet like a photo app's thread, composer pinned at the foot. */
+.post-add-comment {
+  width: auto;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-align: left;
+}
+.comments {
+  display: flex;
+  flex-direction: column;
+  min-height: 50dvh;
+  margin: 0 -20px -20px;
+}
+.comments-list {
+  flex: 1;
+  margin: 0;
+  padding: 4px 20px 12px;
+  list-style: none;
+}
+.comment {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+}
+.comment .avatar {
+  width: 32px;
+  height: 32px;
+}
+.comment-main {
+  min-width: 0;
+}
+.comment-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+.comment-head strong {
+  font-weight: 700;
+}
+.comment-head time {
+  color: var(--muted);
+}
+.comment-body {
+  margin: 2px 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.comment-action {
+  width: auto;
+  min-height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.comments-empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 40px 20px;
+  text-align: center;
+}
+.comments-empty strong {
+  font-size: 1.25rem;
+}
+.comments-empty span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.comment-compose {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+}
+.comment-emoji {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+.comment-emoji button {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 1.5rem;
+}
+.comment-field {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--line-strong, #44474c);
+  border-radius: 24px;
+}
+.comment-field .avatar {
+  width: 32px;
+  height: 32px;
+}
+.comment-field input {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 1rem;
+}
+.comment-field input:focus {
+  outline: none;
+}
+.comment-post {
+  width: auto;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--cardio);
+  font-weight: 700;
+}
+.comment-post:disabled {
+  background: none;
+  opacity: 0.4;
 }

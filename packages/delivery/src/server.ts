@@ -913,7 +913,6 @@ async function proof(request: Request, path: string): Promise<Response> {
           ])
         ).rows.map((row) => [row.workout_checkin_id as string, row.details]),
       );
-      // A Rejected verdict has no photos to sign.
       const paths = rows
         .flatMap((row) => [row.activity_photo_path, row.presence_photo_path])
         .filter((value): value is string => typeof value === "string");

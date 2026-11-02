@@ -182,14 +182,30 @@ test("Home is phone-fixed: no sideways scroll, no text selection, count under th
 
 test("the results pop up once a week, then live in History", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, ({ path }) =>
     path === "/v1/home/extras"
-      ? homeExtras({ recap: [maya, mine] })
+      ? homeExtras({
+          recap: [
+            maya,
+            mine,
+            ...["Ari", "Bo", "Cy", "Dee"].map((name, index) => ({
+              ...maya,
+              memberWeekId: `${maya.memberWeekId.slice(0, -1)}${index}`,
+              name,
+            })),
+          ],
+        })
       : undefined,
   );
   const popup = page.getByRole("dialog", { name: "The results are in" });
+  // Every member shows at once; History is a real button, not a text link.
+  await expect(popup.locator(".recap-row")).toHaveCount(6);
+  await expect(
+    popup.getByRole("link", { name: /Every week in History/ }),
+  ).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("recap.png") });
   await popup.getByRole("button", { name: "Done" }).click();
   await expect(popup).toHaveCount(0);
   await page.reload();

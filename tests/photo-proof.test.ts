@@ -241,7 +241,7 @@ describe("Photo proof", { timeout: 30_000 }, () => {
         )
       ).rows,
     ).toEqual([{ source_kind: "rejected_report" }]);
-    // The Wall of shame keeps a text-only verdict for 48 hours, never the photos.
+    // A Rejected post stays in its day with its photos, marked as not counting.
     const verdict = async (at: string) =>
       (
         await db.query(
@@ -253,12 +253,12 @@ describe("Photo proof", { timeout: 30_000 }, () => {
       {
         decision_outcome: "rejected",
         closed: true,
-        activity_photo_path: null,
-        presence_photo_path: null,
+        activity_photo_path: expect.any(String),
+        presence_photo_path: expect.any(String),
         reject_votes: 2,
       },
     ]);
-    expect(await verdict("2026-03-07T12:31Z")).toEqual([]);
+    expect(await verdict("2026-03-07T12:31Z")).toHaveLength(1);
   });
 
   it("stays Verified without a strict majority, and withdraw makes it Unsupported", async () => {

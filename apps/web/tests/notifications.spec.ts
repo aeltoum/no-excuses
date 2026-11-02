@@ -153,6 +153,10 @@ test("opening a notification goes to its subject; seeing a subject clears it", a
         calls.find((c) => c.path === "/v1/notifications/dismiss")?.body?.ids,
     )
     .toEqual([4]);
+  // The bell's count drops with it, without opening the list.
+  await expect(
+    page.getByRole("button", { name: "Notifications, 1 new" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Notifications/ }).click();
   const sheet = page.getByRole("dialog", { name: "Notifications" });
   await expect(sheet.getByText("Less than 24 hours left")).toHaveCount(0);

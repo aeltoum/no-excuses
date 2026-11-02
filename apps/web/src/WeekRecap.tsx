@@ -8,7 +8,6 @@ import { Sheet } from "./Sheet";
 
 const day = 24 * 3_600_000;
 // Enough rows to see your result and the crew's; the rest open on request.
-const shownRows = 4;
 // Each finished week pops up once on this device; History keeps it after.
 const shownKey = "no-excuses:recap-shown";
 const alreadyShown = (endsAt: string) => {
@@ -49,7 +48,6 @@ export function WeekRecap({
   onHistory: (event: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const [picking, setPicking] = useState<RecapWeek | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [closed, setClosed] = useState(false);
   // A saved copy can outlive the day; the server drops it on the next load.
   const weeks = extras.recap.filter(
@@ -154,7 +152,7 @@ export function WeekRecap({
             </p>
           )}
           <ul>
-            {(showAll ? weeks : weeks.slice(0, shownRows)).map((week) => {
+            {weeks.map((week) => {
               const who = week.mine ? "You" : week.name;
               return (
                 <li
@@ -238,16 +236,6 @@ export function WeekRecap({
               );
             })}
           </ul>
-          {weeks.length > shownRows && (
-            <button
-              type="button"
-              className="text-button recap-more"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((value) => !value)}
-            >
-              {showAll ? "Show fewer" : `Show all ${weeks.length}`}
-            </button>
-          )}
           <a
             className="recap-history"
             href="/history"
@@ -256,7 +244,8 @@ export function WeekRecap({
               onHistory(event);
             }}
           >
-            See every week in History
+            <span>Every week in History</span>
+            <span aria-hidden="true">→</span>
           </a>
           <button type="button" className="recap-done" onClick={close}>
             Done

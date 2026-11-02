@@ -50,8 +50,6 @@ test("closed Group decisions show their verdict on the Wall", async ({
           reviewStatus: "rejected",
           decisionOutcome: "rejected",
           rejectVotes: 2,
-          activityPhotoUrl: null,
-          presencePhotoUrl: null,
         }),
       ];
   });
@@ -68,33 +66,19 @@ test("closed Group decisions show their verdict on the Wall", async ({
   );
   await page.screenshot({ path: testInfo.outputPath("upheld.png") });
   await closePost(page);
-  // Rejected posts stay out of the day rows: one collapsed strip at the bottom.
-  const strip = page.getByRole("region", { name: "Wall of shame" });
-  await page.screenshot({ path: testInfo.outputPath("home-collapsed.png") });
-  await expect(strip).toContainText("Jordan");
-  await expect(
-    page.getByRole("list", { name: "Posts by day" }).getByText("Jordan"),
-  ).toHaveCount(0);
-  await expect(strip.getByRole("button", { name: /^Jordan,/ })).toHaveCount(0);
-  await strip.getByRole("button", { name: /^Wall of shame/ }).click();
-  await page.screenshot({ path: testInfo.outputPath("strip-open.png") });
-  await strip.getByRole("button", { name: /^Jordan,/ }).click();
-  const rejected = page
-    .getByRole("dialog", { name: /post$/ })
-    .getByRole("region", { name: "Group decision" });
-  await expect(rejected).toContainText("🤡 Wall of shame · doesn’t count");
-  await expect(rejected).toContainText(
-    "Here’s Jordan’s Consequence card, clown.",
-  );
+  // A Rejected post stays in its day with its photos, stamped as not counting.
+  const tile = page
+    .getByRole("list", { name: "Posts by day" })
+    .getByRole("button", { name: /^Jordan, .*rejected, doesn’t count/ });
+  await expect(tile).toContainText("Doesn’t count");
+  const opened = await openPost(page, "Jordan");
+  await expect(opened.locator(".proof-discounted")).toHaveText("Doesn’t count");
+  await expect(opened.locator(".proof-main").first()).toBeVisible();
+  const rejected = opened.getByRole("region", { name: "Group decision" });
+  await expect(rejected).toContainText("Rejected · doesn’t count");
+  await expect(rejected).toContainText("It earns Jordan a Consequence card.");
   await page.screenshot({ path: testInfo.outputPath("rejected.png") });
   await closePost(page);
-  await strip.getByRole("button", { name: "Dismiss Wall of shame" }).click();
-  await expect(strip).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByRole("button", { name: /^Maya,/ })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Wall of shame" })).toHaveCount(
-    0,
-  );
   expect(errors).toEqual([]);
 });
 
@@ -119,7 +103,7 @@ test("a deciding vote shows the verdict at once", async ({
   const elapsed = await msUntilVisible(
     page,
     () => reject.click(),
-    page.getByRole("region", { name: "Wall of shame" }),
+    page.getByRole("button", { name: /rejected, doesn’t count/ }),
   );
   expect(elapsed).toBeLessThanOrEqual(100);
   await page.screenshot({ path: testInfo.outputPath("deciding-vote.png") });
