@@ -1228,6 +1228,9 @@ async function withClipUrls(home: unknown) {
   }
   return state;
 }
+// Reactions and comments on an approved Consequence clip.
+const clipSocial =
+  /^\/v1\/consequences\/clip\/([0-9a-f-]{36})\/(react|reactions|message)$/;
 async function consequences(request: Request, path: string): Promise<Response> {
   const reply = (response: ApiResponse) =>
     Response.json(response.body, { status: response.status });
@@ -1255,7 +1258,19 @@ async function consequences(request: Request, path: string): Promise<Response> {
           now,
         ])
       ).rows;
+      const social = new Map(
+        (
+          await query(
+            actor,
+            "select * from app_private.consequence_social($1)",
+            [now],
+          )
+        ).rows.map((row) => [row.claim_id as string, row]),
+      );
       const posts = rows.map((row) => ({
+        reactions: social.get(row.claim_id)?.counts ?? [],
+        myReactions: social.get(row.claim_id)?.my_reactions ?? [],
+        messages: social.get(row.claim_id)?.messages ?? [],
         claimId: row.claim_id,
         authorMembershipId: row.author_membership_id,
         authorName: row.author_name,
@@ -1269,7 +1284,61 @@ async function consequences(request: Request, path: string): Promise<Response> {
       const signed = await withClipUrls({ reviews: posts });
       return reply(ok((signed as { reviews: typeof posts }).reviews));
     }
+    const social = clipSocial.exec(path);
+    if (social?.[2] === "reactions" && request.method === "GET") {
+      const rows = (
+        await query(
+          actor,
+          "select * from app_private.consequence_reactors($1,$2)",
+          [social[1], now],
+        )
+      ).rows;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            emoji: row.reaction,
+            name: row.display_name,
+            mine: row.mine,
+          })),
+        ),
+      );
+    }
     if (request.method !== "POST") return reply(fail("not_found", 404));
+    if (social && social[2] !== "reactions") {
+      let input: Record<string, unknown>;
+      try {
+        input = ((await request.json()) ?? {}) as Record<string, unknown>;
+      } catch {
+        return reply(fail("invalid_request", 400));
+      }
+      if (social[2] === "react") {
+        const { emoji, on } = input;
+        if (
+          typeof emoji !== "string" ||
+          !singleEmoji.test(emoji) ||
+          typeof on !== "boolean"
+        )
+          return reply(fail("invalid_request", 400));
+        await query(
+          actor,
+          "select app_private.react_to_consequence($1,$2,$3,$4)",
+          [social[1], emoji, on, now],
+        );
+        return reply(ok({ claimId: social[1], emoji, on }));
+      }
+      if (
+        !uuid(input.id) ||
+        typeof input.body !== "string" ||
+        input.body.length > 400
+      )
+        return reply(fail("invalid_request", 400));
+      await query(
+        actor,
+        "select app_private.post_consequence_message($1,$2,$3,$4)",
+        [input.id, social[1], input.body, now],
+      );
+      return reply(ok({ id: input.id, claimId: social[1] }));
+    }
     let body: {
       target?: unknown;
       choice?: unknown;

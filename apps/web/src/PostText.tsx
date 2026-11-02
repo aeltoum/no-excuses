@@ -72,8 +72,11 @@ export function PostText({
   confirmReport,
   onNotice,
   onReportPhotos,
+  postComment,
 }: {
-  item: ProofItem;
+  // Consequence clips pass only the text fields.
+  item: Pick<ProofItem, "workoutCheckinId" | "caption" | "messages"> &
+    Partial<ProofItem>;
   authorName: string;
   // Bumped by the comment icon beside the reactions.
   askComment?: number;
@@ -86,6 +89,8 @@ export function PostText({
   confirmReport: () => Promise<boolean>;
   onNotice: (notice: Notice) => void;
   onReportPhotos?: () => void;
+  // Where a comment goes; workout posts by default.
+  postComment?: (id: string, body: string) => Promise<unknown>;
 }) {
   const [caption, setLocalCaption] = useState(item.caption ?? null);
   const [messages, setMessages] = useState<ProofMessage[]>(item.messages ?? []);
@@ -100,7 +105,8 @@ export function PostText({
   ]
     .filter((message) => !reported.has(message.id))
     .sort((left, right) => left.at.localeCompare(right.at));
-  const starters = writing === "caption" ? captionStarters(item) : [];
+  const starters =
+    writing === "caption" ? captionStarters(item as ProofItem) : [];
   const left = captionLimit - draft.length;
   const fail = (error: unknown) =>
     onNotice({
@@ -152,12 +158,9 @@ export function PostText({
       at: new Date().toISOString(),
     };
     setMessages((current) => [...current, message]);
-    postMessage(
-      apiBaseUrl,
-      token,
-      item.workoutCheckinId,
-      message.id,
-      text,
+    (postComment
+      ? postComment(message.id, text)
+      : postMessage(apiBaseUrl, token, item.workoutCheckinId, message.id, text)
     ).catch((error) => {
       setMessages((current) =>
         current.filter((entry) => entry.id !== message.id),

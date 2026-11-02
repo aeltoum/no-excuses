@@ -359,6 +359,40 @@ describe("M5 Consequence system", () => {
     ).toEqual([
       { claim_id: claimId, mine: false, titled: true, clipped: true },
     ]);
+    // Members react to and comment on the clip like a workout post.
+    await db.query(
+      "update app_private.accounts set conduct_version_accepted = app_private.conduct_version() where account_id = $1",
+      [accounts[1]],
+    );
+    await db.query(
+      "select app_private.react_to_consequence($1, '🔥', true, '2026-03-20Z')",
+      [claimId],
+    );
+    await db.query(
+      "select app_private.post_consequence_message($1, $2, 'Brutal', '2026-03-20Z')",
+      [randomUUID(), claimId],
+    );
+    expect(
+      (
+        await db.query(
+          "select counts, my_reactions, jsonb_array_length(messages) as comments from app_private.consequence_social('2026-03-20Z')",
+        )
+      ).rows,
+    ).toEqual([
+      {
+        counts: [{ emoji: "🔥", count: 1 }],
+        my_reactions: ["🔥"],
+        comments: 1,
+      },
+    ]);
+    expect(
+      (
+        await db.query(
+          "select reaction, mine from app_private.consequence_reactors($1, '2026-03-20Z')",
+          [claimId],
+        )
+      ).rows,
+    ).toEqual([{ reaction: "🔥", mine: true }]);
 
     const next = await addObligation(db, memberships[3]);
     const nextOffer = await offer(db, next.obligationId);

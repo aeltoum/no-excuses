@@ -1581,6 +1581,12 @@ export function ProofFeed({
                     post={viewedClip}
                     avatarUrl={avatars[viewedClip.authorMembershipId]}
                     ago={ago}
+                    apiBaseUrl={apiBaseUrl}
+                    token={token}
+                    ensureConduct={ensureConduct}
+                    confirmReport={confirmReport}
+                    onNotice={setNotice}
+                    onRevoked={onRevoked}
                   />
                 )}
           </ul>
