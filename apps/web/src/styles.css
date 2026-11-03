@@ -5500,3 +5500,6 @@ html.post-viewer-open body {
   margin: 0;
   color: var(--muted);
 }
+.friend-nudge time {
+  font-variant-numeric: tabular-nums;
+}

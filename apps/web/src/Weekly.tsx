@@ -66,6 +66,27 @@ const streakText = (item: CurrentWeekProgressItem) =>
 
 const utcDay = () => new Date().toISOString().slice(0, 10);
 
+// Time until nudges reset at the next UTC midnight, ticking each second.
+function NudgeCountdown({ onDone }: { onDone: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  const resetAt = new Date(now).setUTCHours(24, 0, 0, 0);
+  const seconds = Math.max(0, Math.ceil((resetAt - now) / 1000));
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = Date.now();
+      setNow(next);
+      if (next >= resetAt) onDone();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resetAt, onDone]);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return (
+    <time dateTime={new Date(resetAt).toISOString()}>
+      {`${Math.floor(seconds / 3600)}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`}
+    </time>
+  );
+}
+
 // Time left before the week closes, as the Week title, ticking each second.
 function WeekCountdown({ endsAt }: { endsAt: string | null }) {
   const [now, setNow] = useState(() => Date.now());
@@ -328,6 +349,9 @@ export function Weekly({
   const [nudgedOn, setNudgedOn] = useState<ReadonlyMap<string, string>>(
     new Map(),
   );
+  // Re-render at UTC midnight so expired nudges unlock.
+  const [, setNudgeReset] = useState(0);
+  const onNudgeReset = useCallback(() => setNudgeReset((n) => n + 1), []);
   const nudged = new Set(
     [...nudgedOn].filter(([, day]) => day === utcDay()).map(([id]) => id),
   );
@@ -1259,9 +1283,11 @@ export function Weekly({
                               }
                               onClick={() => void nudge(item.membershipId)}
                             >
-                              {nudged.has(item.membershipId)
-                                ? "Nudged ✓"
-                                : "Nudge"}
+                              {nudged.has(item.membershipId) ? (
+                                <NudgeCountdown onDone={onNudgeReset} />
+                              ) : (
+                                "Nudge"
+                              )}
                             </button>
                           )}
                       </li>
