@@ -105,7 +105,7 @@ Each row names the minimum distinct screen contract. Variations listed under **r
 
 | ID | Screen | Primary action | Required states |
 | --- | --- | --- | --- |
-| G01 | Group overview | Open member or setting | setup; active; paused; 2–10 members; role labels; pending tasks; offline/stale |
+| G01 | Group overview | Open member or setting | setup; active; paused; 2–20 members; role labels; pending tasks; offline/stale |
 | G02 | Members | Open allowed member actions | current; joined-this-week; admin/member; blocked relation; departing; Former member in history |
 | G03 | Invitations | Create/revoke invitation | admin; non-admin denial; capacity full; active/expired/revoked/accepted; offline; create/revoke pending/failure |
 | G04 | Member administration | Promote, demote, or remove | permitted; last-admin denial; admin-demotion-first requirement; review; pending; receipt; stale conflict |
