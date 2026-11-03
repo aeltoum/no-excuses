@@ -35,7 +35,7 @@ Only this loop ships:
 
 ### Included behavior
 
-- Private invitation-only Groups of 2–10 existing friends.
+- Private invitation-only Groups of 2–20 existing friends.
 - Account access plus create, invite, join, leave, remove, and Account-deletion paths needed
   to keep membership private and voluntary.
 - One Group per Account.

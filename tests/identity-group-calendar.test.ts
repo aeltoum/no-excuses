@@ -296,7 +296,7 @@ describe("M2 identity, Group authority, and accountability calendar", () => {
     await db.exec(`delete from app_private.memberships where membership_id = '${ids.peerMembership}';
       insert into app_private.accounts (account_id, auth_user_id, email, adult_attested_at)
       select gen_random_uuid(), gen_random_uuid(), 'member' || n || '@example.test', '2026-03-01Z'
-      from generate_series(1, 9) n;
+      from generate_series(1, 19) n;
       insert into app_private.memberships (membership_id, account_id, group_id, joined_at, recurring_target)
       select gen_random_uuid(), account_id, '${ids.group}', '2026-03-05Z', 2
       from app_private.accounts where email like 'member%@example.test';`);
