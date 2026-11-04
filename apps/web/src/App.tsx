@@ -385,18 +385,66 @@ export function App({
     setNotice(null);
     window.scrollTo(0, 0);
   };
-  // A notification opens its subject: the page, then the post once the feed shows it.
+  // A notification opens its subject: the page, then the post itself once the feed
+  // shows it (a day tile or a Needs you card opens full screen).
   const openNotification = (target: { path: string; post?: string }) => {
     if (target.path !== path) go(target.path);
     if (!target.post) return;
-    const until = Date.now() + 4000;
+    const until = Date.now() + 8000;
     const find = () => {
-      const post = document.querySelector(`[data-post="${target.post}"]`);
-      if (post) post.scrollIntoView({ block: "center" });
+      const key = CSS.escape(target.post ?? "");
+      const opener =
+        document.querySelector<HTMLElement>(`button[data-post="${key}"]`) ??
+        document.querySelector<HTMLElement>(
+          `[data-post="${key}"] .needs-thumb`,
+        );
+      const post = document.querySelector(`[data-post="${key}"]`);
+      if (opener) opener.click();
+      else if (post) post.scrollIntoView({ block: "center" });
       else if (Date.now() < until) window.setTimeout(find, 100);
     };
     find();
   };
+  const openNotificationRef = useRef(openNotification);
+  openNotificationRef.current = openNotification;
+  // A device alert's tap: a URL like /home?post=<id>, at launch or sent by the worker.
+  useEffect(() => {
+    if (access !== "signed-in") return;
+    const openUrl = (url: string) => {
+      const parsed = new URL(url, window.location.origin);
+      const post = parsed.searchParams.get("post") ?? undefined;
+      if (parsed.searchParams.has("post"))
+        window.history.replaceState(null, "", parsed.pathname);
+      openNotificationRef.current({ path: parsed.pathname, post });
+    };
+    if (new URLSearchParams(window.location.search).has("post"))
+      openUrl(window.location.href);
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "open-notification" && event.data.url)
+        openUrl(String(event.data.url));
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [access]);
+  // Opening the app clears its alerts from the device; the bell keeps the list.
+  useEffect(() => {
+    if (access !== "signed-in" || !("serviceWorker" in navigator)) return;
+    const clear = () => {
+      if (document.visibilityState !== "visible") return;
+      navigator.serviceWorker
+        .getRegistration("/")
+        .then((registration) => registration?.getNotifications())
+        .then((shown) => {
+          for (const notification of shown ?? []) notification.close();
+        })
+        .catch(() => undefined);
+    };
+    clear();
+    document.addEventListener("visibilitychange", clear);
+    return () => document.removeEventListener("visibilitychange", clear);
+  }, [access]);
   // Being on Home or History clears the notifications that point there.
   useEffect(() => {
     if (access !== "signed-in" || (path !== "/home" && path !== "/history"))

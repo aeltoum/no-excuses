@@ -82,6 +82,60 @@ describe("Notification center", { timeout: 30_000 }, () => {
     ]);
   });
 
+  it("skips device alerts for posts already seen or dismissed and names the post", async () => {
+    const db = await database();
+    await db.query(
+      "update app_private.accounts set notifications_since = '2026-03-01Z'",
+    );
+    const seen = await submitProof(db, 1, "2026-03-05T10:00Z");
+    const unseen = await submitProof(db, 2, "2026-03-05T10:01Z");
+    await db.query(
+      "select app_private.enqueue_push_notifications('2026-03-05T10:05Z')",
+    );
+    await db.query(
+      "insert into app_private.web_push_subscriptions (endpoint, account_id, p256dh, auth, created_at) values ('https://push.example.test/a', $1, 'k', 'a', '2026-03-01Z')",
+      [accounts[0]],
+    );
+    await as(db, 0);
+    await db.query("select app_private.mark_posts_seen($1::uuid[], $2)", [
+      [seen],
+      "2026-03-05T10:06Z",
+    ]);
+    const pending = await db.query<{
+      post: string;
+      tag: string;
+      muted: boolean;
+    }>(
+      "select post, tag, muted from app_private.pending_push(10) where endpoint = 'https://push.example.test/a' order by muted desc",
+    );
+    expect(pending.rows).toEqual([
+      { post: seen, tag: seen, muted: true },
+      { post: unseen, tag: unseen, muted: false },
+    ]);
+
+    const center = await data<{ items: Array<{ post: string }> }>(
+      db,
+      0,
+      "select app_private.notification_center('2026-03-05T12:00Z') as data",
+    );
+    const dismissed = await db.query<{ id: string }>(
+      "select outbox_id as id from app_private.web_push_outbox where account_id = $1 and dedupe_key like $2",
+      [accounts[0], `workout:${unseen}:%`],
+    );
+    expect(center.items.map((item) => item.post).sort()).toEqual(
+      [seen, unseen].sort(),
+    );
+    await db.query(
+      "select app_private.dismiss_notifications($1::bigint[], '2026-03-05T12:01Z')",
+      [[dismissed.rows[0]?.id]],
+    );
+    const after = await db.query<{ muted: boolean }>(
+      "select muted from app_private.pending_push(10) where endpoint = 'https://push.example.test/a' and post = $1",
+      [unseen],
+    );
+    expect(after.rows).toEqual([{ muted: true }]);
+  });
+
   it("sends one digest at the chosen local hour when something happened", async () => {
     const db = await database();
     await submitProof(db, 1, "2026-03-05T10:00Z");

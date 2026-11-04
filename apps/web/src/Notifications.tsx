@@ -12,6 +12,8 @@ type Item = {
   unread: boolean;
   kind: string;
   ref?: string;
+  // The workout post it is about, when there is one (messages included).
+  post?: string | null;
 };
 type Prefs = { socialPush: boolean; digest: boolean; digestHour: number };
 type Center = { items: Item[]; prefs: Prefs };
@@ -32,16 +34,19 @@ onClearPersisted(() => {
 // What each notification points at: a feed post, Home, or History.
 const postKinds = new Set(["workout", "questioned", "proof-outcome"]);
 const historyKinds = new Set(["result", "crown", "missed-response"]);
-export const notificationTarget = (item: Pick<Item, "kind" | "ref">) =>
-  postKinds.has(item.kind) && item.ref
-    ? { path: "/home", post: item.ref }
+const itemPost = (item: Pick<Item, "kind" | "ref" | "post">) =>
+  item.post ?? (postKinds.has(item.kind) ? item.ref : undefined) ?? undefined;
+export const notificationTarget = (
+  item: Pick<Item, "kind" | "ref" | "post">,
+) =>
+  itemPost(item)
+    ? { path: "/home", post: itemPost(item) }
     : historyKinds.has(item.kind)
       ? { path: "/history" }
       : { path: "/home" };
-export const viewedPost = (id: string) => (item: Item) =>
-  postKinds.has(item.kind) && item.ref === id;
+export const viewedPost = (id: string) => (item: Item) => itemPost(item) === id;
 export const viewedPage = (path: string) => (item: Item) =>
-  !postKinds.has(item.kind) && notificationTarget(item).path === path;
+  !itemPost(item) && notificationTarget(item).path === path;
 
 // Seeing a notification's subject removes it from the list. Views noted before
 // the list loads apply once it does.

@@ -41,7 +41,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let message = { title: "No Excuses", body: "" };
+  let message = { title: "No Excuses", body: "", url: "/home" };
   try {
     message = { ...message, ...event.data.json() };
   } catch {}
@@ -49,6 +49,9 @@ self.addEventListener("push", (event) => {
     Promise.all([
       self.registration.showNotification(message.title, {
         body: message.body,
+        // One alert per subject: a newer one about the same post replaces it.
+        tag: message.tag,
+        data: { url: message.url },
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
       }),
@@ -60,11 +63,15 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const url = event.notification.data?.url || "/home";
+  // An open app jumps to the subject; otherwise the app opens on it.
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((windows) =>
-        windows.length > 0 ? windows[0].focus() : self.clients.openWindow("/"),
-      ),
+      .then((windows) => {
+        if (windows.length === 0) return self.clients.openWindow(url);
+        windows[0].postMessage({ type: "open-notification", url });
+        return windows[0].focus();
+      }),
   );
 });
