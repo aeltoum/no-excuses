@@ -214,9 +214,53 @@ async function deleteAbandonedClips() {
 }
 
 let delivering = false;
+let deliverAgain = false;
+// A call while a run is in progress is not dropped: one more run follows at once.
 async function deliverPush() {
-  if (!pushEnabled || delivering) return;
+  if (!pushEnabled) return;
+  if (delivering) {
+    deliverAgain = true;
+    return;
+  }
   delivering = true;
+  try {
+    do {
+      deliverAgain = false;
+      await deliverPushOnce();
+    } while (deliverAgain);
+  } finally {
+    delivering = false;
+  }
+}
+
+async function sendPush(row: Record<string, unknown>) {
+  try {
+    const post = row.post ? String(row.post) : null;
+    await webpush.sendNotification(
+      {
+        endpoint: row.endpoint as string,
+        keys: { p256dh: row.p256dh as string, auth: row.auth as string },
+      },
+      JSON.stringify({
+        title: row.title,
+        body: row.body,
+        tag: row.tag,
+        url: post ? `/home?post=${encodeURIComponent(post)}` : "/home",
+      }),
+      { TTL: 86400 },
+    );
+  } catch (error) {
+    const status = (error as { statusCode?: number }).statusCode;
+    if (status === 404 || status === 410)
+      await pool.query(
+        "delete from app_private.web_push_subscriptions where endpoint=$1",
+        [row.endpoint],
+      );
+    else console.error("Push delivery failed", status ?? "unknown");
+  }
+}
+
+async function deliverPushOnce() {
   try {
     await pool.query("select app_private.enqueue_push_notifications(now())");
     await pool.query("select app_private.enqueue_consequence_push(now())");
@@ -231,32 +275,12 @@ async function deliverPush() {
       "select * from app_private.pending_push(200)",
     );
     const sent = new Set<string>();
-    for (const row of pending.rows) {
-      // Muted social items stay in the app's notification list only.
-      if (row.muted) {
-        sent.add(String(row.outbox_id));
-        continue;
-      }
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: row.endpoint as string,
-            keys: { p256dh: row.p256dh as string, auth: row.auth as string },
-          },
-          JSON.stringify({ title: row.title, body: row.body }),
-          { TTL: 86400 },
-        );
-      } catch (error) {
-        const status = (error as { statusCode?: number }).statusCode;
-        if (status === 404 || status === 410)
-          await pool.query(
-            "delete from app_private.web_push_subscriptions where endpoint=$1",
-            [row.endpoint],
-          );
-        else console.error("Push delivery failed", status ?? "unknown");
-      }
-      sent.add(String(row.outbox_id));
-    }
+    // Muted, dismissed, or already-seen items stay in the app's list only.
+    const live = pending.rows.filter((row) => !row.muted);
+    for (const row of pending.rows) sent.add(String(row.outbox_id));
+    // A few devices at a time, so one slow push service does not hold the rest.
+    for (let i = 0; i < live.length; i += 10)
+      await Promise.all(live.slice(i, i + 10).map(sendPush));
     // Unsent rows for accounts without a live subscription are dropped too.
     await pool.query(
       "update app_private.web_push_outbox set sent_at=now() where sent_at is null and (outbox_id = any($1::bigint[]) or not exists (select 1 from app_private.web_push_subscriptions s where s.account_id=web_push_outbox.account_id))",
@@ -267,8 +291,6 @@ async function deliverPush() {
       "Push delivery failed",
       (error as { code?: string }).code ?? "unknown",
     );
-  } finally {
-    delivering = false;
   }
 }
 
