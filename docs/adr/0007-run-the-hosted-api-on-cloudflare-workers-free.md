@@ -29,7 +29,7 @@ keep-awake traffic is needed.
   inside `ctx.waitUntil` on Workers.
 - Each request and cron run opens its own small `pg` pool, because a Worker cannot share a
   connection between requests. They connect through a free Hyperdrive config (`HYPERDRIVE`,
-  caching off), which keeps pooled connections to the Supabase session pooler; `DATABASE_URL`
+  caching off), which keeps pooled connections to the Supabase transaction pooler; `DATABASE_URL`
   remains the fallback.
 - Web Push uses WebCrypto and `fetch` (`web-push.ts`, RFC 8291 and RFC 8292) instead of the
   Node-only `web-push` package. Existing VAPID keys and subscriptions keep working.
