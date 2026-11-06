@@ -89,7 +89,7 @@ describe("True-MVP workout check-ins", () => {
     await auth(db, adminAuth);
     await db.exec("set role service_role");
     const server = await readFile(
-      new URL("../packages/delivery/src/server.ts", import.meta.url),
+      new URL("../packages/delivery/src/app.ts", import.meta.url),
       "utf8",
     );
     // Evaluate the actual adapter registration, without starting its server or Auth.

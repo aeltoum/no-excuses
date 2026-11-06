@@ -2,19 +2,21 @@
 
 Every update to `main` runs `.github/workflows/deploy-web.yml` in this order:
 
-1. Check configuration, run `pnpm check`, build API and PWA.
-2. Confirm Render's independent Auto-Deploy is off.
-3. List Supabase history, preview pending migrations, apply committed forward migrations.
-4. Ask Render to deploy the workflow's exact commit and wait for that deploy to become Live.
-5. Check `/v1/health`, then publish the matching PWA to Cloudflare Pages.
+1. Check configuration, run `pnpm check`, build API and PWA, and bundle the API Worker.
+2. List Supabase history, preview pending migrations, apply committed forward migrations.
+3. Deploy the workflow's exact commit to the `no-excuses-api` Cloudflare Worker
+   (`pnpm api:deploy`; the commit SHA is the version message).
+4. Check `/v1/health`, then publish the matching PWA to Cloudflare Pages.
 
 The production concurrency lock never cancels an active release. GitHub may replace an older
 pending run with a newer pending run; the next release applies all missing migrations. A
 failure stops later steps. Re-run the failed workflow after correcting its cause. Supabase
 records successful migrations, so a retry skips them. A failed API deployment leaves the
-previous PWA published. Database changes must remain compatible with the previous API while
-Render builds. Use additive migrations; remove old columns/functions only in a later release.
-A successful health check proves HTTP availability, not signed-in feature behavior.
+previous PWA published. Database changes must remain compatible with the previous API until
+the Worker deploy finishes. Use additive migrations; remove old columns/functions only in a
+later release. A successful health check proves HTTP availability, not database access or
+signed-in feature behavior. To roll back the API, run `wrangler rollback` or pick an earlier
+version in the Worker's Deployments tab.
 
 ## One-time setup
 
@@ -22,26 +24,49 @@ Repository Actions secrets:
 
 - `SUPABASE_DB_URL`: Supabase session-pooler PostgreSQL URL, with database password. Use the
   session pooler on port 5432 when GitHub's runner cannot reach the direct IPv6 endpoint.
-- `RENDER_API_KEY`: Render API key for the account that owns `no-excuses-api`.
-- `CLOUDFLARE_API_TOKEN`: existing Pages deployment token.
+- `CLOUDFLARE_API_TOKEN`: the existing Pages deployment token. It also needs
+  **Workers Scripts: Edit** permission on the account to deploy the API Worker.
 
 Repository Actions variables:
 
-- `RENDER_SERVICE_ID`: `srv-daoik6o473hc73afhbvg`.
 - `CLOUDFLARE_ACCOUNT_ID`, `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and
-  `VITE_SUPABASE_ANON_KEY`: existing web settings. The anon key is public; privileged keys
-  belong only in server secrets.
+  `VITE_SUPABASE_ANON_KEY`: existing web settings. `VITE_API_BASE_URL` is the Worker origin,
+  `https://no-excuses-api.<account-subdomain>.workers.dev`, with no trailing slash. The anon key
+  is public; privileged keys belong only in server secrets.
 
-The one-time Repair migration history workflow sets Render Auto-Deploy to Off through the
-Render API and confirms the setting. You can also set it in the service Settings.
-`render.yaml` records `off` for Blueprint syncs. GitHub now triggers API deployments. Leaving Render's separate On Commit
-path enabled can deploy an API before its migration; After CI Checks Pass would wait for
-this same workflow while it waits for Render. The workflow refuses either setting.
+Worker secrets, set once in Cloudflare (Workers & Pages, `no-excuses-api`, Settings, Variables
+and Secrets, type **Secret**) or with `pnpm exec wrangler secret put <NAME> -c
+packages/delivery/wrangler.jsonc`. Deploys keep them.
 
-Keep Render's existing database/Auth/Storage/VAPID environment variables. Recurring releases
-apply database schema without changing Supabase Auth, Storage buckets, or provider settings.
-The `production` GitHub environment must allow `main` and have no required reviewer if
-unattended releases are desired. Branch protection and required PR checks remain separate.
+| Secret | Value |
+| --- | --- |
+| `DATABASE_URL` | Supabase pooler URL (transaction mode, port 6543, recommended for per-request connections) |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase project values |
+| `INVITATION_SECRET` | the value the API already uses; a new one voids outstanding invitations |
+| `PWA_ORIGIN` | exact Pages production origin, no trailing slash |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | the existing keys; new keys void every push subscription |
+
+Optional: a free Hyperdrive config cuts per-request connection time. Create it with
+`pnpm exec wrangler hyperdrive create no-excuses-db --connection-string "<pooler URL>"` and add
+its id to `packages/delivery/wrangler.jsonc` as a `hyperdrive` binding named `HYPERDRIVE`.
+
+Recurring releases apply database schema without changing Supabase Auth, Storage buckets, or
+provider settings. The `production` GitHub environment must allow `main` and have no required
+reviewer if unattended releases are desired. Branch protection and required PR checks remain
+separate.
+
+## Move the API from Render once
+
+1. Add the Worker secrets above, copying values from the Render service's environment.
+2. Give `CLOUDFLARE_API_TOKEN` Workers Scripts edit permission.
+3. Deploy once from a trusted checkout (`pnpm api:deploy` after `pnpm exec wrangler login`), or
+   merge and let the workflow deploy. Note the `workers.dev` URL it prints.
+4. Confirm `GET <worker>/v1/health` returns 200 and a request with
+   `Origin: https://example.invalid` returns 403.
+5. Set `VITE_API_BASE_URL` to the Worker origin and re-run Deploy production so the PWA points at
+   it. Sign in, log a workout, and confirm a push arrives within about a minute.
+6. Suspend or delete the Render service, then delete the `RENDER_API_KEY` secret and
+   `RENDER_SERVICE_ID` variable from GitHub.
 
 ## Repair the October 16 history mismatch once
 
@@ -71,11 +96,10 @@ If any comparison fails, inspect the exact difference before proceeding.
 Both production workflows run only from `main`. Activate them in this order:
 
 1. Add the required GitHub secrets and variables.
-2. Merge the coordinated-release PR. Its first Deploy production run refuses independent
-   Render Auto-Deploy if still enabled, before database changes or deployments. If Auto-Deploy
-   is already Off, the run instead stops at the existing migration-history conflict.
-3. Run Repair migration history from `main`. It disables independent Render Auto-Deploy,
-   confirms Off, then repeats all nine database checks and reconciles exactly October 17 and 18.
+2. Merge the coordinated-release PR. Its first Deploy production run stops at the existing
+   migration-history conflict.
+3. Run Repair migration history from `main`. It repeats all nine database checks and reconciles
+   exactly October 17 and 18.
 4. Confirm its dry-run lists only `20261019000000_reactions_nudges.sql`, then rerun Deploy production.
 
 The repair workflow fails closed after reconciliation because its expected pre-repair history
@@ -90,12 +114,13 @@ pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
 
 The dry-run must show only the actual remaining migration, currently
 `20261019000000_reactions_nudges.sql`. Then rerun Deploy production on `main`. If you used the trusted local repair before merging,
-merge the coordinated-release PR after configuring the providers. Afterward inspect migration history, Render's deployed commit,
+merge the coordinated-release PR after configuring the providers. Afterward inspect migration history, the Worker's deployed version,
 Cloudflare's deployment commit, and signed-in reactions/nudges. Physical-device behavior
 requires its own retest.
 
-Provider references: [Render commit-specific deploys](https://render.com/docs/deploys),
-[Render API trigger deploy](https://api-docs.render.com/reference/create-deploy),
-[Render API update service](https://api-docs.render.com/reference/update-service),
-[Render Blueprint Auto-Deploy](https://render.com/docs/blueprint-spec#autodeploytrigger),
+Provider references: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
+[Wrangler deploy and rollback](https://developers.cloudflare.com/workers/wrangler/commands/),
+[Workers secrets](https://developers.cloudflare.com/workers/configuration/secrets/),
+[Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/),
+[Hyperdrive](https://developers.cloudflare.com/hyperdrive/),
 [Supabase migration repair](https://supabase.com/docs/reference/cli/supabase-migration-repair).

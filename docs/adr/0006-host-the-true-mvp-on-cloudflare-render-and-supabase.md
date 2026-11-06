@@ -2,6 +2,10 @@
 status: accepted
 ---
 
+> The Render API host is superseded by
+> [ADR 0007](0007-run-the-hosted-api-on-cloudflare-workers-free.md): the API now runs on
+> Cloudflare Workers Free. The rest of this decision stands.
+
 # Host the True MVP beta at zero cost
 
 No Excuses will run its first hosted True MVP as a **hosted beta**, not a production-grade

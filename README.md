@@ -42,6 +42,11 @@ invalidates outstanding tokens. Server credentials stay server-only. API startup
 idempotent weekly rollover/close and retries pending Auth hard deletions after DB cutoff;
 maintenance repeats each minute while API runs.
 
+Production API runs on Cloudflare Workers (ADR 0007); a Cron Trigger runs the same maintenance
+each minute. To run the Worker locally, put the server values from `.env.local` into ignored
+`packages/delivery/.dev.vars` and run `pnpm api:dev` (port 8787). Release workflow deploys with
+`pnpm api:deploy`.
+
 To make an Account the Private-pilot operator (Operator console at `/operator`), insert a
 row into `app_private.staff_assignments` with role `operator` and a past `starts_at`; end it by
 setting `ends_at`.

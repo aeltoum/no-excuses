@@ -24,3 +24,7 @@ coverage/
 apps/web/test-results/
 supabase/.branches/
 supabase/.temp/
+
+# Local Cloudflare Worker secrets and state
+.dev.vars*
+.wrangler/

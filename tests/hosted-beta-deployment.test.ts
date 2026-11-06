@@ -10,23 +10,20 @@ describe("hosted beta deployment configuration", () => {
     );
   });
 
-  it("pins the approved Render Free API shape without secret values", async () => {
-    const blueprint = await read("render.yaml");
+  it("pins the approved Cloudflare Workers Free API shape without secret values", async () => {
+    const source = await read("packages/delivery/wrangler.jsonc");
+    const config = JSON.parse(source.replace(/^\s*\/\/.*$/gm, ""));
 
-    expect(blueprint).toContain("runtime: node");
-    expect(blueprint).toContain("plan: free");
-    expect(blueprint).toContain("region: virginia");
-    expect(blueprint).toContain("value: 24.19.0");
-    expect(blueprint).toContain("value: 0.0.0.0");
-    expect(blueprint).toContain(
-      "buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm api:build",
-    );
-    expect(blueprint).toContain(
-      "startCommand: node dist/api/delivery/src/server.js",
-    );
-    expect(blueprint).toContain("healthCheckPath: /v1/health");
-    expect(blueprint).toContain("autoDeployTrigger: 'off'");
-
+    expect(config).toMatchObject({
+      name: "no-excuses-api",
+      main: "src/cloudflare.ts",
+      compatibility_flags: ["nodejs_compat"],
+      workers_dev: true,
+      keep_vars: true,
+      triggers: { crons: ["* * * * *"] },
+    });
+    // Secrets are set in Cloudflare, never committed as vars.
+    expect(config.vars).toBeUndefined();
     for (const key of [
       "DATABASE_URL",
       "SUPABASE_URL",
@@ -34,8 +31,21 @@ describe("hosted beta deployment configuration", () => {
       "SUPABASE_SERVICE_ROLE_KEY",
       "INVITATION_SECRET",
       "PWA_ORIGIN",
-    ]) {
-      expect(blueprint).toContain(`- key: ${key}\n        sync: false`);
-    }
+    ])
+      expect(source).toContain(key);
+  });
+
+  it("deploys the API Worker only after migrations, then checks health before the PWA", async () => {
+    const workflow = await read(".github/workflows/deploy-web.yml");
+    const order = [
+      "pnpm api:deploy --dry-run",
+      "supabase db push",
+      'pnpm api:deploy --message "${{ github.sha }}"',
+      "/v1/health",
+      "wrangler pages deploy",
+    ].map((step) => workflow.indexOf(step));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(workflow).not.toMatch(/render/i);
   });
 });
