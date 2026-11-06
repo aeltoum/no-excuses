@@ -46,9 +46,12 @@ packages/delivery/wrangler.jsonc`. Deploys keep them.
 | `PWA_ORIGIN` | exact Pages production origin, no trailing slash |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | the existing keys; new keys void every push subscription |
 
-Optional: a free Hyperdrive config cuts per-request connection time. Create it with
-`pnpm exec wrangler hyperdrive create no-excuses-db --connection-string "<pooler URL>"` and add
-its id to `packages/delivery/wrangler.jsonc` as a `hyperdrive` binding named `HYPERDRIVE`.
+Hyperdrive config `no-excuses-db` (free, query caching off) pools database connections near
+Supabase; `packages/delivery/wrangler.jsonc` binds it as `HYPERDRIVE`, and the Worker uses it in
+place of `DATABASE_URL`. It points at the Supabase session pooler (port 5432). Do not point it
+at the transaction pooler (port 6543): on 2026-11-06 that made database requests hang. After a database
+password change, update it with `pnpm exec wrangler hyperdrive update 657acc2fe26544bfba97129fe974390f
+--connection-string "<session pooler URL, port 5432>"` as well as `DATABASE_URL`.
 
 Recurring releases apply database schema without changing Supabase Auth, Storage buckets, or
 provider settings. The `production` GitHub environment must allow `main` and have no required

@@ -21,6 +21,8 @@ describe("hosted beta deployment configuration", () => {
       workers_dev: true,
       keep_vars: true,
       triggers: { crons: ["* * * * *"] },
+      hyperdrive: [{ binding: "HYPERDRIVE" }],
+      placement: { mode: "targeted", region: "aws:us-east-1" },
     });
     // Secrets are set in Cloudflare, never committed as vars.
     expect(config.vars).toBeUndefined();
