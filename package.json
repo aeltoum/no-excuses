@@ -21,6 +21,8 @@
     "db:start": "supabase start",
     "api:build": "tsc -p tsconfig.api.json",
     "api:start": "pnpm api:build && node dist/api/delivery/src/server.js",
+    "api:dev": "wrangler dev -c packages/delivery/wrangler.jsonc",
+    "api:deploy": "wrangler deploy -c packages/delivery/wrangler.jsonc",
     "db:stop": "supabase stop",
     "format": "biome check --write .",
     "format:check": "biome check .",
@@ -36,16 +38,15 @@
     "@electric-sql/pglite": "0.5.8",
     "@types/node": "24.10.1",
     "@types/pg": "8.15.5",
-    "@types/web-push": "3.6.4",
     "image-size-next": "2.1.1",
     "openapi-typescript": "7.13.0",
     "supabase": "2.117.0",
     "typescript": "5.9.3",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "wrangler": "4.151.3"
   },
   "dependencies": {
     "pg": "8.23.0",
-    "web-push": "3.6.7",
     "zod": "4.5.4"
   }
 }

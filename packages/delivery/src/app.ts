@@ -1,0 +1,2042 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash, createHmac, randomUUID } from "node:crypto";
+import type pg from "pg";
+import {
+  acceptGroupInvitationRequestSchema,
+  consentRequestSchema,
+  createGroupRequestSchema,
+  currentGroupMembershipRequestSchema,
+  deleteAccountRequestSchema,
+  enrollmentRequestSchema,
+  groupRequestSchema,
+  invitationPreviewRequestSchema,
+  issueGroupInvitationRequestSchema,
+  leaveGroupRequestSchema,
+  removeGroupMemberRequestSchema,
+  revokeGroupInvitationRequestSchema,
+  setDisplayNameRequestSchema,
+  setWeeklyTargetRequestSchema,
+  submitWorkoutCheckinRequestSchema,
+} from "../../contracts/src/runtime.js";
+import type { ApiRequest, ApiResponse } from "./api.js";
+import { createV1HttpHandler, readMemberBody } from "./http.js";
+import { createPushSender } from "./web-push.js";
+
+const required = (name: string) => {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} required`);
+  return value;
+};
+const authUrl = required("SUPABASE_URL").replace(/\/$/, "");
+const anonKey = required("SUPABASE_ANON_KEY");
+const serviceKey = required("SUPABASE_SERVICE_ROLE_KEY");
+const invitationSecret = required("INVITATION_SECRET");
+if (Buffer.byteLength(invitationSecret) < 32)
+  throw new Error("INVITATION_SECRET too short");
+const allowedOrigin = required("PWA_ORIGIN");
+
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY ?? "";
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? "";
+const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
+const sendWebPush = pushEnabled
+  ? createPushSender({
+      subject: process.env.VAPID_SUBJECT ?? "mailto:no-reply@example.com",
+      publicKey: vapidPublicKey,
+      privateKey: vapidPrivateKey,
+    })
+  : null;
+
+// Where queries and after-response work run. Node keeps one process-wide pool.
+// Workers cannot share a connection between requests, so each request and cron
+// run brings its own pool and keeps itself alive until its later work ends.
+export type Scope = Readonly<{
+  pool: pg.Pool;
+  later(task: () => Promise<unknown>): void;
+  // Workers Free allows 50 outbound requests per run; one push or Auth call is one.
+  pushBatch: number;
+  deletionBatch: number;
+}>;
+const scopes = new AsyncLocalStorage<Scope>();
+let processScope: Scope | undefined;
+export const useProcessScope = (scope: Scope) => {
+  processScope = scope;
+};
+export const inScope = <T>(scope: Scope, run: () => Promise<T>) =>
+  scopes.run(scope, run);
+const scope = () => {
+  const current = scopes.getStore() ?? processScope;
+  if (!current) throw new Error("Database scope missing");
+  return current;
+};
+const pool = {
+  query: (sql: string, values?: unknown[]) => scope().pool.query(sql, values),
+  connect: () => scope().pool.connect(),
+};
+const later = (task: () => Promise<unknown>) => scope().later(task);
+
+type Actor = { id: string; issuedAt: string; email: string };
+const fail = (code: string, status: number): ApiResponse => ({
+  status,
+  body: {
+    contractVersion: 1,
+    error: {
+      code,
+      message: code === "unauthorized" ? "Unauthorized" : "Action unavailable",
+      retryable: status >= 500,
+    },
+  },
+});
+const ok = (data: unknown, status = 200): ApiResponse => ({
+  status,
+  body: { contractVersion: 1, data },
+});
+const digest = (value: string) =>
+  createHash("sha256").update(value).digest("hex");
+const invitationToken = (id: string) =>
+  createHmac("sha256", invitationSecret).update(id).digest("base64url");
+const tokenDigest = (token: string) => digest(token);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const uuid = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+
+async function authUser(
+  authorization: string | undefined,
+): Promise<Actor | null> {
+  const token = /^Bearer (.+)$/i.exec(authorization ?? "")?.[1];
+  if (!token) return null;
+  const response = await fetch(`${authUrl}/auth/v1/user`, {
+    headers: { apikey: anonKey, authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) return null;
+  const user = (await response.json()) as { id?: unknown; email?: unknown };
+  if (!uuid(user.id) || typeof user.email !== "string") return null;
+  const part = token.split(".")[1];
+  if (!part) return null;
+  let issued: unknown;
+  try {
+    issued = (
+      JSON.parse(Buffer.from(part, "base64url").toString()) as { iat?: unknown }
+    ).iat;
+  } catch {
+    return null;
+  }
+  if (typeof issued !== "number" || !Number.isSafeInteger(issued)) return null;
+  return {
+    id: user.id,
+    email: user.email.toLowerCase(),
+    issuedAt: new Date(issued * 1000).toISOString(),
+  };
+}
+
+async function query(
+  actor: Actor,
+  sql: string,
+  values: unknown[],
+): Promise<pg.QueryResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("set local role service_role");
+    await client.query(
+      "select set_config('app.auth_user_id', $1, true), set_config('app.token_issued_at', $2, true)",
+      [actor.id, actor.issuedAt],
+    );
+    const access = await client.query(
+      "select app_private.actor_account_id() as id",
+    );
+    // A token issued before the account's access cutoff (e.g. after removal)
+    // is stale, not forbidden: 401 makes the client sign in for a fresh one.
+    if (!access.rows[0]?.id)
+      throw Object.assign(new Error("Access denied"), { code: "28000" });
+    const response = await client.query(sql, values);
+    await client.query("commit");
+    return response;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function adminUser(
+  method: "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+) {
+  const response = await fetch(`${authUrl}/auth/v1/admin/users${path}`, {
+    method,
+    headers: {
+      apikey: serviceKey,
+      authorization: `Bearer ${serviceKey}`,
+      "content-type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok && !(method === "DELETE" && response.status === 404))
+    throw new Error("Auth admin operation failed");
+  return method === "POST"
+    ? ((await response.json()) as { id?: unknown })
+    : null;
+}
+
+async function finishAuthDeletion(authUserId: string) {
+  await adminUser("DELETE", `/${authUserId}`);
+  await pool.query(
+    "update app_private.accounts set auth_deleted_at=coalesce(auth_deleted_at,now()) where auth_user_id=$1 and status='deleted'",
+    [authUserId],
+  );
+}
+
+const proofBucket = "proof-photos";
+async function storage(path: string, method: string, body: unknown) {
+  const response = await fetch(`${authUrl}/storage/v1${path}`, {
+    method,
+    headers: {
+      apikey: serviceKey,
+      authorization: `Bearer ${serviceKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`Storage ${method} failed`);
+  return response.json() as Promise<unknown>;
+}
+
+async function deleteExpiredProofMedia() {
+  const due = await pool.query(
+    "select path from app_private.proof_media_due(now())",
+  );
+  const paths = due.rows.map((row) => row.path as string);
+  if (paths.length === 0) return;
+  await storage(`/object/${proofBucket}`, "DELETE", { prefixes: paths });
+  await pool.query("select app_private.mark_proof_media_deleted($1, now())", [
+    paths,
+  ]);
+}
+
+// Consequence clips stay for good; only uploads never attached to a claim go.
+const clipBucket = "consequence-clips";
+async function deleteAbandonedClips() {
+  const due = await pool.query(
+    "select path from app_private.consequence_clips_due(now())",
+  );
+  const paths = due.rows.map((row) => row.path as string);
+  if (paths.length === 0) return;
+  await storage(`/object/${clipBucket}`, "DELETE", { prefixes: paths });
+  await pool.query(
+    "select app_private.mark_consequence_clips_deleted($1, now())",
+    [paths],
+  );
+}
+
+let delivering = false;
+let deliverAgain = false;
+// A call while a run is in progress is not dropped: one more run follows at once.
+async function deliverPush() {
+  if (!pushEnabled) return;
+  if (delivering) {
+    deliverAgain = true;
+    return;
+  }
+  delivering = true;
+  try {
+    do {
+      deliverAgain = false;
+      await deliverPushOnce();
+    } while (deliverAgain);
+  } finally {
+    delivering = false;
+  }
+}
+
+async function sendPush(row: Record<string, unknown>) {
+  try {
+    const post = row.post ? String(row.post) : null;
+    const status = await sendWebPush?.(
+      {
+        endpoint: row.endpoint as string,
+        keys: { p256dh: row.p256dh as string, auth: row.auth as string },
+      },
+      JSON.stringify({
+        title: row.title,
+        body: row.body,
+        tag: row.tag,
+        url: post ? `/home?post=${encodeURIComponent(post)}` : "/home",
+      }),
+      86400,
+    );
+    if (status === 404 || status === 410)
+      await pool.query(
+        "delete from app_private.web_push_subscriptions where endpoint=$1",
+        [row.endpoint],
+      );
+    else if (status !== undefined && status >= 400)
+      console.error("Push delivery failed", status);
+  } catch {
+    console.error("Push delivery failed", "unknown");
+  }
+}
+
+async function deliverPushOnce() {
+  try {
+    await pool.query("select app_private.enqueue_push_notifications(now())");
+    await pool.query("select app_private.enqueue_consequence_push(now())");
+    await pool.query("select app_private.enqueue_social_push(now())");
+    await pool.query("select app_private.enqueue_exception_push(now())");
+    await pool.query("select app_private.enqueue_missed_response_push(now())");
+    await pool.query("select app_private.enqueue_crown_push(now())");
+    await pool.query("select app_private.enqueue_unlock_push(now())");
+    await pool.query("select app_private.enqueue_digest(now())");
+    await pool.query("select app_private.enqueue_message_push(now())");
+    const pending = await pool.query(
+      "select * from app_private.pending_push($1)",
+      [scope().pushBatch],
+    );
+    const sent = new Set<string>();
+    // Muted, dismissed, or already-seen items stay in the app's list only.
+    const live = pending.rows.filter((row) => !row.muted);
+    for (const row of pending.rows) sent.add(String(row.outbox_id));
+    // A few devices at a time, so one slow push service does not hold the rest.
+    for (let i = 0; i < live.length; i += 10)
+      await Promise.all(live.slice(i, i + 10).map(sendPush));
+    // Unsent rows for accounts without a live subscription are dropped too.
+    await pool.query(
+      "update app_private.web_push_outbox set sent_at=now() where sent_at is null and (outbox_id = any($1::bigint[]) or not exists (select 1 from app_private.web_push_subscriptions s where s.account_id=web_push_outbox.account_id))",
+      [[...sent]],
+    );
+  } catch (error) {
+    console.error(
+      "Push delivery failed",
+      (error as { code?: string }).code ?? "unknown",
+    );
+  }
+}
+
+export async function maintenance() {
+  try {
+    await pool.query("select app_private.advance_true_mvp_weeks(now())");
+    await pool.query("select app_private.advance_consequences(now())");
+    await pool.query("select app_private.advance_crowns(now())");
+    const pending = await pool.query(
+      "select auth_user_id from app_private.accounts where status='deleted' and auth_deleted_at is null limit $1",
+      [scope().deletionBatch],
+    );
+    for (const row of pending.rows) {
+      try {
+        await finishAuthDeletion(row.auth_user_id as string);
+      } catch {
+        console.error("Account Auth deletion pending retry");
+      }
+    }
+    try {
+      await deleteExpiredProofMedia();
+    } catch {
+      console.error("Proof media deletion pending retry");
+    }
+    try {
+      await deleteAbandonedClips();
+    } catch {
+      console.error("Consequence clip cleanup pending retry");
+    }
+    await deliverPush();
+  } catch (error) {
+    console.error(
+      "Weekly maintenance failed",
+      (error as { code?: string }).code ?? "unknown",
+    );
+  }
+}
+
+export async function enroll(
+  email: string,
+  token: string,
+  organizer: boolean,
+): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  if (
+    !emailPattern.test(normalized) ||
+    normalized.length > 254 ||
+    (!organizer && !/^[A-Za-z0-9_-]{43}$/.test(token))
+  )
+    throw new Error("Invalid enrollment");
+  const client = await pool.connect();
+  let createdUser: string | null = null;
+  try {
+    await client.query("begin");
+    if (organizer) {
+      const existing = await client.query(
+        "select 1 from app_private.accounts where organizer_seeded limit 1",
+      );
+      if (existing.rowCount) throw new Error("Organizer already seeded");
+    } else {
+      const invitation = await client.query(
+        "select i.invitation_id from app_private.group_invitations i join app_private.groups g on g.group_id=i.group_id where i.email=$1 and i.token_digest=$2 and i.status='issued' and i.expires_at>now() and g.status<>'closed' for update of i",
+        [normalized, tokenDigest(token)],
+      );
+      if (!invitation.rowCount) throw new Error("Invitation unavailable");
+    }
+    const existing = await client.query(
+      "select 1 from app_private.accounts where email=$1",
+      [normalized],
+    );
+    if (existing.rowCount) throw new Error("Account already enrolled");
+    const user = await adminUser("POST", "", {
+      email: normalized,
+      email_confirm: true,
+    });
+    if (!uuid(user?.id)) throw new Error("Invalid Auth identity");
+    createdUser = user.id;
+    await client.query(
+      "insert into app_private.accounts(account_id,auth_user_id,email,organizer_seeded) values($1,$2,$3,$4)",
+      [randomUUID(), user.id, normalized, organizer],
+    );
+    await client.query("commit");
+    createdUser = null;
+  } catch (error) {
+    await client.query("rollback");
+    if (createdUser) {
+      try {
+        await adminUser("DELETE", `/${createdUser}`);
+      } catch {
+        console.error(
+          "Enrollment Auth compensation failed; operator cleanup required",
+        );
+      }
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function dbError(error: unknown): ApiResponse {
+  const code = (error as { code?: string }).code;
+  if (code === "28000") return fail("unauthorized", 401);
+  if (code === "42501" || code === "P0002") return fail("denied", 403);
+  if (code === "23505" || code === "23514")
+    return fail("idempotency_conflict", 409);
+  if (code === "22023" || code === "22P02") return fail("invalid_request", 400);
+  console.error("API database operation failed", code ?? "unknown");
+  return fail("domain_failure", 500);
+}
+
+function protectedHandler(
+  command: boolean,
+  execute: (
+    actor: Actor,
+    body: Record<string, unknown>,
+    context?: { key: string; hash: string; id: string; now: string },
+  ) => Promise<unknown>,
+  schema: { safeParse(value: unknown): { success: boolean; data?: unknown } },
+  commandName = "",
+  statusForValue: (value: unknown) => number = () => 200,
+) {
+  return async (request: ApiRequest): Promise<ApiResponse> => {
+    let actor: Actor | null;
+    try {
+      actor = await authUser(request.authorization);
+    } catch {
+      return fail("domain_failure", 503);
+    }
+    if (!actor) return fail("unauthorized", 401);
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return fail("invalid_request", 400);
+    const body = parsed.data as Record<string, unknown>;
+    let context:
+      | { key: string; hash: string; id: string; now: string }
+      | undefined;
+    if (command) {
+      const key = request.headers["idempotency-key"];
+      if (!uuid(key)) return fail("idempotency_required", 400);
+      context = {
+        key,
+        hash: digest(JSON.stringify({ command: commandName, body })),
+        id: randomUUID(),
+        now: new Date().toISOString(),
+      };
+    }
+    try {
+      const value = await execute(actor, body, context);
+      return ok(value, statusForValue(value));
+    } catch (error) {
+      return dbError(error);
+    }
+  };
+}
+
+const command = (
+  sql: string,
+  input: (body: Record<string, unknown>, now: string) => unknown[],
+  output: (
+    rows: Record<string, unknown>[],
+    body: Record<string, unknown>,
+  ) => unknown,
+  schema: { safeParse(value: unknown): { success: boolean; data?: unknown } },
+  includeNow = true,
+) =>
+  protectedHandler(
+    true,
+    async (actor, body, context) => {
+      if (!context) throw new Error("Missing context");
+      const rows = (
+        await query(actor, sql, [
+          context.key,
+          context.hash,
+          context.id,
+          ...input(body, context.now),
+          ...(includeNow ? [context.now] : []),
+        ])
+      ).rows;
+      if (rows.length === 0)
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return output(rows, body);
+    },
+    schema,
+    sql,
+  );
+const read = (
+  sql: string,
+  input: (body: Record<string, unknown>) => unknown[],
+  output: (rows: Record<string, unknown>[]) => unknown,
+  schema: { safeParse(value: unknown): { success: boolean; data?: unknown } },
+) =>
+  protectedHandler(
+    false,
+    async (actor, body) => output((await query(actor, sql, input(body))).rows),
+    schema,
+  );
+const membership = (rows: Record<string, unknown>[]) => ({
+  membershipId: rows[0]?.id,
+});
+const group = (body: Record<string, unknown>) => [
+  body.groupId,
+  body.membershipId,
+  body.name,
+  body.timeZone,
+  body.weeklyTarget,
+];
+
+const handlers = {
+  getAccountDisplayName: read(
+    "select app_private.current_account_display_name() as display_name",
+    () => [],
+    (rows) => ({ displayName: rows[0]?.display_name ?? null }),
+    currentGroupMembershipRequestSchema,
+  ),
+  setAccountDisplayName: command(
+    "select app_private.set_display_name_command($1,$2,$3,$4) as display_name",
+    (body) => [body.displayName],
+    (rows) => ({ displayName: rows[0]?.display_name }),
+    setDisplayNameRequestSchema,
+    false,
+  ),
+  createGroup: command(
+    "select app_private.create_group_command($1,$2,$3,$4,$5,$6,$7,$8,$9) as id from app_private.accounts where auth_user_id=current_setting('app.auth_user_id')::uuid and organizer_seeded",
+    group,
+    membership,
+    createGroupRequestSchema,
+  ),
+  issueGroupInvitation: command(
+    "select * from app_private.issue_group_invitation_command($1,$2,$3,$4,$5,$6,$7)",
+    (body) => [
+      body.invitationId,
+      body.email,
+      tokenDigest(invitationToken(String(body.invitationId))),
+    ],
+    (rows, body) => ({
+      invitationId: rows[0]?.invitation_id,
+      token: invitationToken(String(body.invitationId)),
+      expiresAt: new Date(String(rows[0]?.expires_at)).toISOString(),
+    }),
+    issueGroupInvitationRequestSchema,
+  ),
+  revokeGroupInvitation: command(
+    "select app_private.revoke_group_invitation_command($1,$2,$3,$4,$5) as id",
+    (body) => [body.invitationId],
+    (rows) => ({ invitationId: rows[0]?.id, status: "revoked" }),
+    revokeGroupInvitationRequestSchema,
+  ),
+  acceptGroupInvitation: command(
+    "select app_private.accept_group_invitation_command($1,$2,$3,$4,$5,$6,$7,$8) as id",
+    (body) => [
+      tokenDigest(String(body.token)),
+      body.membershipId,
+      body.recurringTarget,
+      body.currentTarget,
+    ],
+    membership,
+    acceptGroupInvitationRequestSchema,
+  ),
+  previewGroupInvitation: read(
+    "select g.name as group_name, count(m.membership_id)::integer as member_count, b.ends_at as week_ends_at from app_private.group_invitations i join app_private.groups g on g.group_id=i.group_id left join app_private.memberships m on m.group_id=g.group_id and m.ended_at is null cross join lateral app_private.accountability_week_bounds(now(),g.time_zone,g.week_starts) b where i.email=(select email from app_private.accounts where auth_user_id=current_setting('app.auth_user_id')::uuid) and i.token_digest=$1 and i.status='issued' and i.expires_at>now() and g.status<>'closed' group by g.name,b.ends_at",
+    (body) => [tokenDigest(String(body.token))],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Invitation unavailable"), {
+          code: "42501",
+        });
+      return {
+        groupName: rows[0].group_name,
+        memberCount: rows[0].member_count,
+        weekEndsAt: new Date(String(rows[0].week_ends_at)).toISOString(),
+      };
+    },
+    invitationPreviewRequestSchema,
+  ),
+  leaveGroup: command(
+    "select app_private.leave_group_command($1,$2,$3,$4) as id",
+    () => [],
+    membership,
+    leaveGroupRequestSchema,
+  ),
+  removeGroupMember: command(
+    "select app_private.remove_group_member_command($1,$2,$3,$4,$5,$6) as id",
+    (body) => [body.groupId, body.membershipId],
+    membership,
+    removeGroupMemberRequestSchema,
+  ),
+  setWeeklyTarget: command(
+    "select * from app_private.set_weekly_target_command($1,$2,$3,$4)",
+    (body) => [body.weeklyTarget],
+    (rows) => ({
+      membershipId: rows[0]?.membership_id,
+      weeklyTarget: rows[0]?.weekly_target,
+    }),
+    setWeeklyTargetRequestSchema,
+    false,
+  ),
+  getWeeklyTarget: read(
+    "select * from app_private.weekly_target_context(now())",
+    () => [],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return {
+        membershipId: rows[0].membership_id,
+        recurringTarget: rows[0].recurring_target,
+        lockedTarget: rows[0].locked_target,
+        nextWeekStartsAt: rows[0].next_week_starts_at
+          ? new Date(String(rows[0].next_week_starts_at)).toISOString()
+          : null,
+        memberCount: rows[0].member_count,
+        timeZone: rows[0].time_zone,
+      };
+    },
+    currentGroupMembershipRequestSchema,
+  ),
+  submitWorkoutCheckin: command(
+    "select * from app_private.submit_proof_checkin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+    (body, now) => [
+      body.workoutCheckinId,
+      body.activityType,
+      body.completedAt ?? now,
+      body.durationMinutes,
+      body.perceivedIntensity,
+      body.selfReportAttested,
+      body.activityPhotoPath,
+      body.presencePhotoPath,
+      body.mediaConsent,
+    ],
+    (rows) => {
+      later(deliverPush);
+      return {
+        workoutCheckinId: rows[0]?.workout_checkin_id,
+        currentWeekCount: rows[0]?.current_week_count,
+      };
+    },
+    submitWorkoutCheckinRequestSchema,
+  ),
+  deleteAccount: protectedHandler(
+    true,
+    async (actor, body, context) => {
+      if (!context) throw new Error("Missing context");
+      if (typeof body.otpCode !== "string" || !/^\d{6}$/.test(body.otpCode))
+        throw Object.assign(new Error("Code required"), { code: "22023" });
+      const verified = await fetch(`${authUrl}/auth/v1/verify`, {
+        method: "POST",
+        headers: { apikey: anonKey, "content-type": "application/json" },
+        body: JSON.stringify({
+          email: actor.email,
+          token: body.otpCode,
+          type: "email",
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!verified.ok)
+        throw Object.assign(new Error("Code rejected"), { code: "42501" });
+      const proof = (await verified.json()) as { user?: { id?: unknown } };
+      if (proof.user?.id !== actor.id)
+        throw Object.assign(new Error("Identity mismatch"), { code: "42501" });
+      const rows = (
+        await query(
+          actor,
+          "select app_private.delete_account_command($1,$2,$3,true,$4) as id",
+          [context.key, context.hash, context.id, context.now],
+        )
+      ).rows;
+      try {
+        await finishAuthDeletion(actor.id);
+        return { accountId: rows[0]?.id };
+      } catch {
+        console.error("Account Auth deletion pending retry");
+        return { accountId: rows[0]?.id, authDeletion: "pending" as const };
+      }
+    },
+    deleteAccountRequestSchema,
+    "delete_account",
+    (value) =>
+      (value as { authDeletion?: string }).authDeletion === "pending"
+        ? 202
+        : 200,
+  ),
+  getCurrentGroupMembership: read(
+    "select app_private.current_group_membership() as data",
+    () => [],
+    (rows) => rows[0]?.data,
+    currentGroupMembershipRequestSchema,
+  ),
+  listGroupMembers: read(
+    "select g.name as group_name, m.membership_id, coalesce(a.display_name, 'Member ' || left(m.membership_id::text,8)) as display_name, m.recurring_target as weekly_target, ga.membership_id is not null as creator from app_private.groups g join app_private.memberships m on m.group_id=g.group_id and m.ended_at is null join app_private.accounts a on a.account_id=m.account_id left join app_private.group_admins ga on ga.membership_id=m.membership_id where g.group_id=$1 and app_private.can_group_action(g.group_id,'group_read') order by (ga.membership_id is not null) desc,m.joined_at,m.membership_id",
+    (body) => [body.groupId],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return {
+        groupName: rows[0].group_name,
+        members: rows.map((row) => ({
+          membershipId: row.membership_id,
+          displayName: row.display_name,
+          weeklyTarget: row.weekly_target,
+          creator: row.creator,
+        })),
+      };
+    },
+    groupRequestSchema,
+  ),
+  listPendingGroupInvitations: read(
+    "with actor_group as (select m.group_id from app_private.memberships m join app_private.group_admins ga on ga.membership_id=m.membership_id where m.account_id=app_private.actor_account_id() and m.group_id=$1 and m.ended_at is null) select i.invitation_id,i.email,i.expires_at from actor_group ag left join app_private.group_invitations i on i.group_id=ag.group_id and i.status='issued' and i.expires_at>now() order by i.issued_at,i.invitation_id",
+    (body) => [body.groupId],
+    (rows) => {
+      if (!rows[0])
+        throw Object.assign(new Error("Action denied"), { code: "42501" });
+      return rows
+        .filter((row) => row.invitation_id)
+        .map((row) => ({
+          invitationId: row.invitation_id,
+          email: row.email,
+          expiresAt: new Date(String(row.expires_at)).toISOString(),
+        }));
+    },
+    groupRequestSchema,
+  ),
+  getCurrentWeekProgress: read(
+    "select * from app_private.current_week_progress($1,now())",
+    (body) => [body.groupId],
+    (rows) =>
+      rows.map((row) => ({
+        membershipId: row.membership_id,
+        displayName: row.display_name,
+        lockedTarget: row.locked_target,
+        completedWorkoutCount: row.completed_workout_count,
+        activityTypes: row.activity_types ?? [],
+        targetStreak: row.target_streak,
+        workoutStreak: row.workout_streak,
+      })),
+    groupRequestSchema,
+  ),
+  getFinalizedWeeklyHistory: read(
+    "select * from app_private.finalized_weekly_history($1)",
+    (body) => [body.groupId],
+    (rows) =>
+      rows.map((row) => ({
+        membershipId: row.membership_id,
+        displayName: row.display_name,
+        startsAt: new Date(String(row.starts_at)).toISOString(),
+        endsAt: new Date(String(row.ends_at)).toISOString(),
+        lockedTarget: row.locked_target,
+        completedWorkoutCount: row.completed_workout_count,
+        outcome: row.outcome,
+        targetStreak: row.target_streak,
+      })),
+    groupRequestSchema,
+  ),
+  getMemberHome: async () => fail("not_found", 404),
+  getNotifications: async () => fail("not_found", 404),
+  createSocialInteraction: async () => fail("not_found", 404),
+  openNotification: async () => fail("not_found", 404),
+};
+
+const route = createV1HttpHandler(handlers);
+async function enrollment(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  }
+  const parsed = enrollmentRequestSchema.safeParse(body);
+  if (!parsed.success)
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  try {
+    await enroll(parsed.data.email, parsed.data.token, false);
+  } catch {
+    /* Same response for unknown, expired, revoked, and already enrolled. */
+  }
+  return Response.json({
+    contractVersion: 1,
+    data: { message: "If invitation is eligible, request a sign-in code." },
+  });
+}
+async function consent(request: Request): Promise<Response> {
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return Response.json(fail("domain_failure", 503).body, { status: 503 });
+  }
+  if (!actor)
+    return Response.json(fail("unauthorized", 401).body, { status: 401 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  }
+  if (!consentRequestSchema.safeParse(body).success)
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  try {
+    await query(
+      actor,
+      "select app_private.record_true_mvp_consent($1,$2,$3,now())",
+      [true, true, true],
+    );
+    return Response.json(ok({ accepted: true }).body);
+  } catch (error) {
+    const response = dbError(error);
+    return Response.json(response.body, { status: response.status });
+  }
+}
+
+async function push(request: Request): Promise<Response> {
+  if (request.method === "GET")
+    return Response.json(
+      ok({ publicKey: pushEnabled ? vapidPublicKey : null }).body,
+    );
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return Response.json(fail("domain_failure", 503).body, { status: 503 });
+  }
+  if (!actor)
+    return Response.json(fail("unauthorized", 401).body, { status: 401 });
+  let body: { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  }
+  const endpoint = body?.endpoint;
+  if (typeof endpoint !== "string" || !endpoint.startsWith("https://"))
+    return Response.json(fail("invalid_request", 400).body, { status: 400 });
+  try {
+    if (request.method === "DELETE") {
+      await query(actor, "select app_private.delete_push_subscription($1)", [
+        endpoint,
+      ]);
+    } else {
+      const { p256dh, auth } = body.keys ?? {};
+      if (typeof p256dh !== "string" || typeof auth !== "string")
+        return Response.json(fail("invalid_request", 400).body, {
+          status: 400,
+        });
+      await query(
+        actor,
+        "select app_private.save_push_subscription($1,$2,$3)",
+        [endpoint, p256dh, auth],
+      );
+    }
+    return Response.json(ok({ subscribed: request.method !== "DELETE" }).body);
+  } catch (error) {
+    const response = dbError(error);
+    return Response.json(response.body, { status: response.status });
+  }
+}
+
+const proofAction =
+  /^\/v1\/proof\/([0-9a-f-]{36})\/(review|vote|withdraw|report|moderate)$/;
+const proofReaction = /^\/v1\/proof\/([0-9a-f-]{36})\/react$/;
+const proofDelete = /^\/v1\/proof\/([0-9a-f-]{36})\/delete$/;
+const proofRemovePhotos = /^\/v1\/proof\/([0-9a-f-]{36})\/remove-photos$/;
+const proofDetails = /^\/v1\/proof\/([0-9a-f-]{36})\/details$/;
+const proofWrite = /^\/v1\/proof\/([0-9a-f-]{36})\/(caption|message)$/;
+const proofReactors = /^\/v1\/proof\/([0-9a-f-]{36})\/reactions$/;
+// One standard emoji, including skin tones, flags, and joined sequences.
+const singleEmoji =
+  /^(?:\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*(?:\u200D\p{Extended_Pictographic}(?:\u{FE0F}|[\u{1F3FB}-\u{1F3FF}])*)*)$/u;
+async function proof(request: Request, path: string): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  let body: Record<string, unknown> = {};
+  if (request.method === "POST") {
+    try {
+      body = ((await request.json()) ?? {}) as Record<string, unknown>;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+  }
+  const now = new Date().toISOString();
+  try {
+    if (path === "/v1/proof/uploads" && request.method === "POST") {
+      if (
+        body.kind !== "activity" &&
+        body.kind !== "presence" &&
+        body.kind !== "avatar"
+      )
+        return reply(fail("invalid_request", 400));
+      const created = await query(
+        actor,
+        "select app_private.create_proof_upload($1,$2) as path",
+        [body.kind, now],
+      );
+      const objectPath = created.rows[0]?.path as string;
+      const signed = (await storage(
+        `/object/upload/sign/${proofBucket}/${objectPath}`,
+        "POST",
+        {},
+      )) as { url?: string };
+      if (!signed.url) throw new Error("Storage sign failed");
+      return reply(
+        ok({
+          path: objectPath,
+          uploadUrl: `${authUrl}/storage/v1${signed.url}`,
+        }),
+      );
+    }
+    if (path === "/v1/proof/feed" && request.method === "GET") {
+      const hidden = new Set(
+        (
+          await query(
+            actor,
+            "select app_private.block_hidden_posts($1) as id",
+            [now],
+          )
+        ).rows.map((row) => row.id as string),
+      );
+      const rows = (
+        await query(actor, "select * from app_private.proof_feed($1)", [now])
+      ).rows.filter((row) => !hidden.has(row.workout_checkin_id as string));
+      const text = new Map(
+        (
+          await query(actor, "select * from app_private.proof_text($1)", [now])
+        ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
+      const reactions = new Map(
+        (
+          await query(
+            actor,
+            "select * from app_private.proof_reaction_summary($1)",
+            [now],
+          )
+        ).rows.map((row) => [row.workout_checkin_id as string, row]),
+      );
+      const details = new Map(
+        (
+          await query(actor, "select * from app_private.proof_details($1)", [
+            now,
+          ])
+        ).rows.map((row) => [row.workout_checkin_id as string, row.details]),
+      );
+      const paths = rows
+        .flatMap((row) => [row.activity_photo_path, row.presence_photo_path])
+        .filter((value): value is string => typeof value === "string");
+      const urls = new Map<string, string>();
+      if (paths.length > 0) {
+        // A day-long URL lets the app reuse it, and the cached image, across loads.
+        const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+          expiresIn: 86_400,
+          paths,
+        })) as Array<{ path?: string; signedURL?: string }>;
+        for (const item of signed)
+          if (item.path && item.signedURL)
+            urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+      }
+      const iso = (value: unknown) =>
+        value ? new Date(String(value)).toISOString() : null;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            workoutCheckinId: row.workout_checkin_id,
+            authorMembershipId: row.author_membership_id,
+            authorName: row.author_name,
+            mine: row.mine,
+            activityType: row.activity_type,
+            durationMinutes: row.duration_minutes,
+            perceivedIntensity: row.perceived_intensity,
+            completedAt: iso(row.completed_at),
+            submittedAt: iso(row.submitted_at),
+            reviewStatus: row.review_status,
+            reviewClosesAt: iso(row.review_closes_at),
+            decisionClosesAt: iso(row.decision_closes_at),
+            hidden: row.hidden,
+            myVote: row.my_vote,
+            acceptVotes: row.accept_votes,
+            rejectVotes: row.reject_votes,
+            eligibleVoters: row.eligible_voters,
+            canReview: row.can_review,
+            canVote: row.can_vote,
+            canDelete: row.can_delete,
+            seen: row.seen,
+            decisionOutcome: row.decision_outcome ?? null,
+            decidedAt: iso(row.decided_at),
+            details: details.get(row.workout_checkin_id) ?? null,
+            caption: text.get(row.workout_checkin_id)?.caption ?? null,
+            messages: text.get(row.workout_checkin_id)?.messages ?? [],
+            activityPhotoUrl:
+              urls.get(row.activity_photo_path as string) ?? null,
+            presencePhotoUrl:
+              urls.get(row.presence_photo_path as string) ?? null,
+            reactions: reactions.get(row.workout_checkin_id)?.counts ?? [],
+            myReactions:
+              reactions.get(row.workout_checkin_id)?.my_reactions ?? [],
+          })),
+        ),
+      );
+    }
+    // Seen posts: many ids per call; the database ignores ids the viewer can't see.
+    if (path === "/v1/proof/seen" && request.method === "POST") {
+      const ids = body.ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.length > 100 ||
+        !ids.every(uuid)
+      )
+        return reply(fail("invalid_request", 400));
+      const marked = await query(
+        actor,
+        "select app_private.mark_posts_seen($1::uuid[],$2) as added",
+        [[...new Set(ids)], now],
+      );
+      return reply(ok({ marked: marked.rows[0]?.added ?? 0 }));
+    }
+    const reactors = proofReactors.exec(path);
+    if (reactors && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.proof_reactors($1,$2)", [
+          reactors[1],
+          now,
+        ])
+      ).rows;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            emoji: row.reaction,
+            name: row.display_name,
+            mine: row.mine,
+          })),
+        ),
+      );
+    }
+    const reacted = proofReaction.exec(path);
+    if (reacted && request.method === "POST") {
+      const { emoji, on } = body;
+      if (
+        typeof emoji !== "string" ||
+        !singleEmoji.test(emoji) ||
+        typeof on !== "boolean"
+      )
+        return reply(fail("invalid_request", 400));
+      await query(actor, "select app_private.react_to_proof($1,$2,$3,$4)", [
+        reacted[1],
+        emoji,
+        on,
+        now,
+      ]);
+      if (on) later(deliverPush);
+      return reply(ok({ workoutCheckinId: reacted[1], emoji, on }));
+    }
+    const detailed = proofDetails.exec(path);
+    if (detailed && request.method === "POST") {
+      const value = body.details;
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        JSON.stringify(value).length > 4000
+      )
+        return reply(fail("invalid_request", 400));
+      const rows = (
+        await query(
+          actor,
+          "select app_private.set_checkin_details($1,$2::jsonb,$3) as data",
+          [detailed[1], JSON.stringify(value), now],
+        )
+      ).rows;
+      return reply(
+        ok({ workoutCheckinId: detailed[1], details: rows[0]?.data }),
+      );
+    }
+    const written = proofWrite.exec(path);
+    if (written && request.method === "POST") {
+      const [, id, kind] = written;
+      if (kind === "caption") {
+        if (typeof body.caption !== "string" || body.caption.length > 300)
+          return reply(fail("invalid_request", 400));
+        const rows = (
+          await query(
+            actor,
+            "select app_private.set_checkin_caption($1,$2,$3) as caption",
+            [id, body.caption, now],
+          )
+        ).rows;
+        return reply(ok({ workoutCheckinId: id, caption: rows[0]?.caption }));
+      }
+      if (
+        !uuid(body.id) ||
+        typeof body.body !== "string" ||
+        body.body.length > 400
+      )
+        return reply(fail("invalid_request", 400));
+      await query(actor, "select app_private.post_proof_message($1,$2,$3,$4)", [
+        body.id,
+        id,
+        body.body,
+        now,
+      ]);
+      later(deliverPush);
+      return reply(ok({ id: body.id, workoutCheckinId: id }));
+    }
+    const deleted = proofDelete.exec(path);
+    if (deleted && request.method === "POST") {
+      const result = (
+        await query(
+          actor,
+          "select app_private.delete_own_checkin($1,$2) as data",
+          [deleted[1], now],
+        )
+      ).rows[0]?.data as { currentWeekCount: number; paths: string[] };
+      // Photos go now when storage answers; otherwise the unused-upload sweep takes them.
+      if (result.paths.length > 0)
+        later(() =>
+          storage(`/object/${proofBucket}`, "DELETE", {
+            prefixes: result.paths,
+          })
+            .then(() =>
+              pool.query(
+                "select app_private.mark_proof_uploads_deleted($1, now())",
+                [result.paths],
+              ),
+            )
+            .catch(() => console.error("Deleted post photos pending sweep")),
+        );
+      return reply(
+        ok({
+          workoutCheckinId: deleted[1],
+          currentWeekCount: result.currentWeekCount,
+        }),
+      );
+    }
+    const removePhotos = proofRemovePhotos.exec(path);
+    if (removePhotos && request.method === "POST") {
+      // The workout keeps counting; the media sweep deletes the files.
+      await query(actor, "select app_private.remove_own_photos($1,$2)", [
+        removePhotos[1],
+        now,
+      ]);
+      return reply(ok({ workoutCheckinId: removePhotos[1] }));
+    }
+    if (path === "/v1/proof/remove-all" && request.method === "POST") {
+      const rows = (
+        await query(actor, "select app_private.remove_all_my_proof($1) as n", [
+          now,
+        ])
+      ).rows;
+      return reply(ok({ removed: rows[0]?.n ?? 0 }));
+    }
+    const match = proofAction.exec(path);
+    if (match && request.method === "POST") {
+      const [, id = "", action = ""] = match;
+      const choice = String(body.choice ?? "");
+      const allowed: Record<string, string[]> = {
+        review: ["question"],
+        vote: ["accept", "reject", "cannot_assess"],
+        moderate: ["restore", "remove"],
+        withdraw: [""],
+        report: [""],
+      };
+      if (!allowed[action]?.includes(choice))
+        return reply(fail("invalid_request", 400));
+      const sql: Record<string, string> = {
+        review:
+          "select app_private.review_proof_checkin($1,$2,$3)::text as status",
+        vote: "select app_private.vote_proof_checkin($1,$2::app_private.proof_vote,$3)::text as status",
+        moderate:
+          "select app_private.moderate_proof_checkin($1,$2,$3)::text as status",
+        withdraw:
+          "select app_private.withdraw_proof_checkin($1,$3)::text as status, $2::text as unused",
+        report:
+          "select app_private.report_proof_checkin($1,$3)::text as status, $2::text as unused",
+      };
+      const rows = (await query(actor, sql[action] ?? "", [id, choice, now]))
+        .rows;
+      later(deliverPush);
+      return reply(ok({ workoutCheckinId: id, status: rows[0]?.status }));
+    }
+    return reply(fail("not_found", 404));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
+async function nudges(request: Request): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  const now = new Date().toISOString();
+  try {
+    if (request.method === "GET") {
+      const rows = (
+        await query(actor, "select app_private.nudged_today($1) as id", [now])
+      ).rows;
+      return reply(ok(rows.map((row) => row.id as string)));
+    }
+    let body: { membershipId?: unknown };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+    if (!anyUuid(body?.membershipId))
+      return reply(fail("invalid_request", 400));
+    await query(actor, "select app_private.nudge_member($1,$2)", [
+      body.membershipId,
+      now,
+    ]);
+    later(deliverPush);
+    return reply(ok({ membershipId: body.membershipId }));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
+// Consequence ids are often md5-derived in SQL, so they carry no RFC version or
+// variant bits; Postgres still rejects anything that is not a uuid.
+const anyUuid = (value: unknown): value is string =>
+  typeof value === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+const consequenceAction =
+  /^\/v1\/consequences\/(redraw|select|claim|request_pause|vote_pause|resume|respond)$/;
+const clipExtensions: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+type ClipHome = {
+  attempt?: { clipPath?: string | null; clipUrl?: string | null } | null;
+  reviews?: { clipPath?: string | null; clipUrl?: string | null }[];
+};
+// Swaps each clip path on the home state for a day-long signed URL the Group can play.
+async function withClipUrls(home: unknown) {
+  const state = home as ClipHome | undefined;
+  if (!state) return home;
+  const items = [state.attempt, ...(state.reviews ?? [])].filter(
+    (item): item is NonNullable<typeof item> => Boolean(item),
+  );
+  const paths = items.flatMap((item) => (item.clipPath ? [item.clipPath] : []));
+  const urls = new Map<string, string>();
+  if (paths.length > 0) {
+    const signed = (await storage(`/object/sign/${clipBucket}`, "POST", {
+      expiresIn: 86_400,
+      paths,
+    })) as Array<{ path?: string; signedURL?: string }>;
+    for (const item of signed)
+      if (item.path && item.signedURL)
+        urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+  }
+  for (const item of items) {
+    item.clipUrl = item.clipPath ? (urls.get(item.clipPath) ?? null) : null;
+    delete item.clipPath;
+  }
+  return state;
+}
+// Reactions and comments on an approved Consequence clip.
+const clipSocial =
+  /^\/v1\/consequences\/clip\/([0-9a-f-]{36})\/(react|reactions|message)$/;
+async function consequences(request: Request, path: string): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  const now = new Date().toISOString();
+  try {
+    if (path === "/v1/consequences" && request.method === "GET") {
+      const rows = (
+        await query(actor, "select app_private.consequence_home($1) as home", [
+          now,
+        ])
+      ).rows;
+      return reply(ok(await withClipUrls(rows[0]?.home)));
+    }
+    // Approved Consequence clips for the Wall, each with a day-long signed URL.
+    if (path === "/v1/consequences/feed" && request.method === "GET") {
+      const rows = (
+        await query(actor, "select * from app_private.consequence_feed($1)", [
+          now,
+        ])
+      ).rows;
+      const social = new Map(
+        (
+          await query(
+            actor,
+            "select * from app_private.consequence_social($1)",
+            [now],
+          )
+        ).rows.map((row) => [row.claim_id as string, row]),
+      );
+      const posts = rows.map((row) => ({
+        reactions: social.get(row.claim_id)?.counts ?? [],
+        myReactions: social.get(row.claim_id)?.my_reactions ?? [],
+        messages: social.get(row.claim_id)?.messages ?? [],
+        claimId: row.claim_id,
+        authorMembershipId: row.author_membership_id,
+        authorName: row.author_name,
+        mine: row.mine,
+        cardTitle: row.card_title,
+        submittedAt: new Date(String(row.submitted_at)).toISOString(),
+        approvedAt: new Date(String(row.approved_at)).toISOString(),
+        clipPath: row.clip_path as string | null,
+        clipUrl: null as string | null,
+      }));
+      const signed = await withClipUrls({ reviews: posts });
+      return reply(ok((signed as { reviews: typeof posts }).reviews));
+    }
+    const social = clipSocial.exec(path);
+    if (social?.[2] === "reactions" && request.method === "GET") {
+      const rows = (
+        await query(
+          actor,
+          "select * from app_private.consequence_reactors($1,$2)",
+          [social[1], now],
+        )
+      ).rows;
+      return reply(
+        ok(
+          rows.map((row) => ({
+            emoji: row.reaction,
+            name: row.display_name,
+            mine: row.mine,
+          })),
+        ),
+      );
+    }
+    if (request.method !== "POST") return reply(fail("not_found", 404));
+    if (social && social[2] !== "reactions") {
+      let input: Record<string, unknown>;
+      try {
+        input = ((await request.json()) ?? {}) as Record<string, unknown>;
+      } catch {
+        return reply(fail("invalid_request", 400));
+      }
+      if (social[2] === "react") {
+        const { emoji, on } = input;
+        if (
+          typeof emoji !== "string" ||
+          !singleEmoji.test(emoji) ||
+          typeof on !== "boolean"
+        )
+          return reply(fail("invalid_request", 400));
+        await query(
+          actor,
+          "select app_private.react_to_consequence($1,$2,$3,$4)",
+          [social[1], emoji, on, now],
+        );
+        return reply(ok({ claimId: social[1], emoji, on }));
+      }
+      if (
+        !uuid(input.id) ||
+        typeof input.body !== "string" ||
+        input.body.length > 400
+      )
+        return reply(fail("invalid_request", 400));
+      await query(
+        actor,
+        "select app_private.post_consequence_message($1,$2,$3,$4)",
+        [input.id, social[1], input.body, now],
+      );
+      return reply(ok({ id: input.id, claimId: social[1] }));
+    }
+    let body: {
+      target?: unknown;
+      choice?: unknown;
+      attemptId?: unknown;
+      challengeId?: unknown;
+      mimeType?: unknown;
+    };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return reply(fail("invalid_request", 400));
+    }
+    if (path === "/v1/consequences/challenge") {
+      if (!anyUuid(body?.attemptId)) return reply(fail("invalid_request", 400));
+      const rows = (
+        await query(
+          actor,
+          "select app_private.issue_consequence_challenge($1,$2) as challenge",
+          [body.attemptId, now],
+        )
+      ).rows;
+      return reply(ok(rows[0]?.challenge));
+    }
+    if (path === "/v1/consequences/clip-upload") {
+      const extension = clipExtensions[String(body?.mimeType)];
+      if (!uuid(body?.challengeId) || !extension)
+        return reply(fail("invalid_request", 400));
+      const created = await query(
+        actor,
+        "select app_private.create_consequence_clip_upload($1,$2,$3) as path",
+        [body.challengeId, extension, now],
+      );
+      const objectPath = created.rows[0]?.path as string;
+      const signed = (await storage(
+        `/object/upload/sign/${clipBucket}/${objectPath}`,
+        "POST",
+        {},
+      )) as { url?: string };
+      if (!signed.url) throw new Error("Storage sign failed");
+      return reply(
+        ok({
+          path: objectPath,
+          uploadUrl: `${authUrl}/storage/v1${signed.url}`,
+        }),
+      );
+    }
+    const action = consequenceAction.exec(path)?.[1];
+    if (!action) return reply(fail("not_found", 404));
+    if (!anyUuid(body?.target)) return reply(fail("invalid_request", 400));
+    const choice = typeof body.choice === "string" ? body.choice : "";
+    if (action === "select" && !anyUuid(choice))
+      return reply(fail("invalid_request", 400));
+    // A claim names the clip uploaded for the caller's open challenge.
+    if (
+      action === "claim" &&
+      !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(mp4|webm)$/.test(choice)
+    )
+      return reply(fail("invalid_request", 400));
+    const rows = (
+      await query(
+        actor,
+        "select app_private.consequence_command($1,$2,$3,$4) as home",
+        [action, body.target, choice, now],
+      )
+    ).rows;
+    later(deliverPush);
+    return reply(ok(await withClipUrls(rows[0]?.home)));
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+
+type MemberCall = {
+  actor: Actor;
+  body: Record<string, unknown>;
+  method: string;
+  now: string;
+  // Runs one SQL statement as the member and returns its first row's `data` column.
+  data: (sql: string, values: unknown[]) => Promise<unknown>;
+};
+// Shared shell for the newer member routes: auth, JSON body, and database errors.
+async function memberRoute(
+  request: Request,
+  handle: (call: MemberCall) => Promise<ApiResponse>,
+): Promise<Response> {
+  const reply = (response: ApiResponse) =>
+    Response.json(response.body, { status: response.status });
+  let actor: Actor | null;
+  try {
+    actor = await authUser(request.headers.get("authorization") ?? undefined);
+  } catch {
+    return reply(fail("domain_failure", 503));
+  }
+  if (!actor) return reply(fail("unauthorized", 401));
+  let body: Record<string, unknown> = {};
+  if (request.method === "POST") {
+    const parsed = await readMemberBody(request).catch(() => null);
+    if (!parsed) return reply(fail("invalid_request", 400));
+    body = parsed;
+  }
+  const signed = actor;
+  try {
+    return reply(
+      await handle({
+        actor: signed,
+        body,
+        method: request.method,
+        now: new Date().toISOString(),
+        data: async (sql, values) =>
+          (await query(signed, sql, values)).rows[0]?.data,
+      }),
+    );
+  } catch (error) {
+    return reply(dbError(error));
+  }
+}
+const invalid = () => fail("invalid_request", 400);
+
+const groupRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/group/settings" && method === "GET")
+      return ok(
+        await data("select app_private.group_settings($1) as data", [now]),
+      );
+    if (path === "/v1/group/activity" && method === "GET")
+      return ok(
+        await data("select app_private.group_activity($1) as data", [now]),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/group/rename") {
+      if (typeof body.name !== "string" || body.name.length > 200)
+        return invalid();
+      return ok(
+        await data("select app_private.rename_group($1,$2) as data", [
+          body.name,
+          now,
+        ]),
+      );
+    }
+    if (path === "/v1/group/admin") {
+      if (!uuid(body.membershipId) || typeof body.admin !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        admin: await data(
+          "select app_private.set_group_admin($1,$2,$3) as data",
+          [body.membershipId, body.admin, now],
+        ),
+      });
+    }
+    if (path === "/v1/group/settings") {
+      if (
+        typeof body.timeZone !== "string" ||
+        body.timeZone.length > 64 ||
+        !Number.isInteger(body.weekStarts)
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_group_settings($1,$2::smallint,$3) as data",
+          [body.timeZone, body.weekStarts, now],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const homeExtras = (request: Request, path: string) =>
+  memberRoute(request, async ({ actor, method, now, data }) => {
+    if (path !== "/v1/home/extras" || method !== "GET")
+      return fail("not_found", 404);
+    const [extras, notices, avatars] = await Promise.all([
+      data("select app_private.home_extras($1) as data", [now]),
+      data("select app_private.notices() as data", []),
+      // Photos are decoration: a storage hiccup must not blank Home.
+      groupAvatars(actor, now).catch(() => ({})),
+    ]);
+    return ok({
+      ...(extras as Record<string, unknown>),
+      countNotice:
+        (notices as { countsRightAway?: boolean } | null)?.countsRightAway ===
+        true,
+      avatars,
+    });
+  });
+
+const exceptionCategories = [
+  "health_safety",
+  "family_caregiving",
+  "schedule_disruption",
+  "travel_access",
+  "planned_recovery",
+  "private",
+];
+const exceptionAction =
+  /^\/v1\/exceptions\/([0-9a-f-]{36})\/(respond|withdraw)$/;
+const exceptionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    const after = (value: unknown) => {
+      later(deliverPush);
+      return ok(value);
+    };
+    if (path === "/v1/exceptions/request") {
+      const note = body.note ?? null;
+      if (
+        !uuid(body.id) ||
+        (body.week !== "current" && body.week !== "next") ||
+        !exceptionCategories.includes(String(body.category)) ||
+        (note !== null && (typeof note !== "string" || note.length > 280))
+      )
+        return invalid();
+      return after(
+        await data(
+          "select app_private.request_exception($1,$2,$3,$4,$5) as data",
+          [body.id, body.week, body.category, note, now],
+        ),
+      );
+    }
+    const match = exceptionAction.exec(path);
+    if (!match) return fail("not_found", 404);
+    if (match[2] === "withdraw")
+      return after(
+        await data("select app_private.withdraw_exception($1,$2) as data", [
+          match[1],
+          now,
+        ]),
+      );
+    if (!["approve", "deny", "abstain"].includes(String(body.response)))
+      return invalid();
+    return after(
+      await data("select app_private.respond_to_exception($1,$2,$3) as data", [
+        match[1],
+        body.response,
+        now,
+      ]),
+    );
+  });
+
+const recapAction = /^\/v1\/recap\/([0-9a-f-]{36})\/react$/;
+const recapRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = recapAction.exec(path);
+    if (!match || method !== "POST") return fail("not_found", 404);
+    const emoji = body.emoji ?? null;
+    if (
+      emoji !== null &&
+      !(typeof emoji === "string" && singleEmoji.test(emoji))
+    )
+      return invalid();
+    const value = await data(
+      "select app_private.react_to_recap($1,$2,$3) as data",
+      [match[1], emoji, now],
+    );
+    later(deliverPush);
+    return ok(value);
+  });
+
+// One-time Home notices: shown through Home extras, dismissed here.
+const noticeRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ method, data }) => {
+    if (path === "/v1/notices/dismiss" && method === "POST")
+      return ok({
+        dismissed: await data(
+          "select app_private.dismiss_count_notice() as data",
+          [],
+        ),
+      });
+    return fail("not_found", 404);
+  });
+
+const notificationRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/notifications" && method === "GET")
+      return ok(
+        await data("select app_private.notification_center($1) as data", [now]),
+      );
+    if (path === "/v1/notifications/seen" && method === "POST")
+      return ok({
+        seen: await data(
+          "select app_private.mark_notifications_seen($1) as data",
+          [now],
+        ),
+      });
+    if (path === "/v1/notifications/clear" && method === "POST")
+      return ok({
+        cleared: await data(
+          "select app_private.clear_notifications($1) as data",
+          [now],
+        ),
+      });
+    if (path === "/v1/notifications/dismiss" && method === "POST") {
+      const ids = body.ids;
+      if (
+        !Array.isArray(ids) ||
+        ids.length === 0 ||
+        ids.length > 60 ||
+        !ids.every((id) => Number.isSafeInteger(id) && id > 0)
+      )
+        return invalid();
+      return ok({
+        dismissed: await data(
+          "select app_private.dismiss_notifications($1::bigint[],$2) as data",
+          [ids, now],
+        ),
+      });
+    }
+    if (path === "/v1/notifications/prefs" && method === "POST") {
+      const flag = (value: unknown) =>
+        value === undefined || typeof value === "boolean";
+      const hour = body.digestHour;
+      if (
+        !flag(body.socialPush) ||
+        !flag(body.digest) ||
+        (hour !== undefined &&
+          (!Number.isInteger(hour) || Number(hour) < 0 || Number(hour) > 23))
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.set_notification_prefs($1,$2,$3::smallint) as data",
+          [body.socialPush ?? null, body.digest ?? null, hour ?? null],
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const avatarPath = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/;
+// Signed profile photo URLs for the caller's Group, by membership id.
+async function groupAvatars(actor: Actor, now: string) {
+  const rows = (
+    await query(actor, "select * from app_private.group_avatars($1)", [now])
+  ).rows;
+  const avatars: Record<string, string> = {};
+  if (rows.length === 0) return avatars;
+  // Day-long URLs, like proof photos, so the browser reuses cached images.
+  const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+    expiresIn: 86_400,
+    paths: rows.map((row) => row.avatar_path as string),
+  })) as Array<{ path?: string; signedURL?: string }>;
+  const urls = new Map(
+    signed.map((item) => [
+      item.path,
+      item.signedURL ? `${authUrl}/storage/v1${item.signedURL}` : null,
+    ]),
+  );
+  for (const row of rows) {
+    const url = urls.get(row.avatar_path as string);
+    if (url) avatars[row.membership_id as string] = url;
+  }
+  return avatars;
+}
+// Sets or, with a null path, clears the caller's profile photo.
+const avatarRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path !== "/v1/avatars" || method !== "POST")
+      return fail("not_found", 404);
+    const requested = body.path ?? null;
+    if (
+      requested !== null &&
+      !(typeof requested === "string" && avatarPath.test(requested))
+    )
+      return invalid();
+    await data("select app_private.set_avatar($1,$2) as data", [
+      requested,
+      now,
+    ]);
+    return ok({ path: requested });
+  });
+
+const reportCategories = [
+  "sexual_content",
+  "harassment",
+  "threats",
+  "private_information",
+  "dangerous",
+  "other",
+];
+const safetyRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/safety/conduct")
+      return ok({
+        version: await data("select app_private.accept_conduct() as data", []),
+      });
+    if (path === "/v1/safety/block") {
+      if (!uuid(body.membershipId) || typeof body.on !== "boolean")
+        return invalid();
+      return ok({
+        membershipId: body.membershipId,
+        blocked: await data(
+          "select app_private.set_safety_block($1,$2,$3) as data",
+          [body.membershipId, body.on, now],
+        ),
+      });
+    }
+    const category = String(body.category ?? "");
+    if (!reportCategories.includes(category)) return invalid();
+    if (path === "/v1/safety/report-message" && uuid(body.messageId))
+      return ok({
+        reported: await data(
+          "select app_private.report_message($1,$2,$3) as data",
+          [body.messageId, category, now],
+        ),
+      });
+    if (path === "/v1/safety/report-member" && uuid(body.membershipId))
+      return ok({
+        reported: await data(
+          "select app_private.report_member($1,$2,$3) as data",
+          [body.membershipId, category, now],
+        ),
+      });
+    return invalid();
+  });
+
+type ConsoleCase = { photoPaths?: string[] | null; photoUrls?: string[] };
+// Reported photo pairs reach the operator as short-lived signed URLs.
+async function withCasePhotos(console: unknown) {
+  const cases = (console as { cases?: ConsoleCase[] })?.cases ?? [];
+  const paths = cases.flatMap((item) => item.photoPaths ?? []);
+  const urls = new Map<string, string>();
+  if (paths.length > 0) {
+    const signed = (await storage(`/object/sign/${proofBucket}`, "POST", {
+      expiresIn: 900,
+      paths,
+    })) as Array<{ path?: string; signedURL?: string }>;
+    for (const item of signed)
+      if (item.path && item.signedURL)
+        urls.set(item.path, `${authUrl}/storage/v1${item.signedURL}`);
+  }
+  for (const item of cases) {
+    item.photoUrls = (item.photoPaths ?? []).flatMap((path) => {
+      const url = urls.get(path);
+      return url ? [url] : [];
+    });
+    delete item.photoPaths;
+  }
+  return console;
+}
+const operatorRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    if (path === "/v1/operator" && method === "GET")
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_console($1) as data", [now]),
+        ),
+      );
+    if (method !== "POST") return fail("not_found", 404);
+    if (path === "/v1/operator/resolve") {
+      if (
+        !anyUuid(body.caseId) ||
+        !["dismiss", "remove", "suspend", "terminate"].includes(
+          String(body.action),
+        )
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_resolve_case($1,$2,$3) as data",
+            [body.caseId, body.action, now],
+          ),
+        ),
+      );
+    }
+    if (path === "/v1/operator/reinstate") {
+      if (!uuid(body.accountId)) return invalid();
+      return ok(
+        await withCasePhotos(
+          await data("select app_private.operator_reinstate($1,$2) as data", [
+            body.accountId,
+            now,
+          ]),
+        ),
+      );
+    }
+    if (path === "/v1/operator/hold") {
+      const open = body.open === true;
+      if (
+        typeof body.open !== "boolean" ||
+        (open &&
+          (!uuid(body.groupId) ||
+            (body.membershipId != null && !uuid(body.membershipId)) ||
+            typeof body.reason !== "string" ||
+            !body.reason.trim() ||
+            body.reason.length > 200)) ||
+        (!open && !anyUuid(body.holdId))
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_set_hold($1,$2,$3,$4,$5,$6) as data",
+            [
+              body.groupId ?? null,
+              body.membershipId ?? null,
+              body.reason ?? "",
+              open,
+              body.holdId ?? null,
+              now,
+            ],
+          ),
+        ),
+      );
+    }
+    return fail("not_found", 404);
+  });
+
+const sessionAction = /^\/v1\/sessions\/([0-9a-f-]{36})\/(start|end|link)$/;
+const sessionRoutes = (request: Request, path: string) =>
+  memberRoute(request, async ({ body, method, now, data }) => {
+    const match = sessionAction.exec(path);
+    if (!match || method !== "POST" || !uuid(match[1]))
+      return fail("not_found", 404);
+    const [, id, action] = match;
+    if (action === "start")
+      return ok(
+        await data("select app_private.start_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (action === "end")
+      return ok(
+        await data("select app_private.end_my_session($1,$2) as data", [
+          id,
+          now,
+        ]),
+      );
+    if (!uuid(body.workoutCheckinId)) return invalid();
+    return ok({
+      linked: await data(
+        "select app_private.link_session_checkin($1,$2,$3) as data",
+        [id, body.workoutCheckinId, now],
+      ),
+    });
+  });
+
+// Routes outside the generated contract, by exact path or prefix; the rest go to `route`.
+const extraRoutes: Array<
+  [string, (request: Request, path: string) => Promise<Response>]
+> = [
+  ["/v1/proof/", proof],
+  ["/v1/consequences/", consequences],
+  ["/v1/group/", groupRoutes],
+  ["/v1/home/", homeExtras],
+  ["/v1/exceptions/", exceptionRoutes],
+  ["/v1/recap/", recapRoutes],
+  ["/v1/safety/", safetyRoutes],
+  ["/v1/sessions/", sessionRoutes],
+];
+function dispatch(request: Request, path: string): Promise<Response> {
+  if (path === "/v1/enrollment" && request.method === "POST")
+    return enrollment(request);
+  if (path === "/v1/consent" && request.method === "POST")
+    return consent(request);
+  if (path === "/v1/push" && ["GET", "POST", "DELETE"].includes(request.method))
+    return push(request);
+  if (path === "/v1/nudges" && ["GET", "POST"].includes(request.method))
+    return nudges(request);
+  if (path === "/v1/consequences") return consequences(request, path);
+  if (path === "/v1/account/export" && request.method === "GET")
+    return memberRoute(request, async ({ now, data }) =>
+      ok(await data("select app_private.account_export($1) as data", [now])),
+    );
+  if (path === "/v1/operator" || path.startsWith("/v1/operator/"))
+    return operatorRoutes(request, path);
+  if (path === "/v1/notices/dismiss") return noticeRoutes(request, path);
+  if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
+    return notificationRoutes(request, path);
+  if (path === "/v1/avatars") return avatarRoutes(request, path);
+  for (const [prefix, handler] of extraRoutes)
+    if (path.startsWith(prefix)) return handler(request, path);
+  return route(request);
+}
+
+const corsHeaders = {
+  "access-control-allow-origin": allowedOrigin,
+  "access-control-allow-headers": "authorization,content-type,idempotency-key",
+  "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+};
+const maxBody = 16384;
+
+async function readBody(request: Request) {
+  const reader = request.body?.getReader();
+  if (!reader) return undefined;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBody) {
+      await reader.cancel();
+      throw new Error("Body too large");
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+// One request in, one response out: the same on Node and Cloudflare Workers.
+export async function handle(incoming: Request): Promise<Response> {
+  const origin = incoming.headers.get("origin");
+  if (origin && origin !== allowedOrigin)
+    return new Response(null, { status: 403 });
+  if (incoming.method === "OPTIONS")
+    return new Response(null, { status: 204, headers: corsHeaders });
+  try {
+    const request = new Request(incoming.url, {
+      method: incoming.method,
+      headers: incoming.headers,
+      body: ["GET", "HEAD"].includes(incoming.method)
+        ? undefined
+        : await readBody(incoming),
+    });
+    const path = new URL(request.url).pathname;
+    const response = await dispatch(request, path);
+    return new Response(await response.text(), {
+      status: response.status,
+      headers: {
+        ...corsHeaders,
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "API request failed",
+      error instanceof SyntaxError ? "malformed request" : "internal error",
+    );
+    const invalid =
+      error instanceof SyntaxError ||
+      (error instanceof Error && error.message === "Body too large");
+    const response = fail(
+      invalid ? "invalid_request" : "domain_failure",
+      invalid ? 400 : 500,
+    );
+    return new Response(JSON.stringify(response.body), {
+      status: response.status,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  }
+}

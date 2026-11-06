@@ -14,3 +14,7 @@ minimumReleaseAgeExclude:
   - '@supabase/cli-windows-x64@2.117.0'
   - supabase@2.117.0
   - image-size-next@2.1.1
+# Their install scripts only re-check platform binaries already installed as optional dependencies.
+allowBuilds:
+  esbuild: false
+  workerd: false

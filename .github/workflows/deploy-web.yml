@@ -30,15 +30,13 @@ jobs:
       - name: Check release configuration
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         run: |
-          for key in SUPABASE_DB_URL RENDER_API_KEY RENDER_SERVICE_ID CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID VITE_API_BASE_URL VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY; do
+          for key in SUPABASE_DB_URL CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID VITE_API_BASE_URL VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY; do
             if [ -z "${!key}" ]; then echo "Missing configuration: $key"; exit 1; fi
           done
       - run: pnpm check
@@ -49,11 +47,8 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-      - name: Verify Render release control before database changes
-        run: node scripts/deploy-render.mjs --check
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      - name: Bundle API Worker before database changes
+        run: pnpm api:deploy --dry-run --outdir "$RUNNER_TEMP/api-worker"
       - name: Apply committed forward migrations
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -62,11 +57,11 @@ jobs:
           pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
           pnpm exec supabase db push --db-url "$SUPABASE_DB_URL" --yes
           pnpm exec supabase migration list --db-url "$SUPABASE_DB_URL"
-      - name: Deploy exact API commit and wait for Live
-        run: node scripts/deploy-render.mjs
+      - name: Deploy exact API commit to Cloudflare Workers
+        run: pnpm api:deploy --message "${{ github.sha }}"
         env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       - name: Check API health
         env:
           API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
@@ -75,7 +70,7 @@ jobs:
           node --input-type=module -e 'import {readFileSync} from "node:fs"; const result = JSON.parse(readFileSync("/tmp/health.json", "utf8")); if (result.status !== "ok") throw new Error("API health failed");'
       - name: Publish web only after database and API succeed
         run: >-
-          npx wrangler@3 pages deploy apps/web/dist
+          pnpm exec wrangler pages deploy apps/web/dist
           --project-name no-excuses --branch main
           --commit-hash ${{ github.sha }}
         env:

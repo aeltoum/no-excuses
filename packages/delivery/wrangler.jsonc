@@ -1,0 +1,19 @@
+// The API on Cloudflare Workers Free. Secrets live in Cloudflare (dashboard or
+// `wrangler secret put`), never here: DATABASE_URL, SUPABASE_URL,
+// SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INVITATION_SECRET, PWA_ORIGIN,
+// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "no-excuses-api",
+  "main": "src/cloudflare.ts",
+  "compatibility_date": "2026-10-01",
+  // node:crypto, node:async_hooks, Buffer, pg sockets, and process.env from secrets.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  // Keep values set in the dashboard when a deploy runs.
+  "keep_vars": true,
+  // Weekly rollover, cleanup, and push delivery, as the Node process did every minute.
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true }
+}

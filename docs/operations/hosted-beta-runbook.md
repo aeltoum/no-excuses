@@ -1,16 +1,17 @@
 # Hosted beta deployment runbook
 
-This runbook activates ADR 0006's zero-cost hosted beta. It is not a production-readiness
+This runbook activates ADR 0006's zero-cost hosted beta, with the API on Cloudflare Workers per
+ADR 0007. It is not a production-readiness
 claim. Recheck provider free-tier terms before provisioning. Use owner-controlled accounts with
 MFA. Do not add payment methods, paid resources, trials that convert to paid service, custom
 domains, or artificial keep-alive traffic.
 
-Record final Cloudflare, Render, and Supabase URLs plus deployed Git commit in release evidence.
+Record final Cloudflare Pages, Worker, and Supabase URLs plus deployed Git commit in release evidence.
 Use provider subdomains. Substitute final assigned URLs consistently if requested names are
 unavailable.
 
 For subsequent `main` releases, use [production releases](production-release.md). GitHub
-coordinates migrations, Render, and Cloudflare Pages. The steps below provision the initial beta.
+coordinates migrations, the API Worker, and Cloudflare Pages. The steps below provision the initial beta.
 
 ## 1. Supabase and migrations
 
@@ -44,7 +45,7 @@ Use one dedicated standard Gmail account. Enable two-step verification. Create o
 In Supabase Auth SMTP Settings, enable custom SMTP and set Gmail SMTP host `smtp.gmail.com`, port
 `465`, username to full Gmail address, password to app password, sender email to same address, and
 sender name to `No Excuses`. Keep app password only in Supabase; never put it in Git, Cloudflare,
-Render, screenshots, logs, or release evidence.
+screenshots, logs, or release evidence.
 
 Before inviting members, request an OTP from deployed PWA to one address at each invited email
 provider. Confirm message arrives, sender identity is expected, code works once, reused/expired
@@ -52,26 +53,27 @@ code fails, and message is not unexpectedly classified as spam. Gmail's standard
 send quota is shared with manual mail; stop sending when quota blocks delivery. Do not fall back
 to Supabase default SMTP.
 
-## 3. Render API
+## 3. Cloudflare Workers API
 
-Create Blueprint from repository `render.yaml`. Confirm one web service only: Free plan, Virginia,
-Node `24.19.0`, configured build/start commands, `/v1/health`, and Auto-Deploy Off. GitHub triggers exact-commit API releases after migrations. Do not add
-a Render database, disk, worker, cron job, or paid feature.
+Deploy the `no-excuses-api` Worker on Workers Free from `packages/delivery/wrangler.jsonc`
+(`pnpm api:deploy`). It runs maintenance from a Cron Trigger each minute. Do not add Workers Paid,
+a custom domain, or paid add-ons. GitHub deploys exact-commit API releases after migrations.
 
-Set these Render environment values:
+Set these as Worker secrets (Settings, Variables and Secrets, type Secret):
 
 | Variable | Source | Boundary |
 | --- | --- | --- |
-| `DATABASE_URL` | Supabase direct/session-pooler connection string | secret, server only |
+| `DATABASE_URL` | Supabase pooler connection string | secret, server only |
 | `SUPABASE_URL` | Supabase project URL | server config |
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | public-capable, server also needs it |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key | secret, server only |
 | `INVITATION_SECRET` | cryptographically random 32+ byte value | secret, server only; keep stable |
 | `PWA_ORIGIN` | exact final Cloudflare production origin | server config; no trailing slash |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push keys | secret, server only; keep stable |
 
-Render supplies `PORT`; do not override it. Confirm `GET https://<render-host>/v1/health` returns
-HTTP 200. Confirm request with `Origin: https://example.invalid` returns HTTP 403. API CORS accepts
-exactly `PWA_ORIGIN`; preview deployments must use synthetic data and a non-production backend.
+Confirm `GET https://<worker-host>/v1/health` returns HTTP 200. Confirm request with
+`Origin: https://example.invalid` returns HTTP 403. API CORS accepts exactly `PWA_ORIGIN`;
+preview deployments must use synthetic data and a non-production backend.
 
 ## 4. Cloudflare Pages
 
@@ -87,12 +89,13 @@ Set only these Cloudflare build variables:
 
 | Variable | Value | Boundary |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | final HTTPS Render origin | public |
+| `VITE_API_BASE_URL` | final HTTPS Worker origin | public |
 | `VITE_SUPABASE_URL` | Supabase project URL | public |
 | `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key | public |
 
 Any `VITE_` value is client-readable. Never set `DATABASE_URL`, service-role key,
-`INVITATION_SECRET`, Gmail app password, provider token, or database password in Cloudflare.
+`INVITATION_SECRET`, Gmail app password, provider token, or database password in Cloudflare
+Pages build variables; server values belong only in Worker secrets.
 Production secrets must not enter preview/PR builds.
 
 After deployment, open `/`, `/sign-in`, `/group`, `/home`, `/target`, `/history`, and `/account`
@@ -101,7 +104,7 @@ loop.
 
 ## 5. First organizer
 
-Render Free has no shell. On trusted checkout, create temporary file outside repository:
+The Worker has no shell. On trusted checkout, create temporary file outside repository:
 
 ```bash
 BETA_ENV_FILE="$(mktemp)"
@@ -121,18 +124,18 @@ Confirm success once; repeated seed must fail. Organizer then signs in through d
 attests 18+, accepts pilot/product consent, and creates Group. Immediately delete temporary file
 using OS trash/secure local procedure, clear shell history if values were pasted there, and remove
 local Supabase link credentials when no longer needed. Remove `SEED_ORGANIZER_EMAIL` anywhere it
-was temporarily stored. Never place seed email or hosted secrets in Render or Git.
+was temporarily stored. Never place seed email in Worker settings or Git, or hosted secrets in Git.
 
 ## 6. Monitoring and manual exports
 
 Free-tier monitoring is manual:
 
-- enable owner email notifications for Render deploy/failure and quota events;
+- enable owner notifications for Worker errors and Workers Free usage limits;
 - enable Supabase project, inactivity, database-size, and egress notifications available on Free;
 - review Cloudflare deployment failures and analytics available on Free;
 - review Gmail security alerts, rejected OTPs, and sending quota;
 - after each release and at least weekly during active beta, check API health, recent provider
-  logs, Supabase status/usage, pending pauses, and Render/Supabase quota notices.
+  logs, Supabase status/usage, pending pauses, and Workers/Supabase quota notices.
 
 Supabase Free has no managed automatic backup or Point-in-Time Recovery. Record this as accepted
 beta risk, never as passed. Tell participants experimental data may be lost. Before each release
@@ -164,7 +167,7 @@ synthetic names; do not run repository `LIVE_PWA_INTEGRATION` suite against host
 4. Organizer sets weekly target; synthetic member records one workout; both see consistent weekly
    progress after reload and session restoration.
 5. From terminal, confirm `/v1/health` is HTTP 200 with allowed production `Origin`; confirm an
-   invalid origin is HTTP 403. Allow documented Render cold-start delay after inactivity.
+   invalid origin is HTTP 403.
 6. Synthetic member deletes Account in app. Confirm sign-in no longer succeeds and organizer no
    longer sees active member. Keep only sanitized timestamps/statuses in evidence; no OTP,
    invitation token, email, access token, or provider secret.
@@ -176,12 +179,12 @@ synthetic end-to-end smoke.
 ## 8. Rollback and shutdown
 
 On bad web release, select prior successful Cloudflare deployment and roll it back. On bad API
-release, use Render rollback to prior healthy deploy where Free supports it; otherwise redeploy
-prior known-good Git commit. Never roll database migrations backward in place. Stop writes,
+release, roll the Worker back to its prior version (`wrangler rollback` or the Deployments tab);
+otherwise redeploy prior known-good Git commit. Never roll database migrations backward in place. Stop writes,
 preserve export, fix through a new forward migration, deploy API compatibility first, then PWA.
 Re-run health, CORS, direct-route, OTP, and synthetic smoke checks after rollback.
 
-If compromise is suspected: stop service, rotate affected Supabase/Render secrets, revoke Gmail
+If compromise is suspected: stop service, rotate affected Supabase/Worker secrets, revoke Gmail
 app password and provider tokens, invalidate outstanding invitations by rotating
 `INVITATION_SECRET` only with explicit acceptance, then investigate sanitized logs. At beta end,
 export if appropriate, notify participants, revoke Gmail app password, remove hosted services,
