@@ -48,10 +48,10 @@ packages/delivery/wrangler.jsonc`. Deploys keep them.
 
 Hyperdrive config `no-excuses-db` (free, query caching off) pools database connections near
 Supabase; `packages/delivery/wrangler.jsonc` binds it as `HYPERDRIVE`, and the Worker uses it in
-place of `DATABASE_URL`. It points at the Supabase transaction pooler (port 6543): the
-session pooler's ~15-client limit failed about 4% of requests when the app opened. After a database
+place of `DATABASE_URL`. It points at the Supabase session pooler (port 5432). Do not point it
+at the transaction pooler (port 6543): on 2026-11-06 that made database requests hang. After a database
 password change, update it with `pnpm exec wrangler hyperdrive update 657acc2fe26544bfba97129fe974390f
---connection-string "<transaction pooler URL, port 6543>"` as well as `DATABASE_URL`.
+--connection-string "<session pooler URL, port 5432>"` as well as `DATABASE_URL`.
 
 Recurring releases apply database schema without changing Supabase Auth, Storage buckets, or
 provider settings. The `production` GitHub environment must allow `main` and have no required
