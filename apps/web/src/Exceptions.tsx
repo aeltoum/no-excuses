@@ -7,6 +7,7 @@ import {
   type HomeExtras,
 } from "./extras";
 import { Sheet } from "./Sheet";
+import { track } from "./track";
 
 export const categories: Array<[ExceptionCategory, string]> = [
   ["health_safety", "Health or safety"],
@@ -80,6 +81,7 @@ export function Exceptions({
     const id = crypto.randomUUID();
     const previous = extras;
     const free = extras.freeWeekOff === true;
+    track("week_off_requested", { free, week });
     // Optimistic: the request shows at once; a free week off is approved outright.
     apply({
       ...extras,

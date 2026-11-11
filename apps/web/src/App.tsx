@@ -30,6 +30,7 @@ import { call, removeAllProof, setTokenSource } from "./proof";
 import { Result, useNotice } from "./Result";
 import { MemberSafety } from "./Safety";
 import { Sheet } from "./Sheet";
+import { clearTrack, setTrackTarget, track } from "./track";
 import { UpdatePrompt } from "./UpdatePrompt";
 import { prefetchWeekly, Weekly, type WeeklySnapshot } from "./Weekly";
 
@@ -269,6 +270,22 @@ export function App({
   const [confirmSheet, ask] = useConfirm();
   const [managedMemberId, setManagedMemberId] = useState<string | null>(null);
   const avatars = useAvatars();
+  // Product events go out with the signed-in member's token only.
+  useEffect(() => {
+    setTrackTarget(
+      apiBaseUrl,
+      access === "signed-in" ? (session?.access_token ?? null) : null,
+    );
+  }, [apiBaseUrl, access, session]);
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const id = session?.user.id;
+    if (access !== "signed-in" || !id || openedFor.current === id) return;
+    openedFor.current = id;
+    track("app_opened", {
+      standalone: window.matchMedia?.("(display-mode: standalone)").matches,
+    });
+  }, [access, session]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLaunching(false), 700);
@@ -896,6 +913,7 @@ export function App({
   // Access ends on screen at once; Auth's own sign-out (which tells other
   // tabs) finishes in the background.
   const signOut = () => {
+    clearTrack();
     setSession(null);
     setMembership(null);
     setAccess("signed-out");
@@ -1138,6 +1156,7 @@ export function App({
                     // A late sign-out must never remove the new session.
                     await signOutInFlight;
                     await verifyOtp(auth, email, code);
+                    track("signin_verified", { door: signInDoor });
                     if (signInDoor === "invited") {
                       setCrewChoice("join");
                       setInvitationCode(enrollmentToken.trim());
@@ -1319,6 +1338,7 @@ export function App({
                         setDisplayName(savedDisplayName.current);
                         await api.consent(token());
                         setOnboardingStep(2);
+                        track("onboarding_step_completed", { step: 1 });
                         return "About you saved.";
                       });
                     }}
@@ -2006,6 +2026,9 @@ export function App({
                               type="button"
                               onClick={() => {
                                 const url = inviteLink(inviteReady.token);
+                                track("invite_shared", {
+                                  method: canShare() ? "share" : "copy",
+                                });
                                 if (canShare())
                                   void navigator
                                     .share({
@@ -2072,6 +2095,7 @@ export function App({
                               draft.key,
                             );
                             commandDrafts.current.delete("invite");
+                            track("invite_created");
                             setInviteReady({
                               email: inviteEmail,
                               token: result.data.token,

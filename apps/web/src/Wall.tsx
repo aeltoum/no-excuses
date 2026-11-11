@@ -44,6 +44,7 @@ import {
   useSeenWatch,
 } from "./seen";
 import { keepSigned, markFailed, savedSigned } from "./signed";
+import { track } from "./track";
 
 const feedCache = persistentMap<ProofItem[]>("feed");
 
@@ -364,6 +365,7 @@ export function ProofFeed({
   const opener = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openPost = (id: string, from: HTMLElement) => {
+    track("post_viewed");
     opener.current = from;
     setViewing(id);
   };
@@ -637,6 +639,7 @@ export function ProofFeed({
           ),
         );
       update(on);
+      if (on) track("reaction_added");
       try {
         await reactToProof(apiBaseUrl, token, id, emoji, on);
       } catch (error) {

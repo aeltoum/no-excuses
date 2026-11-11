@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { track } from "./track";
 
 type Card = {
   cardId: string;
@@ -51,6 +52,7 @@ export function AugmentPicker({
   useEffect(() => {
     void hand;
     setChosen(null);
+    track("card_offer_viewed");
     buzz([60, 80, 60, 80, 140]);
   }, [hand]);
 

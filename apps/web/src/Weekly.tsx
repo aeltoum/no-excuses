@@ -53,6 +53,7 @@ import { Result, useNotice } from "./Result";
 import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
 import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
+import { track } from "./track";
 import { ProofFeed, useFeedItems } from "./Wall";
 import { WeekRecap } from "./WeekRecap";
 
@@ -650,8 +651,10 @@ export function Weekly({
     for (const entry of sent) dropOutgoing(entry.id);
     setPlateDrop(true);
     // The first win is the moment to ask for notifications, once per device.
-    if (!pushAsked() && (pushAskable() || pushNeedsInstall()))
+    if (!pushAsked() && (pushAskable() || pushNeedsInstall())) {
       setPushAsk(pushNeedsInstall() ? "install" : "ask");
+      track("push_prompt_shown", { install: pushNeedsInstall() });
+    }
     // One short buzz where supported (not iPhone Safari); skipped for reduced motion.
     if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
       try {
@@ -788,6 +791,7 @@ export function Weekly({
   }, [apiBaseUrl, token, route, groupId, nudgeable, fresh]);
   const nudge = async (membershipId: string) => {
     setNudgedOn((ids) => new Map(ids).set(membershipId, utcDay()));
+    track("nudge_sent");
     try {
       await nudgeMember(apiBaseUrl, token, membershipId);
       setNotice({ kind: "success", text: "Nudge sent." });
@@ -1239,6 +1243,10 @@ export function Weekly({
                           kind: "success",
                           text: `Comeback week: ${next} this week.`,
                         });
+                        track("comeback_used", {
+                          from: own.lockedTarget,
+                          to: next,
+                        });
                         extrasCommand(
                           apiBaseUrl,
                           token,
@@ -1490,7 +1498,10 @@ export function Weekly({
                       event.currentTarget.focus();
                       if (logBlock) setLockOpen(true);
                       // The editor opens first; the camera waits for a capture action.
-                      else setSheetOpen(true);
+                      else {
+                        track("log_sheet_opened");
+                        setSheetOpen(true);
+                      }
                     }}
                   >
                     {logBlock ? (
@@ -1531,7 +1542,11 @@ export function Weekly({
                             onClick={() => {
                               setPushBusy(true);
                               void enablePush(apiBaseUrl, token)
-                                .then((on) =>
+                                .then((on) => {
+                                  if (on)
+                                    track("push_enabled", {
+                                      from: "first_log",
+                                    });
                                   setNotice(
                                     on
                                       ? {
@@ -1542,8 +1557,8 @@ export function Weekly({
                                           kind: "error",
                                           text: "Notifications stayed off. You can turn them on in Account.",
                                         },
-                                  ),
-                                )
+                                  );
+                                })
                                 .catch(() =>
                                   setNotice({
                                     kind: "error",
@@ -1636,6 +1651,10 @@ export function Weekly({
                         // Optimistic: close the sheet and count it now; the
                         // upload and check-in finish in the background.
                         setOutbox([...outbox, entry]);
+                        track("log_submitted", {
+                          activity: activityType,
+                          minutes: Number(duration),
+                        });
                         setSheetOpen(false);
                         resetDraft();
                         setSessionId(null);
