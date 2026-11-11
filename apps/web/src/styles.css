@@ -5501,3 +5501,38 @@ html.post-viewer-open body {
 .friend-nudge time {
   font-variant-numeric: tabular-nums;
 }
+
+/* Comeback week offer on Week, under the barbell. */
+.comeback-offer {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.comeback-offer h2 {
+  margin: 0;
+  font-size: var(--type-secondary);
+}
+.comeback-offer p {
+  margin: 0;
+  color: var(--muted);
+}
+.comeback-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.comeback-row strong {
+  flex: 1;
+  white-space: nowrap;
+  min-width: 4ch;
+  text-align: center;
+  font-family: "Big Shoulders Display", system-ui, sans-serif;
+  font-size: 1.75rem;
+}
+.comeback-offer > button {
+  width: 100%;
+}

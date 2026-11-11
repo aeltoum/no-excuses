@@ -35,7 +35,7 @@ import {
   saveWorkout,
 } from "./durable";
 import { Exceptions } from "./Exceptions";
-import { useHomeExtras } from "./extras";
+import { extrasCommand, useHomeExtras } from "./extras";
 import { useFreshness } from "./freshness";
 import { InstallPrompt } from "./InstallPrompt";
 import { onClearPersisted } from "./persist";
@@ -1148,6 +1148,58 @@ export function Weekly({
                       onOpen={(event) => onNavigate(event, "/history")}
                     />
                   </div>
+                  {extras.pausedStreak ? (
+                    <p className="home-settle">
+                      {extras.pausedStreak}-week streak paused. Meet this week
+                      to get it back.
+                    </p>
+                  ) : null}
+                  {extras.comeback?.available && (
+                    <ComebackOffer
+                      target={own.lockedTarget}
+                      onLower={(next) => {
+                        const previous = extras;
+                        // Optimistic: the lighter target shows at once.
+                        applyExtras({
+                          ...extras,
+                          comeback: {
+                            available: false,
+                            target: next,
+                            loweredFrom: own.lockedTarget,
+                          },
+                        });
+                        setProgress((items) =>
+                          items.map((item) =>
+                            item.membershipId === membership.membershipId
+                              ? { ...item, lockedTarget: next }
+                              : item,
+                          ),
+                        );
+                        setNotice({
+                          kind: "success",
+                          text: `Comeback week: ${next} this week.`,
+                        });
+                        extrasCommand(
+                          apiBaseUrl,
+                          token,
+                          "/v1/exceptions/comeback",
+                          { target: next },
+                        )
+                          .then(applyExtras)
+                          .catch((error) => {
+                            applyExtras(previous);
+                            setProgress((items) =>
+                              items.map((item) =>
+                                item.membershipId === membership.membershipId
+                                  ? { ...item, lockedTarget: own.lockedTarget }
+                                  : item,
+                              ),
+                            );
+                            updateError(error);
+                          });
+                      }}
+                    />
+                  )}
                   <UnlockNote unlocks={extras.unlocks} />
                   <div className="home-actions">
                     <Exceptions
@@ -2213,4 +2265,49 @@ export function prefetchWeekly(
     if (inflight.get(cacheKey)?.load === load) inflight.delete(cacheKey);
   };
   load.then(settle, settle);
+}
+
+// After a missed week: one chance to lighten this week's locked target.
+function ComebackOffer({
+  target,
+  onLower,
+}: {
+  target: number;
+  onLower: (next: number) => void;
+}) {
+  const [next, setNext] = useState(Math.max(1, target - 1));
+  return (
+    <section className="comeback-offer" aria-labelledby="comeback-title">
+      <h2 id="comeback-title">Comeback week</h2>
+      <p>
+        Last week got away. Lighten this one, once, and get back on the bar.
+      </p>
+      <div className="comeback-row">
+        <button
+          type="button"
+          className="target-adjust"
+          aria-label="Fewer workouts"
+          disabled={next <= 1}
+          onClick={() => setNext(Math.max(1, next - 1))}
+        >
+          −
+        </button>
+        <strong>
+          {next} of {target}
+        </strong>
+        <button
+          type="button"
+          className="target-adjust"
+          aria-label="More workouts"
+          disabled={next >= target - 1}
+          onClick={() => setNext(Math.min(target - 1, next + 1))}
+        >
+          +
+        </button>
+      </div>
+      <button type="button" onClick={() => onLower(next)}>
+        Set {next} this week
+      </button>
+    </section>
+  );
 }

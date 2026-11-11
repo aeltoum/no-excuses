@@ -1592,6 +1592,17 @@ const exceptionRoutes = (request: Request, path: string) =>
       later(deliverPush);
       return ok(value);
     };
+    // Comeback week: lower this week's target once after a missed week.
+    if (path === "/v1/exceptions/comeback") {
+      if (!Number.isSafeInteger(body.target) || Number(body.target) < 1)
+        return invalid();
+      return ok(
+        await data("select app_private.set_comeback_target($1,$2) as data", [
+          body.target,
+          now,
+        ]),
+      );
+    }
     if (path === "/v1/exceptions/request") {
       const note = body.note ?? null;
       if (
