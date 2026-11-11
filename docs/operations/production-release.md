@@ -1,12 +1,23 @@
 # Production releases
 
-Every update to `main` runs `.github/workflows/deploy-web.yml` in this order:
+Production deploys through Cloudflare (owner decision 2026-11-11). One script,
+`scripts/deploy-production.sh`, runs every release in this order:
 
-1. Check configuration, run `pnpm check`, build API and PWA, and bundle the API Worker.
+1. Refuse unless on `main`; run `pnpm check` (in UTC); build API and PWA; bundle the API Worker.
 2. List Supabase history, preview pending migrations, apply committed forward migrations.
-3. Deploy the workflow's exact commit to the `no-excuses-api` Cloudflare Worker
-   (`pnpm api:deploy`; the commit SHA is the version message).
-4. Check `/v1/health`, then publish the matching PWA to Cloudflare Pages.
+3. Deploy the exact commit to the `no-excuses-api` Cloudflare Worker (commit SHA is the version message).
+4. Check `/v1/health`, then publish the matching PWA to Cloudflare Pages (`no-excuses`).
+
+It runs two ways:
+
+- **Automatic (default):** Cloudflare Workers Builds, connected to the GitHub repository on the
+  `no-excuses-api` Worker, production branch `main`, deploy command `pnpm release`. Set its
+  build variables: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and the
+  secret `SUPABASE_DB_URL`. Workers Builds supplies Cloudflare credentials.
+- **Manual:** `pnpm release` from a clean `main` checkout after `wrangler login`, with the four
+  values above in the git-ignored `.env.production.local`.
+
+`.github/workflows/deploy-web.yml` no longer runs on push; it stays as a manual fallback.
 
 The production concurrency lock never cancels an active release. GitHub may replace an older
 pending run with a newer pending run; the next release applies all missing migrations. A

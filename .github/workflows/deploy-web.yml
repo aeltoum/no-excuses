@@ -1,8 +1,8 @@
 name: Deploy production
 
+# Production now deploys through Cloudflare (scripts/deploy-production.sh, run by
+# Cloudflare Workers Builds or `pnpm release`). This workflow stays as a manual fallback.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # All production mutations share one lock. Never cancel an applying migration.
