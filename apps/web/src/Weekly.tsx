@@ -435,6 +435,9 @@ export function Weekly({
     (entry) => entry.membershipId === membership?.membershipId,
   );
   const [feedRevision, setFeedRevision] = useState(0);
+  // The Home strip's new plate lands with a short drop after a confirmed log.
+  const [plateDrop, setPlateDrop] = useState(false);
+  const plateTimer = useRef<number | undefined>(undefined);
   const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
     () => new Set(),
   );
@@ -638,13 +641,26 @@ export function Weekly({
       ),
     );
     for (const entry of sent) dropOutgoing(entry.id);
+    setPlateDrop(true);
+    // One short buzz where supported (not iPhone Safari); skipped for reduced motion.
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+      try {
+        navigator.vibrate?.(30);
+      } catch {}
+    window.clearTimeout(plateTimer.current);
+    plateTimer.current = window.setTimeout(() => setPlateDrop(false), 900);
     setFeedRevision((value) => value + 1);
     const target = progress.find(
       (item) => item.membershipId === membership.membershipId,
     )?.lockedTarget;
     setNotice({
       kind: "success",
-      text: `Workout logged. ${last?.count} of ${target} this week. It counts now; friends can question it for 24 hours.`,
+      text:
+        last?.count !== undefined &&
+        target !== undefined &&
+        last.count >= target
+          ? `${last.count} of ${target}. Week's in the bag.`
+          : `${last?.count} of ${target}. Plate's on.`,
     });
     // Refresh in the background; the screen already shows the server count.
     void api
@@ -1100,6 +1116,40 @@ export function Weekly({
         <>
           {home && (
             <>
+              {!week && own && (
+                <a
+                  className={`home-week-strip${plateDrop ? " plate-drop" : ""}`}
+                  href="/week"
+                  onClick={(event) => onNavigate(event, "/week")}
+                  aria-label={`Your week: ${own.completedWorkoutCount} of ${own.lockedTarget} workouts. Open Week.`}
+                >
+                  <Barbell
+                    count={own.completedWorkoutCount}
+                    target={own.lockedTarget}
+                    size="mini"
+                    activityTypes={own.activityTypes}
+                  />
+                  <strong>
+                    {own.completedWorkoutCount}
+                    <span> of {own.lockedTarget}</span>
+                  </strong>
+                  <span className="home-week-friends" aria-hidden="true">
+                    {progress
+                      .filter(
+                        (item) => item.membershipId !== membership.membershipId,
+                      )
+                      .slice(0, 3)
+                      .map((item) => (
+                        <Avatar
+                          key={item.membershipId}
+                          name={item.displayName}
+                          url={avatars[item.membershipId]}
+                          size="sm"
+                        />
+                      ))}
+                  </span>
+                </a>
+              )}
               {!week && extras.countNotice && (
                 <CountNotice failed={noticeFailed} onDismiss={dismissNotice} />
               )}

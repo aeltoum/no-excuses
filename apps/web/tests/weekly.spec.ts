@@ -566,9 +566,7 @@ const weeklyLoop = async (
     await sending.getByRole("button", { name: "Retry" }).click();
   }
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("status")).toHaveText(
-    "Workout logged. 3 of 4 this week. It counts now; friends can question it for 24 hours.",
-  );
+  await expect(page.getByRole("status")).toHaveText("3 of 4. Plate's on.");
   expect(uploads).toBe(2);
   // Logging refreshes the Home feed so the new proof appears.
   await expect.poll(() => feedLoads).toBeGreaterThanOrEqual(2);
