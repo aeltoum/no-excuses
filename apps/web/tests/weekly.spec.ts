@@ -131,9 +131,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
     actionDenied = await page.getByText("Action denied.").isVisible();
   }
   await expect(
-    page.getByText(
-      "Accountability and workouts begin once a second member joins your Group.",
-    ),
+    page.getByText("Workouts start counting once a friend joins your Group."),
   ).toBeVisible();
   expect(actionDenied).toBe(false);
   await expect(logWorkout).toHaveCount(0);

@@ -45,8 +45,13 @@ export const notificationTarget = (
       ? { path: "/history" }
       : { path: "/home" };
 export const viewedPost = (id: string) => (item: Item) => itemPost(item) === id;
+// Nudges, reminders, and digests are messages to read, not pages: only opening
+// the bell or the item itself clears them.
+const messageKinds = new Set(["social", "reminder", "digest"]);
 export const viewedPage = (path: string) => (item: Item) =>
-  !itemPost(item) && notificationTarget(item).path === path;
+  !itemPost(item) &&
+  !messageKinds.has(item.kind) &&
+  notificationTarget(item).path === path;
 
 // Seeing a notification's subject removes it from the list. Views noted before
 // the list loads apply once it does.

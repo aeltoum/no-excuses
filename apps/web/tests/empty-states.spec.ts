@@ -191,7 +191,7 @@ test("a member alone in their Group sees only the solo line beside the waiting b
 }) => {
   const { errors } = await open(page, [], 1, []);
   await expect(
-    page.getByRole("heading", { name: "Waiting for a second member" }),
+    page.getByRole("heading", { name: "Your bar needs a spotter" }),
   ).toBeVisible();
   await expect(page.getByText("Your crew’s posts land here.")).toBeVisible();
   await expect(page.getByText("No posts this week or last.")).toHaveCount(0);

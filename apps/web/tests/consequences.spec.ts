@@ -334,15 +334,13 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   await expect(page).toHaveURL(/\/week$/);
 
   // The hand pops up on its own, like an augment round.
-  let dialog = page.getByRole("dialog", { name: "Choose your punishment" });
+  let dialog = page.getByRole("dialog", { name: "Choose your card" });
   await expect(dialog).toBeVisible();
-  await expect(
-    dialog.getByText("Penalty due · 1 owed · 48 hours to finish"),
-  ).toBeVisible();
+  await expect(dialog.getByText("1 owed · 48 hours to finish")).toBeVisible();
   const handButtons = dialog.locator(".augment-card");
   await expect(handButtons).toHaveCount(3);
   await expect(
-    dialog.getByRole("button", { name: "Accept penalty" }),
+    dialog.getByRole("button", { name: "Lock it in" }),
   ).toBeDisabled();
   await page.waitForTimeout(700);
   expect(
@@ -371,7 +369,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
   ).toHaveText(["MAMaya2 of 3 workoutsOwes 2 cardsNudge"]);
   await expect(
-    page.getByRole("img", { name: "Consequence debt: 1 of 5 cards owed" }),
+    page.getByRole("img", { name: "1 of 5 Consequence cards owed" }),
   ).toContainText("1/5");
 
   await page.reload();
@@ -383,7 +381,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   if ((await strip.getAttribute("aria-expanded")) === "false")
     await strip.click();
   await page.getByRole("button", { name: "Choose your card" }).click();
-  dialog = page.getByRole("dialog", { name: "Choose your punishment" });
+  dialog = page.getByRole("dialog", { name: "Choose your card" });
 
   await dialog.getByRole("button", { name: /Reroll all/ }).click();
   await expect(
@@ -396,7 +394,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   ).toHaveAttribute("aria-pressed", "true");
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath("card-chosen.png") });
-  await dialog.getByRole("button", { name: "Accept penalty" }).click();
+  await dialog.getByRole("button", { name: "Lock it in" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "5 km run" })).toBeVisible();
   await expect(page.getByText(/Due in 4[78] hours\. Miss it/)).toBeVisible();
@@ -537,7 +535,7 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
     page.getByText("Waiting for friends: 0 of 2 approvals."),
   ).toBeVisible();
   // The next card pops up right away; it can wait.
-  const nextHand = page.getByRole("dialog", { name: "Choose your punishment" });
+  const nextHand = page.getByRole("dialog", { name: "Choose your card" });
   await expect(nextHand).toBeVisible();
   await nextHand.getByRole("button", { name: "Decide later" }).click();
   await expect(

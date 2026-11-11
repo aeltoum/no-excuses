@@ -1233,7 +1233,7 @@ export function App({
               groupRoster &&
               groupScope.current ===
                 `${session?.user.id}:${membership.groupId}:${membership.membershipId}`
-                ? `${groupRoster.members.length} members`
+                ? `${groupRoster.members.length} ${groupRoster.members.length === 1 ? "member" : "members"}`
                 : membership
                   ? "Loading your Group."
                   : "Start a private Group or join one with an invitation code."

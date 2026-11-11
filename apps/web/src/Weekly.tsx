@@ -1199,11 +1199,15 @@ export function Weekly({
               ) : own ? null : (
                 <div className="solo-week">
                   <Barbell count={0} target={0} size="big" />
-                  <h2>Waiting for a second member</h2>
-                  <p>
-                    Accountability and workouts begin once a second member joins
-                    your Group.
-                  </p>
+                  <h2>Your bar needs a spotter</h2>
+                  <p>Workouts start counting once a friend joins your Group.</p>
+                  <a
+                    className="primary-action"
+                    href="/group"
+                    onClick={(event) => onNavigate(event, "/group")}
+                  >
+                    Invite a friend
+                  </a>
                   <a
                     className="home-target-link"
                     href="/target"

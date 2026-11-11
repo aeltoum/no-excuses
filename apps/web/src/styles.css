@@ -4553,14 +4553,12 @@ h1 {
 
 /* Discard draft: same shape as Log workout, in the error colour. */
 .log-sheet-footer .log-discard {
-  justify-self: stretch;
-  width: 100%;
+  justify-self: center;
   min-height: 48px;
   border: 0;
-  border-radius: var(--radius-control);
-  background: var(--error);
-  color: #fff;
-  font-weight: 700;
+  background: none;
+  color: var(--error);
+  font-weight: 600;
   text-decoration: none;
 }
 
