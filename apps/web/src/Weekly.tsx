@@ -38,6 +38,7 @@ import { Exceptions } from "./Exceptions";
 import { extrasCommand, useHomeExtras } from "./extras";
 import { useFreshness } from "./freshness";
 import { InstallPrompt } from "./InstallPrompt";
+import { enablePush, pushAskable, pushNeedsInstall } from "./PushToggle";
 import { onClearPersisted } from "./persist";
 import {
   call,
@@ -438,6 +439,12 @@ export function Weekly({
   // The Home strip's new plate lands with a short drop after a confirmed log.
   const [plateDrop, setPlateDrop] = useState(false);
   const plateTimer = useRef<number | undefined>(undefined);
+  const [pushAsk, setPushAsk] = useState<"ask" | "install" | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const closePushAsk = () => {
+    markPushAsked();
+    setPushAsk(null);
+  };
   const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
     () => new Set(),
   );
@@ -642,6 +649,9 @@ export function Weekly({
     );
     for (const entry of sent) dropOutgoing(entry.id);
     setPlateDrop(true);
+    // The first win is the moment to ask for notifications, once per device.
+    if (!pushAsked() && (pushAskable() || pushNeedsInstall()))
+      setPushAsk(pushNeedsInstall() ? "install" : "ask");
     // One short buzz where supported (not iPhone Safari); skipped for reduced motion.
     if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
       try {
@@ -1492,6 +1502,73 @@ export function Weekly({
                     )}{" "}
                     Log workout
                   </button>
+                  <Sheet
+                    open={pushAsk !== null}
+                    title="Know when your crew trains"
+                    onDismiss={closePushAsk}
+                  >
+                    <div className="push-ask">
+                      {pushAsk === "install" ? (
+                        <>
+                          <p>
+                            iPhone only sends notifications to apps on your Home
+                            Screen. Tap Share, then Add to Home Screen, and open
+                            No Excuses from there.
+                          </p>
+                          <button type="button" onClick={closePushAsk}>
+                            Got it
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p>
+                            Get a ping when a friend posts or nudges you, and
+                            one before your week closes.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={pushBusy}
+                            onClick={() => {
+                              setPushBusy(true);
+                              void enablePush(apiBaseUrl, token)
+                                .then((on) =>
+                                  setNotice(
+                                    on
+                                      ? {
+                                          kind: "success",
+                                          text: "Notifications on.",
+                                        }
+                                      : {
+                                          kind: "error",
+                                          text: "Notifications stayed off. You can turn them on in Account.",
+                                        },
+                                  ),
+                                )
+                                .catch(() =>
+                                  setNotice({
+                                    kind: "error",
+                                    text: "Couldn’t turn on notifications. Try again in Account.",
+                                  }),
+                                )
+                                .finally(() => {
+                                  setPushBusy(false);
+                                  closePushAsk();
+                                });
+                            }}
+                          >
+                            {pushBusy ? "Turning on…" : "Turn on notifications"}
+                          </button>
+                          <button
+                            type="button"
+                            className="log-discard"
+                            onClick={closePushAsk}
+                          >
+                            Not now
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </Sheet>
                   <Sheet
                     open={lockOpen}
                     title="Bar’s racked"
@@ -2360,4 +2437,18 @@ function ComebackOffer({
       </button>
     </section>
   );
+}
+
+const pushAskedKey = "no-excuses:push-asked";
+function pushAsked() {
+  try {
+    return localStorage.getItem(pushAskedKey) === "1";
+  } catch {
+    return true;
+  }
+}
+function markPushAsked() {
+  try {
+    localStorage.setItem(pushAskedKey, "1");
+  } catch {}
 }
