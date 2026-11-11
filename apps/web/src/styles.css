@@ -5624,3 +5624,14 @@ html.post-viewer-open body {
   margin: 0;
   color: var(--muted);
 }
+
+/* Clip tiles show a still stand-in; the play mark sits on top. */
+.day-tile-clip {
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      color-mix(in srgb, var(--error) 22%, transparent),
+      transparent 60%
+    ),
+    var(--surface);
+}
