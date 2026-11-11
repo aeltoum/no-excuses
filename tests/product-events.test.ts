@@ -8,7 +8,12 @@ describe("Product events", { timeout: 30_000 }, () => {
       db,
       0,
       "select app_private.record_product_events($1::jsonb, '2026-03-04T10:00Z') as data",
-      [JSON.stringify([{ name: "app_opened", payload: { standalone: true } }, { name: "log_submitted" }])],
+      [
+        JSON.stringify([
+          { name: "app_opened", payload: { standalone: true } },
+          { name: "log_submitted" },
+        ]),
+      ],
     );
     expect(added).toBe(2);
     await as(db, 0);
