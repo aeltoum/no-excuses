@@ -1,7 +1,7 @@
 import { type CSSProperties, useRef, useState } from "react";
 
 // A proof clip with only two controls: tap the frame to play or pause, drag
-// the bar to seek. It opens on a frame from the clip instead of a black box.
+// the bar to seek. Nothing downloads until play is tapped.
 export function ClipPlayer({
   url,
   label,
@@ -30,14 +30,13 @@ export function ClipPlayer({
         className="clip-player-video"
         src={url}
         playsInline
-        preload="auto"
+        // Clips are the largest files we serve; nothing loads until play.
+        preload="none"
         aria-label={label}
         onClick={toggle}
-        // Seeking past the blank first frame paints the thumbnail.
         onLoadedMetadata={(event) => {
           const clip = event.currentTarget;
           setDuration(clip.duration);
-          if (clip.currentTime === 0) clip.currentTime = 0.1;
         }}
         onDurationChange={(event) => setDuration(event.currentTarget.duration)}
         onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}

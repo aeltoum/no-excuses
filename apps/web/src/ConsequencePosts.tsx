@@ -16,6 +16,7 @@ import {
 } from "./proof";
 import { Reactions } from "./Reactions";
 import { Sheet } from "./Sheet";
+import { keepSigned } from "./signed";
 
 // An approved Consequence claim, shown on the Wall as a clip post.
 export type ConsequencePost = {
@@ -58,8 +59,18 @@ export function useConsequencePosts(
     })
       .then((list) => {
         if (!active || !Array.isArray(list)) return;
-        saved.set(cacheKey, list);
-        setPosts(list);
+        const known = new Map(
+          (saved.get(cacheKey) ?? []).map((post) => [
+            post.claimId,
+            post.clipUrl,
+          ]),
+        );
+        const next = list.map((post) => ({
+          ...post,
+          clipUrl: keepSigned(known.get(post.claimId), post.clipUrl),
+        }));
+        saved.set(cacheKey, next);
+        setPosts(next);
       })
       .catch(() => undefined);
     return () => {
@@ -85,18 +96,8 @@ export function ConsequenceTile({
         aria-label={`${who}, Consequence: ${post.cardTitle}. Open post`}
         onClick={(event) => onOpen(event.currentTarget)}
       >
-        {post.clipUrl ? (
-          // The first frame stands in for a poster.
-          <video
-            className="day-tile-photo"
-            src={`${post.clipUrl}#t=0.1`}
-            muted
-            playsInline
-            preload="metadata"
-          />
-        ) : (
-          <span className="day-tile-photo" />
-        )}
+        {/* No video here: a feed tile must never download the clip. */}
+        <span className="day-tile-photo day-tile-clip" />
         <span className="day-tile-play" aria-hidden="true" />
         <span className="day-tile-cap" aria-hidden="true">
           <strong className="day-tile-name">{who}</strong>

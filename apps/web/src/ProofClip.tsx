@@ -138,8 +138,8 @@ export function ProofClip({
     const open = (video: MediaTrackConstraints, audio = true) =>
       media.getUserMedia({ video, audio });
     open({
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
+      width: { ideal: 640 },
+      height: { ideal: 480 },
       facingMode: facing,
     })
       // Some Android cameras reject the sized request, and a blocked or busy
@@ -223,8 +223,9 @@ export function ProofClip({
     const chunks: Blob[] = [];
     const next = new MediaRecorder(media, {
       mimeType: type,
-      videoBitsPerSecond: 1_500_000,
-      audioBitsPerSecond: 64_000,
+      // About 2.6 MB for a full 30 seconds: enough to judge a card.
+      videoBitsPerSecond: 650_000,
+      audioBitsPerSecond: 48_000,
     });
     next.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
