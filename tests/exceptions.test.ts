@@ -54,9 +54,23 @@ const status = async (db: Awaited<ReturnType<typeof database>>) =>
     )
   ).rows[0]?.status;
 
+// Spends the member's free week off so a request goes to the Group vote.
+const spendFreeWeekOff = (
+  db: Awaited<ReturnType<typeof database>>,
+  member = 0,
+) =>
+  db.query(
+    `insert into app_private.exception_requests (exception_request_id, membership_id,
+       week_starts_at, category, submitted_at, closes_at, status, resolved_at, self_serve)
+     values ($1, $2, '2026-02-23Z', 'private', '2026-03-01Z', '2026-03-03Z',
+       'approved', '2026-03-01Z', true)`,
+    [randomUUID(), memberships[member]],
+  );
+
 describe("Exceptions", { timeout: 30_000 }, () => {
   it("approved by a strict majority settles the week as Excepted with no card or streak change", async () => {
     const db = await database([3, 1, 1]);
+    await spendFreeWeekOff(db);
     await db.query(
       "update app_private.memberships set target_streak = 2 where membership_id = $1",
       [memberships[0]],
@@ -100,6 +114,7 @@ describe("Exceptions", { timeout: 30_000 }, () => {
 
   it("holds settlement while open, then a timeout denies it", async () => {
     const db = await database([3, 1, 1]);
+    await spendFreeWeekOff(db);
     const { id } = await request(db, 0, "current", "2026-03-08T20:00Z");
     await db.query(
       "select app_private.advance_true_mvp_weeks('2026-03-09T01:00Z')",
@@ -118,6 +133,7 @@ describe("Exceptions", { timeout: 30_000 }, () => {
 
   it("keeps ballots sealed to the audience and allows one open request per week", async () => {
     const db = await database();
+    await spendFreeWeekOff(db);
     const { id } = await request(db, 0);
     expect(
       await rejects(
@@ -149,6 +165,7 @@ describe("Exceptions", { timeout: 30_000 }, () => {
 
   it("freezes the Workout streak through an excused week and clears private context later", async () => {
     const db = await database([1, 1, 1]);
+    await spendFreeWeekOff(db);
     const { id } = await request(db, 0);
     await respond(db, 1, id, "approve");
     await respond(db, 2, id, "approve");
@@ -166,5 +183,78 @@ describe("Exceptions", { timeout: 30_000 }, () => {
       [id],
     );
     expect(cleared.rows[0]?.category).toBeNull();
+  });
+});
+
+describe("Comeback rules", { timeout: 30_000 }, () => {
+  it("approves one week off a month at once, then sends the next to a vote", async () => {
+    const db = await database();
+    const free = await request(db, 0);
+    expect(free.extras.exceptions.mine).toMatchObject([
+      { id: free.id, status: "approved" },
+    ]);
+    const ballots = await db.query(
+      "select 1 from app_private.exception_ballots where exception_request_id = $1",
+      [free.id],
+    );
+    expect(ballots.rows).toHaveLength(0);
+    const voted = await request(db, 0, "next");
+    expect(
+      voted.extras.exceptions.mine.find((item) => item.id === voted.id)?.status,
+    ).toBe("pending");
+  });
+
+  it("pauses the Target streak on a miss instead of erasing it", async () => {
+    const db = await database([2, 1, 1]);
+    await db.query(
+      "update app_private.memberships set target_streak = 3 where membership_id = $1",
+      [memberships[0]],
+    );
+    await db.query(
+      "select app_private.advance_true_mvp_weeks('2026-03-09T01:00Z')",
+    );
+    const paused = await db.query<{
+      target_streak: number;
+      paused_target_streak: number;
+    }>(
+      "select target_streak, paused_target_streak from app_private.memberships where membership_id = $1",
+      [memberships[0]],
+    );
+    expect(paused.rows[0]).toEqual({
+      target_streak: 0,
+      paused_target_streak: 3,
+    });
+    const extras = await data<{ pausedStreak: number }>(
+      db,
+      0,
+      "select app_private.home_extras('2026-03-09T02:00Z') as data",
+    );
+    expect(extras.pausedStreak).toBe(3);
+  });
+
+  it("lets a member lower this week's target once after a missed week", async () => {
+    const db = await database([3, 1, 1]);
+    await db.query(
+      "select app_private.advance_true_mvp_weeks('2026-03-09T01:00Z')",
+    );
+    const extras = await data<{
+      comeback: { available: boolean; target: number };
+    }>(db, 0, "select app_private.home_extras('2026-03-09T02:00Z') as data");
+    expect(extras.comeback).toMatchObject({ available: true });
+    const lowered = await data<{
+      comeback: { available: boolean; target: number; loweredFrom: number };
+    }>(
+      db,
+      0,
+      "select app_private.set_comeback_target(1, '2026-03-09T03:00Z') as data",
+    );
+    expect(lowered.comeback).toMatchObject({ available: false, target: 1 });
+    expect(
+      await rejects(
+        db.query(
+          "select app_private.set_comeback_target(1, '2026-03-09T04:00Z')",
+        ),
+      ),
+    ).toBe("42501");
   });
 });

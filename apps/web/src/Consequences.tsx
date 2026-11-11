@@ -131,9 +131,9 @@ function DebtMeter({ owed }: { owed: number }) {
     <div
       className={`debt-meter debt-${level}`}
       role="img"
-      aria-label={`Consequence debt: ${owed} of ${debtCap} cards owed`}
+      aria-label={`${owed} of ${debtCap} Consequence cards owed`}
     >
-      <span className="debt-label">Debt</span>
+      <span className="debt-label">Owed</span>
       <span className="debt-cells" aria-hidden="true">
         {Array.from({ length: debtCap }, (_, index) => (
           <i

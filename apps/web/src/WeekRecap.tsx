@@ -5,6 +5,7 @@ import { extrasCommand, type HomeExtras, type RecapWeek } from "./extras";
 import { markViewed } from "./Notifications";
 import { EmojiPicker, quickPicks } from "./Reactions";
 import { Sheet } from "./Sheet";
+import { track } from "./track";
 
 const day = 24 * 3_600_000;
 // Enough rows to see your result and the crew's; the rest open on request.
@@ -56,6 +57,9 @@ export function WeekRecap({
   if (weeks.length === 0 || closed || alreadyShown(weeks[0].endsAt))
     return null;
   const close = () => {
+    track("recap_viewed", {
+      met: weeks.find((week) => week.mine)?.met ?? null,
+    });
     rememberShown(weeks[0].endsAt);
     // Seeing the results clears the result notifications.
     markViewed((item) => resultKinds.has(item.kind));

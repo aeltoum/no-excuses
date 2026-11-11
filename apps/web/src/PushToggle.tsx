@@ -193,3 +193,59 @@ export async function unsubscribePush() {
     await (await registration?.pushManager.getSubscription())?.unsubscribe();
   } catch {}
 }
+
+// Whether this device could turn push on right now with one permission prompt.
+export function pushAskable() {
+  try {
+    return supported() && Notification.permission === "default";
+  } catch {
+    return false;
+  }
+}
+
+// iPhone Safari outside a Home Screen app: push needs the install first.
+export function pushNeedsInstall() {
+  const standalone =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia?.("(display-mode: standalone)").matches;
+  return ios() && !standalone;
+}
+
+// Asks for permission and subscribes this device. Resolves true when push is on.
+export async function enablePush(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<boolean> {
+  let key = readKey();
+  if (!key) {
+    const response = await fetch(`${apiBaseUrl}/v1/push`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(wakeTimeoutMs),
+    });
+    key =
+      ((await response.json()) as { data?: { publicKey?: string } }).data
+        ?.publicKey ?? null;
+    writeKey(key);
+  }
+  if (!key) return false;
+  if ((await Notification.requestPermission()) !== "granted") return false;
+  const registration = await navigator.serviceWorker.register("/sw.js", {
+    scope: "/",
+  });
+  await navigator.serviceWorker.ready;
+  const subscription =
+    (await registration.pushManager.getSubscription()) ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64Key(key),
+    }));
+  const saved = await fetch(`${apiBaseUrl}/v1/push`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(subscription.toJSON()),
+  });
+  return saved.ok;
+}

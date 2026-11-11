@@ -90,6 +90,16 @@ export type HomeExtras = {
   session: { id: string; startedAt: string } | null;
   // Signed profile photo URLs by membership id.
   avatars?: Record<string, string>;
+  // Target streak held after one missed week; meeting the next week restores it.
+  pausedStreak?: number | null;
+  // After a missed week: lower this week's target once.
+  comeback?: {
+    available: boolean;
+    target?: number;
+    loweredFrom?: number | null;
+  };
+  // One week off a month needs no Group vote.
+  freeWeekOff?: boolean;
 };
 export const emptyExtras: HomeExtras = {
   exceptions: { mine: [], toDecide: [], excused: [], pending: [] },

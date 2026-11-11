@@ -98,6 +98,7 @@ const defaults = (call: ApiCall): unknown => {
     return { owed: 0, offer: null, attempt: null, reviews: [], groupOwed: {} };
   if (path === "/v1/nudges") return [];
   if (path === "/v1/home/extras") return homeExtras();
+  if (path === "/v1/events") return { recorded: 0 };
   return undefined;
 };
 

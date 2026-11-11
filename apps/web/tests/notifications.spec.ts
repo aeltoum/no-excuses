@@ -113,7 +113,7 @@ test("Account mutes social pushes and moves the digest, instantly", async ({
     .toEqual([{ socialPush: false }, { socialPush: false }, { digestHour: 7 }]);
 });
 
-test("opening a notification goes to its subject; seeing a subject clears it", async ({
+test("opening a notification goes to its subject; reminders wait to be read", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -146,21 +146,12 @@ test("opening a notification goes to its subject; seeing a subject clears it", a
     if (path === "/v1/notifications") return list;
     if (path.startsWith("/v1/notifications/")) return { done: true };
   });
-  // Home is the reminder's subject, so being here clears it.
-  await expect
-    .poll(
-      () =>
-        calls.find((c) => c.path === "/v1/notifications/dismiss")?.body?.ids,
-    )
-    .toEqual([4]);
-  // The bell's count drops with it, without opening the list.
-  await expect(
-    page.getByRole("button", { name: "Notifications, 1 new" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Notifications/ }).click();
+  // A reminder is a message: being on Home leaves it for the member to read.
+  await page.getByRole("button", { name: "Notifications, 2 new" }).click();
   const sheet = page.getByRole("dialog", { name: "Notifications" });
-  await expect(sheet.getByText("Less than 24 hours left")).toHaveCount(0);
-  await expect(sheet.getByText("1 notification")).toBeVisible();
+  await expect(sheet.getByText("Less than 24 hours left")).toBeVisible();
+  await expect(sheet.getByText("2 notifications")).toBeVisible();
+  expect(calls.some((c) => c.path === "/v1/notifications/dismiss")).toBe(false);
   // Tapping the result opens History and clears it.
   await sheet.getByRole("button", { name: /Week Met/ }).click();
   await expect(page).toHaveURL(/\/history$/);

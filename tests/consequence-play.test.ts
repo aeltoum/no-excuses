@@ -174,7 +174,7 @@ const advance = (db: PGlite, at: string) =>
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("Consequence play loop", { timeout: 30_000 }, () => {
-  it("offers three heavy cards, redraws once, and completes after two approvals", async () => {
+  it("offers three short cards, redraws once, and completes after two approvals", async () => {
     const db = await database();
     await owe(db);
     await owe(db, 0, "2026-03-09T00:01Z");
@@ -205,7 +205,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
       expiresAt: "2026-03-11T01:00:00+00:00",
     });
 
-    expect(selected.logBlocked).toBe(true);
+    expect(selected.logBlocked).toBe(false);
     const attemptId = selected.attempt?.attemptId as string;
     await expect(command(db, 0, "claim", attemptId)).rejects.toThrow(
       "video proof required",
@@ -232,7 +232,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     expect(done.owed).toBe(1);
     expect(done.attempt).toBeNull();
     expect(done.offer?.canRedraw).toBe(true);
-    expect(done.logBlocked).toBe(true);
+    expect(done.logBlocked).toBe(false);
   });
 
   it("offers the next card as soon as proof is sent; silent reviews approve after 48 hours", async () => {
@@ -341,7 +341,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     const after = await home(db, 0);
     expect(after.attempt?.status).toBe("active");
     expect(after.attempt?.pauseRequest).toBeNull();
-    expect(after.logBlocked).toBe(true);
+    expect(after.logBlocked).toBe(false);
     expect((await home(db, 1)).pauseReviews).toEqual([]);
   });
 

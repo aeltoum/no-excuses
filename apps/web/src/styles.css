@@ -4553,14 +4553,12 @@ h1 {
 
 /* Discard draft: same shape as Log workout, in the error colour. */
 .log-sheet-footer .log-discard {
-  justify-self: stretch;
-  width: 100%;
+  justify-self: center;
   min-height: 48px;
   border: 0;
-  border-radius: var(--radius-control);
-  background: var(--error);
-  color: #fff;
-  font-weight: 700;
+  background: none;
+  color: var(--error);
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -5502,4 +5500,127 @@ html.post-viewer-open body {
 }
 .friend-nudge time {
   font-variant-numeric: tabular-nums;
+}
+
+/* Comeback week offer on Week, under the barbell. */
+.comeback-offer {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.comeback-offer h2 {
+  margin: 0;
+  font-size: var(--type-secondary);
+}
+.comeback-offer p {
+  margin: 0;
+  color: var(--muted);
+}
+.comeback-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.comeback-row strong {
+  flex: 1;
+  white-space: nowrap;
+  min-width: 4ch;
+  text-align: center;
+  font-family: "Big Shoulders Display", system-ui, sans-serif;
+  font-size: 1.75rem;
+}
+.comeback-offer > button {
+  width: 100%;
+}
+
+/* Home: the member's week in one tappable strip above the feed. */
+.home-week-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+  text-decoration: none;
+}
+.home-week-strip > .barbell {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 150px;
+}
+.home-week-strip strong {
+  font-family: "Big Shoulders Display", system-ui, sans-serif;
+  font-size: 1.75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.home-week-strip strong span {
+  color: var(--muted);
+  font-size: 1.125rem;
+}
+.home-week-friends {
+  display: flex;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.home-week-friends > .avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  font-size: 0.6875rem;
+  border: 2px solid var(--surface);
+}
+.home-week-strip {
+  overflow: hidden;
+}
+.home-week-friends {
+  gap: 4px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .home-week-strip.plate-drop strong {
+    animation: plate-count 600ms cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  .home-week-strip.plate-drop {
+    animation: plate-thud 420ms cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+}
+@keyframes plate-count {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(2px);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes plate-thud {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(3px);
+    border-color: var(--chalk);
+  }
+}
+
+/* First-win notification ask. */
+.push-ask {
+  display: grid;
+  gap: var(--space-3);
+}
+.push-ask p {
+  margin: 0;
+  color: var(--muted);
 }

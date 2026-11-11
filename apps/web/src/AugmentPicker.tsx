@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { track } from "./track";
 
 type Card = {
   cardId: string;
@@ -51,6 +52,7 @@ export function AugmentPicker({
   useEffect(() => {
     void hand;
     setChosen(null);
+    track("card_offer_viewed");
     buzz([60, 80, 60, 80, 140]);
   }, [hand]);
 
@@ -106,11 +108,9 @@ export function AugmentPicker({
         >
           ×
         </button>
-        <p className="augment-kicker">
-          Penalty due · {owed} owed · 48 hours to finish
-        </p>
+        <p className="augment-kicker">{owed} owed · 48 hours to finish</p>
         <h2 id={titleId} tabIndex={-1}>
-          Choose your punishment
+          Choose your card
         </h2>
         <div className="augment-hand" key={hand}>
           {cards.map((card) => (
@@ -132,7 +132,7 @@ export function AugmentPicker({
                   </span>
                 ) : (
                   <span className="augment-tier">
-                    {card.unlockedByFriend ? "From a friend" : "Penalty"}
+                    {card.unlockedByFriend ? "From a friend" : "Card"}
                   </span>
                 )}
               </span>
@@ -159,7 +159,7 @@ export function AugmentPicker({
             disabled={busy || !chosen}
             onClick={() => chosen && onLock(chosen)}
           >
-            {busy && chosen ? "Locking…" : "Accept penalty"}
+            {busy && chosen ? "Locking…" : "Lock it in"}
           </button>
         </div>
         <p className="augment-hint">

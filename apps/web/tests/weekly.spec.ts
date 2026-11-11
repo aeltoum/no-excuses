@@ -131,9 +131,7 @@ test("one-member Group pauses workouts until a second member joins", async ({
     actionDenied = await page.getByText("Action denied.").isVisible();
   }
   await expect(
-    page.getByText(
-      "Accountability and workouts begin once a second member joins your Group.",
-    ),
+    page.getByText("Workouts start counting once a friend joins your Group."),
   ).toBeVisible();
   expect(actionDenied).toBe(false);
   await expect(logWorkout).toHaveCount(0);
@@ -568,9 +566,7 @@ const weeklyLoop = async (
     await sending.getByRole("button", { name: "Retry" }).click();
   }
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("status")).toHaveText(
-    "Workout logged. 3 of 4 this week. It counts now; friends can question it for 24 hours.",
-  );
+  await expect(page.getByRole("status")).toHaveText("3 of 4. Plate's on.");
   expect(uploads).toBe(2);
   // Logging refreshes the Home feed so the new proof appears.
   await expect.poll(() => feedLoads).toBeGreaterThanOrEqual(2);

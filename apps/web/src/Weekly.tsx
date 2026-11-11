@@ -35,9 +35,10 @@ import {
   saveWorkout,
 } from "./durable";
 import { Exceptions } from "./Exceptions";
-import { useHomeExtras } from "./extras";
+import { extrasCommand, useHomeExtras } from "./extras";
 import { useFreshness } from "./freshness";
 import { InstallPrompt } from "./InstallPrompt";
+import { enablePush, pushAskable, pushNeedsInstall } from "./PushToggle";
 import { onClearPersisted } from "./persist";
 import {
   call,
@@ -52,6 +53,7 @@ import { Result, useNotice } from "./Result";
 import { SeasonCard, SeasonChip, UnlockList, UnlockNote } from "./Season";
 import { clearCandidates, SessionCard, useCandidates } from "./Session";
 import { Sheet } from "./Sheet";
+import { track } from "./track";
 import { ProofFeed, useFeedItems } from "./Wall";
 import { WeekRecap } from "./WeekRecap";
 
@@ -435,6 +437,15 @@ export function Weekly({
     (entry) => entry.membershipId === membership?.membershipId,
   );
   const [feedRevision, setFeedRevision] = useState(0);
+  // The Home strip's new plate lands with a short drop after a confirmed log.
+  const [plateDrop, setPlateDrop] = useState(false);
+  const plateTimer = useRef<number | undefined>(undefined);
+  const [pushAsk, setPushAsk] = useState<"ask" | "install" | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const closePushAsk = () => {
+    markPushAsked();
+    setPushAsk(null);
+  };
   const [awaitingReview, setAwaitingReview] = useState<Set<string>>(
     () => new Set(),
   );
@@ -638,13 +649,31 @@ export function Weekly({
       ),
     );
     for (const entry of sent) dropOutgoing(entry.id);
+    setPlateDrop(true);
+    // The first win is the moment to ask for notifications, once per device.
+    if (!pushAsked() && (pushAskable() || pushNeedsInstall())) {
+      setPushAsk(pushNeedsInstall() ? "install" : "ask");
+      track("push_prompt_shown", { install: pushNeedsInstall() });
+    }
+    // One short buzz where supported (not iPhone Safari); skipped for reduced motion.
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
+      try {
+        navigator.vibrate?.(30);
+      } catch {}
+    window.clearTimeout(plateTimer.current);
+    plateTimer.current = window.setTimeout(() => setPlateDrop(false), 900);
     setFeedRevision((value) => value + 1);
     const target = progress.find(
       (item) => item.membershipId === membership.membershipId,
     )?.lockedTarget;
     setNotice({
       kind: "success",
-      text: `Workout logged. ${last?.count} of ${target} this week. It counts now; friends can question it for 24 hours.`,
+      text:
+        last?.count !== undefined &&
+        target !== undefined &&
+        last.count >= target
+          ? `${last.count} of ${target}. Week's in the bag.`
+          : `${last?.count} of ${target}. Plate's on.`,
     });
     // Refresh in the background; the screen already shows the server count.
     void api
@@ -762,6 +791,7 @@ export function Weekly({
   }, [apiBaseUrl, token, route, groupId, nudgeable, fresh]);
   const nudge = async (membershipId: string) => {
     setNudgedOn((ids) => new Map(ids).set(membershipId, utcDay()));
+    track("nudge_sent");
     try {
       await nudgeMember(apiBaseUrl, token, membershipId);
       setNotice({ kind: "success", text: "Nudge sent." });
@@ -1100,6 +1130,40 @@ export function Weekly({
         <>
           {home && (
             <>
+              {!week && own && (
+                <a
+                  className={`home-week-strip${plateDrop ? " plate-drop" : ""}`}
+                  href="/week"
+                  onClick={(event) => onNavigate(event, "/week")}
+                  aria-label={`Your week: ${own.completedWorkoutCount} of ${own.lockedTarget} workouts. Open Week.`}
+                >
+                  <Barbell
+                    count={own.completedWorkoutCount}
+                    target={own.lockedTarget}
+                    size="mini"
+                    activityTypes={own.activityTypes}
+                  />
+                  <strong>
+                    {own.completedWorkoutCount}
+                    <span> of {own.lockedTarget}</span>
+                  </strong>
+                  <span className="home-week-friends" aria-hidden="true">
+                    {progress
+                      .filter(
+                        (item) => item.membershipId !== membership.membershipId,
+                      )
+                      .slice(0, 3)
+                      .map((item) => (
+                        <Avatar
+                          key={item.membershipId}
+                          name={item.displayName}
+                          url={avatars[item.membershipId]}
+                          size="sm"
+                        />
+                      ))}
+                  </span>
+                </a>
+              )}
               {!week && extras.countNotice && (
                 <CountNotice failed={noticeFailed} onDismiss={dismissNotice} />
               )}
@@ -1148,6 +1212,62 @@ export function Weekly({
                       onOpen={(event) => onNavigate(event, "/history")}
                     />
                   </div>
+                  {extras.pausedStreak ? (
+                    <p className="home-settle">
+                      {extras.pausedStreak}-week streak paused. Meet this week
+                      to get it back.
+                    </p>
+                  ) : null}
+                  {extras.comeback?.available && (
+                    <ComebackOffer
+                      target={own.lockedTarget}
+                      onLower={(next) => {
+                        const previous = extras;
+                        // Optimistic: the lighter target shows at once.
+                        applyExtras({
+                          ...extras,
+                          comeback: {
+                            available: false,
+                            target: next,
+                            loweredFrom: own.lockedTarget,
+                          },
+                        });
+                        setProgress((items) =>
+                          items.map((item) =>
+                            item.membershipId === membership.membershipId
+                              ? { ...item, lockedTarget: next }
+                              : item,
+                          ),
+                        );
+                        setNotice({
+                          kind: "success",
+                          text: `Comeback week: ${next} this week.`,
+                        });
+                        track("comeback_used", {
+                          from: own.lockedTarget,
+                          to: next,
+                        });
+                        extrasCommand(
+                          apiBaseUrl,
+                          token,
+                          "/v1/exceptions/comeback",
+                          { target: next },
+                        )
+                          .then(applyExtras)
+                          .catch((error) => {
+                            applyExtras(previous);
+                            setProgress((items) =>
+                              items.map((item) =>
+                                item.membershipId === membership.membershipId
+                                  ? { ...item, lockedTarget: own.lockedTarget }
+                                  : item,
+                              ),
+                            );
+                            updateError(error);
+                          });
+                      }}
+                    />
+                  )}
                   <UnlockNote unlocks={extras.unlocks} />
                   <div className="home-actions">
                     <Exceptions
@@ -1199,11 +1319,15 @@ export function Weekly({
               ) : own ? null : (
                 <div className="solo-week">
                   <Barbell count={0} target={0} size="big" />
-                  <h2>Waiting for a second member</h2>
-                  <p>
-                    Accountability and workouts begin once a second member joins
-                    your Group.
-                  </p>
+                  <h2>Your bar needs a spotter</h2>
+                  <p>Workouts start counting once a friend joins your Group.</p>
+                  <a
+                    className="primary-action"
+                    href="/group"
+                    onClick={(event) => onNavigate(event, "/group")}
+                  >
+                    Invite a friend
+                  </a>
                   <a
                     className="home-target-link"
                     href="/target"
@@ -1374,7 +1498,10 @@ export function Weekly({
                       event.currentTarget.focus();
                       if (logBlock) setLockOpen(true);
                       // The editor opens first; the camera waits for a capture action.
-                      else setSheetOpen(true);
+                      else {
+                        track("log_sheet_opened");
+                        setSheetOpen(true);
+                      }
                     }}
                   >
                     {logBlock ? (
@@ -1386,6 +1513,77 @@ export function Weekly({
                     )}{" "}
                     Log workout
                   </button>
+                  <Sheet
+                    open={pushAsk !== null}
+                    title="Know when your crew trains"
+                    onDismiss={closePushAsk}
+                  >
+                    <div className="push-ask">
+                      {pushAsk === "install" ? (
+                        <>
+                          <p>
+                            iPhone only sends notifications to apps on your Home
+                            Screen. Tap Share, then Add to Home Screen, and open
+                            No Excuses from there.
+                          </p>
+                          <button type="button" onClick={closePushAsk}>
+                            Got it
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p>
+                            Get a ping when a friend posts or nudges you, and
+                            one before your week closes.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={pushBusy}
+                            onClick={() => {
+                              setPushBusy(true);
+                              void enablePush(apiBaseUrl, token)
+                                .then((on) => {
+                                  if (on)
+                                    track("push_enabled", {
+                                      from: "first_log",
+                                    });
+                                  setNotice(
+                                    on
+                                      ? {
+                                          kind: "success",
+                                          text: "Notifications on.",
+                                        }
+                                      : {
+                                          kind: "error",
+                                          text: "Notifications stayed off. You can turn them on in Account.",
+                                        },
+                                  );
+                                })
+                                .catch(() =>
+                                  setNotice({
+                                    kind: "error",
+                                    text: "Couldn’t turn on notifications. Try again in Account.",
+                                  }),
+                                )
+                                .finally(() => {
+                                  setPushBusy(false);
+                                  closePushAsk();
+                                });
+                            }}
+                          >
+                            {pushBusy ? "Turning on…" : "Turn on notifications"}
+                          </button>
+                          <button
+                            type="button"
+                            className="log-discard"
+                            onClick={closePushAsk}
+                          >
+                            Not now
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </Sheet>
                   <Sheet
                     open={lockOpen}
                     title="Bar’s racked"
@@ -1453,6 +1651,10 @@ export function Weekly({
                         // Optimistic: close the sheet and count it now; the
                         // upload and check-in finish in the background.
                         setOutbox([...outbox, entry]);
+                        track("log_submitted", {
+                          activity: activityType,
+                          minutes: Number(duration),
+                        });
                         setSheetOpen(false);
                         resetDraft();
                         setSessionId(null);
@@ -2209,4 +2411,63 @@ export function prefetchWeekly(
     if (inflight.get(cacheKey)?.load === load) inflight.delete(cacheKey);
   };
   load.then(settle, settle);
+}
+
+// After a missed week: one chance to lighten this week's locked target.
+function ComebackOffer({
+  target,
+  onLower,
+}: {
+  target: number;
+  onLower: (next: number) => void;
+}) {
+  const [next, setNext] = useState(Math.max(1, target - 1));
+  return (
+    <section className="comeback-offer" aria-labelledby="comeback-title">
+      <h2 id="comeback-title">Comeback week</h2>
+      <p>
+        Last week got away. Lighten this one, once, and get back on the bar.
+      </p>
+      <div className="comeback-row">
+        <button
+          type="button"
+          className="target-adjust"
+          aria-label="Fewer workouts"
+          disabled={next <= 1}
+          onClick={() => setNext(Math.max(1, next - 1))}
+        >
+          −
+        </button>
+        <strong>
+          {next} of {target}
+        </strong>
+        <button
+          type="button"
+          className="target-adjust"
+          aria-label="More workouts"
+          disabled={next >= target - 1}
+          onClick={() => setNext(Math.min(target - 1, next + 1))}
+        >
+          +
+        </button>
+      </div>
+      <button type="button" onClick={() => onLower(next)}>
+        Set {next} this week
+      </button>
+    </section>
+  );
+}
+
+const pushAskedKey = "no-excuses:push-asked";
+function pushAsked() {
+  try {
+    return localStorage.getItem(pushAskedKey) === "1";
+  } catch {
+    return true;
+  }
+}
+function markPushAsked() {
+  try {
+    localStorage.setItem(pushAskedKey, "1");
+  } catch {}
 }

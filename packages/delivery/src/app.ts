@@ -1592,6 +1592,17 @@ const exceptionRoutes = (request: Request, path: string) =>
       later(deliverPush);
       return ok(value);
     };
+    // Comeback week: lower this week's target once after a missed week.
+    if (path === "/v1/exceptions/comeback") {
+      if (!Number.isSafeInteger(body.target) || Number(body.target) < 1)
+        return invalid();
+      return ok(
+        await data("select app_private.set_comeback_target($1,$2) as data", [
+          body.target,
+          now,
+        ]),
+      );
+    }
     if (path === "/v1/exceptions/request") {
       const note = body.note ?? null;
       if (
@@ -1961,6 +1972,18 @@ function dispatch(request: Request, path: string): Promise<Response> {
   if (path === "/v1/notifications" || path.startsWith("/v1/notifications/"))
     return notificationRoutes(request, path);
   if (path === "/v1/avatars") return avatarRoutes(request, path);
+  // First-party product events; the database checks names and size.
+  if (path === "/v1/events" && request.method === "POST")
+    return memberRoute(request, async ({ body, now, data }) => {
+      if (!Array.isArray(body.events) || body.events.length > 50)
+        return invalid();
+      return ok({
+        recorded: await data(
+          "select app_private.record_product_events($1::jsonb,$2) as data",
+          [JSON.stringify(body.events), now],
+        ),
+      });
+    });
   for (const [prefix, handler] of extraRoutes)
     if (path.startsWith(prefix)) return handler(request, path);
   return route(request);

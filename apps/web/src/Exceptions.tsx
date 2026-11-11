@@ -7,6 +7,7 @@ import {
   type HomeExtras,
 } from "./extras";
 import { Sheet } from "./Sheet";
+import { track } from "./track";
 
 export const categories: Array<[ExceptionCategory, string]> = [
   ["health_safety", "Health or safety"],
@@ -79,7 +80,9 @@ export function Exceptions({
     if (!category) return;
     const id = crypto.randomUUID();
     const previous = extras;
-    // Optimistic: the request shows as pending at once.
+    const free = extras.freeWeekOff === true;
+    track("week_off_requested", { free, week });
+    // Optimistic: the request shows at once; a free week off is approved outright.
     apply({
       ...extras,
       exceptions: {
@@ -91,18 +94,21 @@ export function Exceptions({
             week,
             category,
             note: note.trim() || null,
-            status: "pending",
+            status: free ? "approved" : "pending",
             closesAt: new Date(Date.now() + 48 * 3_600_000).toISOString(),
           },
         ],
       },
+      freeWeekOff: free ? false : extras.freeWeekOff,
     });
     setOpen(false);
     setCategory(null);
     setNote("");
     onNotice({
       kind: "success",
-      text: `Asked your Group to excuse ${weekLabel(week)}. They have 48 hours.`,
+      text: free
+        ? `${weekLabel(week)[0]?.toUpperCase()}${weekLabel(week).slice(1)} is off. Streaks hold.`
+        : `Asked your Group to excuse ${weekLabel(week)}. They have 48 hours.`,
     });
     void send(
       "/v1/exceptions/request",
@@ -244,8 +250,9 @@ export function Exceptions({
       >
         <form className="exception-form" onSubmit={submit}>
           <p className="hint">
-            Your Group votes privately for 48 hours. If approved, there’s no
-            miss, no card, and your streaks hold. No proof or details needed.
+            {extras.freeWeekOff
+              ? "Your free week off this month: no vote, no miss, no card, and your streaks hold."
+              : "You’ve used this month’s free week. Your Group votes privately for 48 hours; if approved, there’s no miss, no card, and your streaks hold."}
           </p>
           <fieldset className="choice-chips" aria-label="Which week">
             {(["current", "next"] as const).map((value) => (
@@ -284,7 +291,7 @@ export function Exceptions({
             <span className="hint">{280 - note.length} characters left</span>
           </label>
           <button type="submit" disabled={!category || taken.has(week)}>
-            Send request
+            {extras.freeWeekOff ? "Take the week off" : "Send request"}
           </button>
         </form>
       </Sheet>

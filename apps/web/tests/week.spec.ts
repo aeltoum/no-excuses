@@ -145,7 +145,7 @@ test("Week shows the solo state until a second member joins", async ({
     "/week",
   );
   await expect(
-    page.getByRole("heading", { name: "Waiting for a second member" }),
+    page.getByRole("heading", { name: "Your bar needs a spotter" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "Change target" })).toBeVisible();
   expect(await seriousAxe(page)).toEqual([]);
