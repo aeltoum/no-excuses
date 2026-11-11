@@ -59,6 +59,19 @@ const memberRoutes: Array<[Route, string]> = [
   ["/account", "Account"],
 ];
 const currentPath = () => window.location.pathname.replace(/\/+$/, "") || "/";
+// An invite link (/join/<token>) opens sign-in with the invitation attached. The
+// token leaves the address bar at once so it is not kept in history.
+const joinPattern = /^\/join\/([A-Za-z0-9_-]{16,256})$/;
+const takeJoinToken = () => {
+  const token = joinPattern.exec(currentPath())?.[1] ?? null;
+  if (token) window.history.replaceState(null, "", "/sign-in");
+  return token;
+};
+// Read once at startup, before the router reads the address.
+const startupJoinToken = takeJoinToken();
+const canShare = () => typeof navigator.share === "function";
+export const inviteLink = (token: string) =>
+  `${window.location.origin}/join/${token}`;
 
 function TabIcon({ route }: { route: Route }) {
   const shape =
@@ -278,11 +291,12 @@ export function App({
     setDisplayNameLoaded(false);
   }, [access]);
   const [email, setEmail] = useState("");
-  const [enrollmentToken, setEnrollmentToken] = useState("");
+  const [joinToken] = useState(startupJoinToken);
+  const [enrollmentToken, setEnrollmentToken] = useState(joinToken ?? "");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [signInDoor, setSignInDoor] = useState<"invited" | "returning" | null>(
-    null,
+    joinToken ? "invited" : null,
   );
   const codeInputs = useRef<Array<HTMLInputElement | null>>([]);
   const emailInput = useRef<HTMLInputElement>(null);
@@ -1090,20 +1104,26 @@ export function App({
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={busy("send-code")}
                 />
-                {signInDoor === "invited" && (
-                  <>
-                    <label htmlFor="enrollment-token">Invitation code</label>
-                    <input
-                      id="enrollment-token"
-                      type="password"
-                      autoComplete="off"
-                      maxLength={256}
-                      required
-                      value={enrollmentToken}
-                      onChange={(e) => setEnrollmentToken(e.target.value)}
-                      disabled={busy("send-code")}
-                    />
-                  </>
+                {signInDoor === "invited" && joinToken ? (
+                  <p className="hint">
+                    Invitation attached. Use the email it was sent to.
+                  </p>
+                ) : (
+                  signInDoor === "invited" && (
+                    <>
+                      <label htmlFor="enrollment-token">Invitation code</label>
+                      <input
+                        id="enrollment-token"
+                        type="password"
+                        autoComplete="off"
+                        maxLength={256}
+                        required
+                        value={enrollmentToken}
+                        onChange={(e) => setEnrollmentToken(e.target.value)}
+                        disabled={busy("send-code")}
+                      />
+                    </>
+                  )
                 )}
                 <button type="submit" disabled={busy("send-code")}>
                   {busy("send-code") ? "Sending…" : "Send code"}
@@ -1984,27 +2004,43 @@ export function App({
                           <div>
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                const url = inviteLink(inviteReady.token);
+                                if (canShare())
+                                  void navigator
+                                    .share({
+                                      text: `Join ${groupRoster.groupName} on No Excuses`,
+                                      url,
+                                    })
+                                    .catch(() => undefined);
+                                else {
+                                  void navigator.clipboard.writeText(url);
+                                  setNotice({
+                                    kind: "success",
+                                    text: "Invite link copied.",
+                                  });
+                                }
+                              }}
+                            >
+                              {canShare()
+                                ? "Share invite link"
+                                : "Copy invite link"}
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={() => {
                                 void navigator.clipboard.writeText(
                                   inviteReady.token,
-                                )
-                              }
+                                );
+                                setNotice({
+                                  kind: "success",
+                                  text: "Code copied.",
+                                });
+                              }}
                             >
                               Copy code
                             </button>
-                            {navigator.share && (
-                              <button
-                                className="secondary-button"
-                                type="button"
-                                onClick={() =>
-                                  void navigator.share({
-                                    text: `Join ${groupRoster.groupName} with code ${inviteReady.token}`,
-                                  })
-                                }
-                              >
-                                Share…
-                              </button>
-                            )}
                           </div>
                           <p>
                             Send it privately. It works once and expires in 7
