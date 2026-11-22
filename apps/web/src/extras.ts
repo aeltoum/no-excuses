@@ -92,6 +92,8 @@ export type HomeExtras = {
   avatars?: Record<string, string>;
   // Target streak held after one missed week; meeting the next week restores it.
   pausedStreak?: number | null;
+  // An operator Service pause: the week clock is stopped until it ends.
+  groupPause?: { since: string; reason: string } | null;
   // After a missed week: lower this week's target once.
   comeback?: {
     available: boolean;

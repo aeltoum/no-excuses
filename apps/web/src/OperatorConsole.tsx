@@ -265,7 +265,9 @@ export function OperatorConsole({
         <h2 id="holds-heading">Pauses</h2>
         <p className="hint">
           While a pause is open, the weeks it covers wait to settle, so nobody
-          misses a week for an outage or a defect.
+          misses a week for an outage or a defect. A whole-Group pause also
+          stops the Group's clock and notifies everyone when it opens and ends;
+          ending it moves the week's deadline later by the time paused.
         </p>
         {state.holds.length > 0 && (
           <ul className="operator-list">

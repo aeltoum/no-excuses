@@ -4558,6 +4558,17 @@ h1 {
 .week-countdown-title.is-close {
   color: var(--error);
 }
+.week-countdown-title.is-paused {
+  color: var(--muted);
+}
+.pause-glyph {
+  display: inline-block;
+  width: 18px;
+  height: 26px;
+  margin-right: 10px;
+  border-inline: 6px solid currentColor;
+  vertical-align: -1px;
+}
 
 .proof-reactions .proof-comment {
   margin-right: -10px;

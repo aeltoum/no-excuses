@@ -90,21 +90,38 @@ function NudgeCountdown({ onDone }: { onDone: () => void }) {
 }
 
 // Time left before the week closes, as the Week title, ticking each second.
-function WeekCountdown({ endsAt }: { endsAt: string | null }) {
+// While the Group is paused the clock holds the time left when the pause began.
+function WeekCountdown({
+  endsAt,
+  pausedSince,
+}: {
+  endsAt: string | null;
+  pausedSince?: string | null;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!endsAt) return;
+    if (!endsAt || pausedSince) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [endsAt]);
+  }, [endsAt, pausedSince]);
   if (!endsAt) return <h1 className="week-countdown-title">Our week</h1>;
-  const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - now) / 1000));
+  const from = pausedSince ? Date.parse(pausedSince) : now;
+  const seconds = Math.max(0, Math.floor((Date.parse(endsAt) - from) / 1000));
   // The server rolls the week over within a minute or so.
-  if (seconds === 0)
+  if (seconds === 0 && !pausedSince)
     return <h1 className="week-countdown-title is-close">Week closing</h1>;
   const pad = (value: number) => String(value).padStart(2, "0");
   // Days:hours:minutes:seconds.
   const text = `${Math.floor(seconds / 86_400)}:${pad(Math.floor((seconds % 86_400) / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
+  if (pausedSince)
+    return (
+      <h1 className="week-countdown-title is-paused">
+        <span className="visually-hidden">Week paused with </span>
+        <span className="pause-glyph" aria-hidden="true" />
+        {text}
+        <span className="visually-hidden"> left</span>
+      </h1>
+    );
   return (
     <h1
       className={`week-countdown-title${seconds < 86_400 ? " is-close" : ""}`}
@@ -1010,7 +1027,10 @@ export function Weekly({
       {home ? (
         <header className="home-header">
           {week ? (
-            <WeekCountdown endsAt={targetContext?.nextWeekStartsAt ?? null} />
+            <WeekCountdown
+              endsAt={targetContext?.nextWeekStartsAt ?? null}
+              pausedSince={extras.groupPause?.since ?? null}
+            />
           ) : (
             <h1>Home</h1>
           )}
@@ -1212,6 +1232,12 @@ export function Weekly({
                       onOpen={(event) => onNavigate(event, "/history")}
                     />
                   </div>
+                  {extras.groupPause ? (
+                    <p className="home-settle group-pause-note" role="status">
+                      Week paused: {extras.groupPause.reason}. The clock is
+                      stopped and the time comes back when it resumes.
+                    </p>
+                  ) : null}
                   {extras.pausedStreak ? (
                     <p className="home-settle">
                       {extras.pausedStreak}-week streak paused. Meet this week
