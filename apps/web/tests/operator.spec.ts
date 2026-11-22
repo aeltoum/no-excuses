@@ -109,3 +109,50 @@ test("the console refuses members who are not operators", async ({ page }) => {
     page.getByRole("link", { name: /Operator console/ }),
   ).toHaveCount(0);
 });
+
+test("operators remove an owed card after a reason and confirm", async ({
+  page,
+}) => {
+  const card = {
+    obligationId: "92000000-0000-4000-8000-000000000001",
+    membershipId: "30000000-0000-4000-8000-000000000002",
+    member: "Maya",
+    group: "6AM Crew",
+    reason: "missed_target",
+    createdAt: "2026-10-19T10:00:00.000Z",
+    card: "Wall sit 60s",
+    expiresAt: "2026-10-21T10:00:00.000Z",
+  };
+  const { calls, errors } = await signIn(page, ({ path }) => {
+    if (path === "/v1/home/extras")
+      return homeExtras({
+        safety: { conductAccepted: true, blocked: [], operator: true },
+      });
+    if (path === "/v1/operator") return { ...state, cards: [card] };
+    if (path === "/v1/operator/void-card") return { ...state, cards: [] };
+  });
+  await page.getByRole("link", { name: /^Account/ }).click();
+  await page.getByRole("link", { name: /Operator console/ }).click();
+  await expect(page.getByText("Maya · Wall sit 60s")).toBeVisible();
+  const remove = page.getByRole("button", { name: "Remove card" });
+  await expect(remove).toBeDisabled();
+  await page.getByLabel("Why remove Maya’s card").fill("Unsafe for injury");
+  await delayRoute(page, "**/v1/operator/void-card", 1000);
+  await remove.click();
+  const pending = await msUntilVisible(
+    page,
+    () =>
+      page
+        .getByRole("dialog", { name: "Remove this card?" })
+        .getByRole("button", { name: "Remove card" })
+        .click(),
+    page.getByRole("button", { name: "Removing…" }),
+  );
+  expect(pending).toBeLessThanOrEqual(100);
+  await expect(page.getByText("Nobody owes a card.")).toBeVisible();
+  expect(calls.find((c) => c.path === "/v1/operator/void-card")?.body).toEqual({
+    obligationId: card.obligationId,
+    reason: "Unsafe for injury",
+  });
+  expect(errors).toEqual([]);
+});

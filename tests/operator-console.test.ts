@@ -155,4 +155,83 @@ describe("Operator console", { timeout: 30_000 }, () => {
     );
     expect(await status()).toBe("missed");
   });
+
+  it("voids one owed card with a reason and audit row", async () => {
+    const db = await withOperator();
+    const owe = () =>
+      db.query(
+        "select app_private.add_consequence_obligation($1, $2, 'missed_target', $3, '2026-03-05T10:00Z')",
+        [randomUUID(), memberships[0], randomUUID()],
+      );
+    await owe();
+    await owe();
+    await db.query(
+      "select app_private.advance_consequences('2026-03-05T11:00Z')",
+    );
+    type Cards = { cards: Array<{ obligationId: string; member: string }> };
+    const before = await data<Cards>(
+      db,
+      2,
+      "select app_private.operator_console('2026-03-05T12:00Z') as data",
+    );
+    expect(before.cards.map((c) => c.member)).toEqual(["Alex", "Alex"]);
+    const target = before.cards[0]?.obligationId;
+    await as(db, 0);
+    expect(
+      await rejects(
+        db.query(
+          "select app_private.operator_void_card($1, 'x', '2026-03-05T12:00Z')",
+          [target],
+        ),
+      ),
+    ).toBe("42501");
+    await as(db, 2);
+    expect(
+      await rejects(
+        db.query(
+          "select app_private.operator_void_card($1, '  ', '2026-03-05T12:00Z')",
+          [target],
+        ),
+      ),
+    ).toBe("22023");
+    const after = await data<Cards>(
+      db,
+      2,
+      "select app_private.operator_void_card($1, 'Unsafe for injury', '2026-03-05T12:00Z') as data",
+      [target],
+    );
+    expect(after.cards.map((c) => c.obligationId)).toEqual([
+      before.cards[1]?.obligationId,
+    ]);
+    const rows = await db.query<{ o: string; offer: string; reason: string }>(
+      `select o.status as o, (select string_agg(status, ',') from app_private.card_offers
+         where obligation_id = o.obligation_id) as offer, v.reason
+       from app_private.consequence_obligations o
+       join app_private.operator_card_voids v using (obligation_id)
+       where o.obligation_id = $1`,
+      [target],
+    );
+    expect(rows.rows[0]).toEqual({
+      o: "voided",
+      offer: "voided",
+      reason: "Unsafe for injury",
+    });
+    expect(
+      await rejects(
+        db.query(
+          "select app_private.operator_void_card($1, 'again', '2026-03-05T12:01Z')",
+          [target],
+        ),
+      ),
+    ).toBe("P0002");
+    // The next owed card is offered as usual.
+    await db.query(
+      "select app_private.advance_consequences('2026-03-05T12:02Z')",
+    );
+    const next = await db.query<{ n: number }>(
+      "select count(*)::int as n from app_private.card_offers where obligation_id = $1 and status = 'initial'",
+      [before.cards[1]?.obligationId],
+    );
+    expect(next.rows[0]?.n).toBe(1);
+  });
 });
