@@ -1848,6 +1848,17 @@ const operatorRoutes = (request: Request, path: string) =>
           await data("select app_private.operator_console($1) as data", [now]),
         ),
       );
+    // Alpha overrides: one member's backlog and weeks, waive, excuse, add a workout.
+    const memberPath = /^\/v1\/operator\/member\/([0-9a-f-]{36})$/.exec(path);
+    if (memberPath && method === "GET") {
+      if (!anyUuid(memberPath[1])) return invalid();
+      return ok(
+        await data("select app_private.operator_member($1,$2) as data", [
+          memberPath[1],
+          now,
+        ]),
+      );
+    }
     if (method !== "POST") return fail("not_found", 404);
     if (path === "/v1/operator/resolve") {
       if (
@@ -1906,8 +1917,58 @@ const operatorRoutes = (request: Request, path: string) =>
         ),
       );
     }
+    if (path === "/v1/operator/waive") {
+      if (
+        !anyUuid(body.membershipId) ||
+        (body.obligationId != null && !anyUuid(body.obligationId))
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.operator_waive_consequences($1,$2,$3) as data",
+          [body.membershipId, body.obligationId ?? null, now],
+        ),
+      );
+    }
+    if (path === "/v1/operator/excuse") {
+      if (!anyUuid(body.memberWeekId)) return invalid();
+      return ok(
+        await data("select app_private.operator_excuse_week($1,$2) as data", [
+          body.memberWeekId,
+          now,
+        ]),
+      );
+    }
+    if (path === "/v1/operator/workout") {
+      const minutes = Number(body.durationMinutes);
+      if (
+        !anyUuid(body.memberWeekId) ||
+        !operatorActivities.includes(String(body.activityType)) ||
+        !["low", "moderate", "high"].includes(String(body.intensity)) ||
+        typeof body.completedAt !== "string" ||
+        Number.isNaN(Date.parse(body.completedAt)) ||
+        !Number.isInteger(minutes) ||
+        minutes < 1 ||
+        minutes > 600
+      )
+        return invalid();
+      return ok(
+        await data(
+          "select app_private.operator_add_workout($1,$2,$3,$4,$5,$6) as data",
+          [
+            body.memberWeekId,
+            body.activityType,
+            new Date(body.completedAt).toISOString(),
+            minutes,
+            body.intensity,
+            now,
+          ],
+        ),
+      );
+    }
     return fail("not_found", 404);
   });
+const operatorActivities = ["strength", "cardio", "class", "sport", "mixed"];
 
 const sessionAction = /^\/v1\/sessions\/([0-9a-f-]{36})\/(start|end|link)$/;
 const sessionRoutes = (request: Request, path: string) =>

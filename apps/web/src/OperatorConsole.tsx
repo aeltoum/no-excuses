@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "./api-client";
 import { useConfirm } from "./Confirm";
+import { MemberSupport } from "./MemberSupport";
 import { call } from "./proof";
 import { Result, useNotice } from "./Result";
 
@@ -224,6 +225,13 @@ export function OperatorConsole({
           </ul>
         )}
       </section>
+      <MemberSupport
+        apiBaseUrl={apiBaseUrl}
+        token={token}
+        groups={state.groups}
+        ask={ask}
+        setNotice={setNotice}
+      />
       {state.suspended.length > 0 && (
         <section aria-labelledby="suspended-heading">
           <h2 id="suspended-heading">Suspended</h2>

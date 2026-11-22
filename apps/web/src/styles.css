@@ -3132,6 +3132,60 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+/* Member support (alpha overrides) */
+.support-pick,
+.support-log {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+.support-skeleton,
+.support-member {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+.support-streak {
+  margin: 0;
+}
+.support-block h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.support-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.support-block-head button {
+  width: auto;
+  padding-inline: 12px;
+}
+.support-line {
+  display: grid;
+  gap: 2px;
+  padding-block: 8px;
+}
+.support-line > span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.support-line > span[data-status="missed"] {
+  color: var(--ink);
+}
+.operator-list li.support-week {
+  flex-wrap: wrap;
+}
+.support-week .operator-actions {
+  justify-content: flex-end;
+}
+.support-log {
+  flex-basis: 100%;
+  padding: 0 0 12px;
+}
+
 /* Timed sessions */
 .session-start {
   display: block;
