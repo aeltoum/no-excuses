@@ -150,9 +150,84 @@ describe("Operator console", { timeout: 30_000 }, () => {
       "select app_private.operator_set_hold(null, null, '', false, $1, '2026-03-09T03:00Z') as data",
       [held.holds[0]?.id],
     );
+    // The 7-hour pause moved the week's end from Mar 9 00:00 to 07:00.
     await db.query(
       "select app_private.advance_true_mvp_weeks('2026-03-09T04:00Z')",
     );
+    expect(await status()).toBe("active");
+    await db.query(
+      "select app_private.advance_true_mvp_weeks('2026-03-09T07:01Z')",
+    );
     expect(await status()).toBe("missed");
+  });
+
+  it("stops the Group clock, notifies members, and shifts the calendar on resume", async () => {
+    const db = await withOperator();
+    const weeks = async () =>
+      (
+        await db.query<{ starts_at: Date; ends_at: Date }>(
+          "select starts_at, ends_at from app_private.accountability_weeks where group_id = $1 order by starts_at",
+          [group],
+        )
+      ).rows.map((row) => [
+        new Date(row.starts_at).toISOString(),
+        new Date(row.ends_at).toISOString(),
+      ]);
+    const notices = async () =>
+      (
+        await db.query<{ title: string; body: string }>(
+          "select title, body from app_private.web_push_outbox where dedupe_key like 'pause:%' order by outbox_id",
+        )
+      ).rows;
+    const held = await data<Console>(
+      db,
+      2,
+      "select app_private.operator_set_hold($1, null, 'Upload outage', true, null, '2026-03-08T12:00Z') as data",
+      [group],
+    );
+    expect(await notices()).toHaveLength(3);
+    expect((await notices())[0]?.title).toBe("Week paused");
+    expect(
+      await data<{ groupPause: { reason: string } | null }>(
+        db,
+        0,
+        "select app_private.home_extras('2026-03-08T13:00Z') as data",
+      ),
+    ).toMatchObject({ groupPause: { reason: "Upload outage" } });
+    await as(db, 2);
+    expect(
+      await rejects(
+        db.query(
+          "select app_private.operator_set_hold($1, null, 'Again', true, null, '2026-03-08T13:00Z')",
+          [group],
+        ),
+      ),
+    ).toBe("22023");
+    // The week end passes during the pause: no rollover.
+    await db.query(
+      "select app_private.advance_true_mvp_weeks('2026-03-10T00:00Z')",
+    );
+    expect(await weeks()).toEqual([
+      ["2026-03-02T00:00:00.000Z", "2026-03-09T00:00:00.000Z"],
+    ]);
+    // Resumed after 36 hours: this week and every later one move 36 hours.
+    await data(
+      db,
+      2,
+      "select app_private.operator_set_hold(null, null, '', false, $1, '2026-03-10T00:00Z') as data",
+      [held.holds[0]?.id],
+    );
+    expect((await notices()).at(-1)).toMatchObject({
+      title: "Week resumed",
+      body: "The clock is running again. This week now ends Tuesday March 10, 12:00 PM.",
+    });
+    await db.query(
+      "select app_private.advance_true_mvp_weeks('2026-03-17T13:00Z')",
+    );
+    expect(await weeks()).toEqual([
+      ["2026-03-02T00:00:00.000Z", "2026-03-10T12:00:00.000Z"],
+      ["2026-03-10T12:00:00.000Z", "2026-03-17T12:00:00.000Z"],
+      ["2026-03-17T12:00:00.000Z", "2026-03-24T12:00:00.000Z"],
+    ]);
   });
 });
