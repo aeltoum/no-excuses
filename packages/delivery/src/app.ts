@@ -450,7 +450,8 @@ function protectedHandler(
     if (!parsed.success) return fail("invalid_request", 400);
     const body = parsed.data as Record<string, unknown>;
     let context:
-      { key: string; hash: string; id: string; now: string } | undefined;
+      | { key: string; hash: string; id: string; now: string }
+      | undefined;
     if (command) {
       const key = request.headers["idempotency-key"];
       if (!uuid(key)) return fail("idempotency_required", 400);

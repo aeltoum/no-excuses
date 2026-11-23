@@ -2186,7 +2186,10 @@ export function App({
             <Result notice={notice} />
           </Page>
         ) : route === "/operator" ? (
-          <Page title="Operator console" lead="Moderation cases, owed cards, and pauses.">
+          <Page
+            title="Operator console"
+            lead="Moderation cases, owed cards, and pauses."
+          >
             {session && (
               <OperatorConsole
                 apiBaseUrl={apiBaseUrl}
