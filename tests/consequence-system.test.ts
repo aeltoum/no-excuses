@@ -13,13 +13,14 @@ const memberships = [1, 2, 3, 4].map(
   (n) => `83000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
 );
 
-async function database() {
+async function database(stopBefore?: string) {
   const db = new PGlite();
   opened.push(db);
   await db.exec(
     "create role anon; create role authenticated; create role service_role;",
   );
   for (const file of (await readdir(migrationsDirectory)).sort()) {
+    if (stopBefore && file >= stopBefore) continue;
     await db.exec(await readFile(new URL(file, migrationsDirectory), "utf8"));
   }
   await db.exec(`
@@ -91,7 +92,7 @@ describe("M5 Consequence system", () => {
         count(*) filter (where progression)::integer as progression
         from app_private.consequence_cards where retired_at is null`)
       ).rows,
-    ).toEqual([{ total: 14, starters: 6, progression: 8 }]);
+    ).toEqual([{ total: 16, starters: 6, progression: 10 }]);
 
     const unlockId = randomUUID();
     const unlock = await db.query<{ award_card_unlock: string }>(
@@ -207,16 +208,59 @@ describe("M5 Consequence system", () => {
     ).toEqual([{ count: 1 }]);
   });
 
-  it("caps and deduplicates backlog, pauses safely, expires once, and reoffers original obligation", async () => {
+  it("collapses stacked owed cards to one, keeping the card in play and auditing the voids", async () => {
+    const oneCard = "20261201000000_consequence_one_card.sql";
+    const db = await database(oneCard);
+    const stacked = [];
+    for (let n = 0; n < 3; n += 1) stacked.push(await addObligation(db));
+    const single = await addObligation(db, memberships[1]);
+    // The newest of the three is the one on offer, so it is the one kept.
+    await offer(db, stacked[2]?.obligationId ?? "");
+    await db.exec(
+      await readFile(new URL(oneCard, migrationsDirectory), "utf8"),
+    );
+    const rows = async (sql: string) => (await db.query(sql)).rows;
+    expect(
+      await rows(`select membership_id, obligation_id from app_private.consequence_obligations
+        where status = 'open' order by membership_id`),
+    ).toEqual([
+      {
+        membership_id: memberships[0],
+        obligation_id: stacked[2]?.obligationId,
+      },
+      { membership_id: memberships[1], obligation_id: single.obligationId },
+    ]);
+    expect(
+      await rows(`select count(*)::integer as count from app_private.consequence_obligations o
+        join app_private.operator_card_voids v using (obligation_id)
+        where o.status = 'voided' and v.voided_by is null and v.reason like 'One owed card%'`),
+    ).toEqual([{ count: 2 }]);
+    expect(
+      await rows(
+        "select count(*)::integer as count from app_private.consequence_obligations",
+      ),
+    ).toEqual([{ count: 4 }]);
+    expect(
+      await rows(`select count(*)::integer as count from app_private.card_offers
+        where obligation_id = '${stacked[2]?.obligationId}' and status = 'initial'`),
+    ).toEqual([{ count: 1 }]);
+    expect(
+      await rows(
+        "select count(*)::integer as count from app_private.consequence_cards where retired_at is null and catalog_key like 'v4_%'",
+      ),
+    ).toEqual([{ count: 16 }]);
+  });
+
+  it("caps owed cards at one, deduplicates, pauses safely, expires once, and reoffers original obligation", async () => {
     const db = await database();
     const obligations = [];
-    for (let n = 0; n < 6; n += 1) obligations.push(await addObligation(db));
+    for (let n = 0; n < 3; n += 1) obligations.push(await addObligation(db));
     expect(
       (
         await db.query(`select count(*)::integer as count from app_private.consequence_obligations
         where membership_id = '${memberships[0]}' and status = 'open'`)
       ).rows,
-    ).toEqual([{ count: 5 }]);
+    ).toEqual([{ count: 1 }]);
     expect(
       (
         await db.query(
@@ -227,9 +271,6 @@ describe("M5 Consequence system", () => {
     ).toEqual([{ add_consequence_obligation: obligations[0]?.obligationId }]);
 
     const offerId = await offer(db, obligations[0]?.obligationId ?? "");
-    await expect(offer(db, obligations[1]?.obligationId ?? "")).rejects.toThrow(
-      "duplicate key",
-    );
     await db.exec(`update app_private.consequence_obligations set status = 'completed', closed_at = '2026-03-10Z'
       where obligation_id <> '${obligations[0]?.obligationId}'`);
     const selected = (
@@ -290,7 +331,7 @@ describe("M5 Consequence system", () => {
         await db.query(`select count(*)::integer as count from app_private.consequence_obligations
         where membership_id = '${memberships[0]}' and status = 'open'`)
       ).rows,
-    ).toEqual([{ count: 2 }]);
+    ).toEqual([{ count: 1 }]);
   });
 
   it("approves at threshold exactly once; rejection, timeout, and departure keep no extra obligation effect", async () => {

@@ -21,7 +21,7 @@ A revocable, single-use invitation created by a Group admin that expires after s
 _Avoid_: Public join link, membership application
 
 **Group member**:
-A person aged 18 or older who has accepted a Group invitation and has not left, been removed, or had service access terminated. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward; while currently in the Group they may also see any still-retained Verified Proof item on the Wall, including its week and date, author, activity type, structured Workout details, Verified status, photos, and still-available descriptions, even when it was verified before they joined or rejoined. Other earlier Workout-report information, Missed-target events, Exceptions, and discussions remain hidden. A midweek join is marked neutrally with its date and reduced target; apart from the bounded Wall exception, it never reveals pre-membership activity. Any member may leave at any time; on leaving, removal, or termination, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless Account deletion replaces it with Former member while Proof photos follow their existing deletion periods. The former member's Workout reports leave the Wall, their Proof photos are deleted, and they can no longer be questioned (an already open Group decision on one still closes under its usual rule), pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Consequence backlog close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. A person whose account remains eligible may return through a new invitation, beginning a new membership with new targets and streaks and the ordinary midweek-join rules, including current-member access to still-retained Verified Proof items on the Wall.
+A person aged 18 or older who has accepted a Group invitation and has not left, been removed, or had service access terminated. On joining, a member may see current targets, progress, and streaks plus activity created from that moment onward; while currently in the Group they may also see any still-retained Verified Proof item on the Wall, including its week and date, author, activity type, structured Workout details, Verified status, photos, and still-available descriptions, even when it was verified before they joined or rejoined. Other earlier Workout-report information, Missed-target events, Exceptions, and discussions remain hidden. A midweek join is marked neutrally with its date and reduced target; apart from the bounded Wall exception, it never reveals pre-membership activity. Any member may leave at any time; on leaving, removal, or termination, access ends immediately, later Group activity remains hidden, and the Group retains non-media accountability records under the former member's identity unless Account deletion replaces it with Former member while Proof photos follow their existing deletion periods. The former member's Workout reports leave the Wall, their Proof photos are deleted, and they can no longer be questioned (an already open Group decision on one still closes under its usual rule), pending Exception requests are withdrawn, unfinished accountability week ends without a result or Missed-target event, active Consequence cards and the Owed card close without completion, and votes on other members' open decisions are removed before thresholds are recalculated; finalized history never changes. A person whose account remains eligible may return through a new invitation, beginning a new membership with new targets and streaks and the ordinary midweek-join rules, including current-member access to still-retained Verified Proof items on the Wall.
 _Avoid_: Follower, subscriber
 
 **Former member**:
@@ -77,7 +77,7 @@ A Group-local, sequentially numbered series of four active accountability weeks 
 _Avoid_: Permanent leaderboard, workout streak, elapsed calendar month
 
 **Season standings**:
-The Group-visible ranking of current Group members by Crowns earned during the current Season. A mid-Season joiner enters immediately with zero Crowns and a visible joining-week marker, without proration or Crowns transferred from another membership. A departure removes the former member from active standings while preserving finalized weekly awards in history; returning begins again at zero. Equal Crown totals share rank, and every member tied for first when the Season ends is a co-champion. Crown totals and Season standings reset when the next Season begins; Weekly targets, Target streaks, Workout streaks, Performance baselines, Card unlocks, Consequence backlogs, and membership continue across the boundary.
+The Group-visible ranking of current Group members by Crowns earned during the current Season. A mid-Season joiner enters immediately with zero Crowns and a visible joining-week marker, without proration or Crowns transferred from another membership. A departure removes the former member from active standings while preserving finalized weekly awards in history; returning begins again at zero. Equal Crown totals share rank, and every member tied for first when the Season ends is a co-champion. Crown totals and Season standings reset when the next Season begins; Weekly targets, Target streaks, Workout streaks, Performance baselines, Card unlocks, Owed cards, and membership continue across the boundary.
 _Avoid_: All-time ranking, prorated score, transferred Crowns, tiebreaker
 
 **Season summary**:
@@ -165,11 +165,11 @@ A neutral, group-visible record created when a member's finalized accountability
 _Avoid_: Failure, punishment, public shaming
 
 **Consequence card**:
-An app-authored low- or medium-effort physical activity lasting no more than five minutes, selected by a member from a Card offer to satisfy one item in their Consequence backlog. It requires no equipment, fits a small safe space, supports lower-impact adaptation, and never requires maximal effort, exercise to failure, excessive repetition, breath-holding, pain, hazardous surroundings, or a judgment about medical fitness.
+An app-authored, structured bodyweight session of about 10 to 15 minutes, set as intervals or rounds (for example EMOM 12: 10 squats + 5 push-ups) so it is manageable for a general fitness level yet felt, selected by a member from a Card offer to settle their one Owed card. It requires no equipment, fits a small safe space, supports lower-impact adaptation, and never requires maximal effort, exercise to failure, excessive repetition, breath-holding, pain, hazardous surroundings, or a judgment about medical fitness.
 _Avoid_: Punishment, maximal-effort card, user-authored forfeit
 
 **Card catalog**:
-The app-authored inventory of available Consequence cards. The MVP launches with six universal starter cards and eight equally safe, equally ranked progression cards.
+The app-authored inventory of available Consequence cards. Catalog release 4 holds six universal starter cards and ten equally safe, equally ranked progression cards; earlier releases are retired, never deleted, so history keeps its references.
 _Avoid_: Card pool, user-created deck, rarity tier
 
 **Card unlock**:
@@ -184,16 +184,16 @@ _Avoid_: Hand-picked deck, weighted duplicates
 Three distinct random Consequence cards from which a member selects one. A member may instead use one redraw that excludes all three original cards, after which they must select from the three replacements.
 _Avoid_: Assigned card, unlimited redraw
 
-**Consequence backlog**:
-A Group-visible count of Consequence completions a member owes after Missed-target events, Rejected reports, and expired Consequence cards, capped at five with only one active Card offer at a time. Expiration keeps the original completion owed and adds another up to the cap, while each approved Consequence completion removes exactly one.
-_Avoid_: Punishment debt, simultaneous card stack
+**Owed card**:
+The single Group-visible Consequence completion a member owes after a Missed-target event, Rejected report, or expired Consequence card. A member owes at most one at a time: further Missed-target events or Rejected reports while one is owed add nothing, and expiration keeps the same card owed and deals a fresh Card offer. An approved Consequence completion clears it. Backlogs from before this rule collapsed to one, with the extra cards voided and audited rather than deleted.
+_Avoid_: Consequence backlog, punishment debt, card stack
 
 **Consequence completion**:
-A Consequence card completed through a timely structured completion claim approved by two other Group members, or by every other member when fewer than two are available. The claim contains the fixed Card identity, completion time, the member's explicit attestation, and one Proof clip; it has no free text. Approval acknowledges a trusted peer's claim rather than certifying independently observed performance. It removes exactly one item from the member's Consequence backlog and starts the next Card offer when any remain.
+A Consequence card completed through a timely structured completion claim approved by two other Group members, or by every other member when fewer than two are available. The claim contains the fixed Card identity, completion time, the member's explicit attestation, and one Proof clip; it has no free text. Approval acknowledges a trusted peer's claim rather than certifying independently observed performance. It clears the member's Owed card.
 _Avoid_: Self-reported consequence
 
 **Consequence completion claim**:
-A Group-visible structured claim submitted within an active Consequence card's 48-hour deadline. It identifies the fixed Card and completion time, requires an explicit completion attestation and one Proof clip, permits no free text, and pauses Card expiration during a 48-hour peer review. Reviewers may Approve, Reject, or choose Cannot assess; review closes when two other Group members approve or reject, every other member does so when fewer than two are available, or time expires. A rejected or timed-out claim is Not completed and returns the original owed completion to a fresh Card offer without adding another backlog item.
+A Group-visible structured claim submitted within an active Consequence card's 48-hour deadline. It identifies the fixed Card and completion time, requires an explicit completion attestation and one Proof clip, permits no free text, and pauses Card expiration during a 48-hour peer review. Reviewers may Approve, Reject, or choose Cannot assess; review closes when two other Group members approve or reject, every other member does so when fewer than two are available, or time expires. A rejected or timed-out claim is Not completed and returns the original owed completion to a fresh Card offer without adding another Owed card.
 _Avoid_: Independent performance verification
 
 **Proof clip**:
@@ -201,7 +201,7 @@ A video of up to 30 seconds recorded live in the app for a Consequence completio
 _Avoid_: Proof video from the camera roll
 
 **Safety pause**:
-A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still add to the Consequence backlog.
+A Group-visible suspension of an active Consequence card when a member cannot safely perform it, requiring no health disclosure, proof, or peer approval. It freezes expiration penalties until the member declares readiness and receives a fresh Card offer, while independent Missed-target events and Rejected reports may still create an Owed card when none is owed.
 _Avoid_: Medical excuse, permanent opt-out
 
 **Critical safety incident**:

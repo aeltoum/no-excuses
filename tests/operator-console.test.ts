@@ -164,7 +164,6 @@ describe("Operator console", { timeout: 30_000 }, () => {
         [randomUUID(), memberships[0], randomUUID()],
       );
     await owe();
-    await owe();
     await db.query(
       "select app_private.advance_consequences('2026-03-05T11:00Z')",
     );
@@ -174,7 +173,7 @@ describe("Operator console", { timeout: 30_000 }, () => {
       2,
       "select app_private.operator_console('2026-03-05T12:00Z') as data",
     );
-    expect(before.cards.map((c) => c.member)).toEqual(["Alex", "Alex"]);
+    expect(before.cards.map((c) => c.member)).toEqual(["Alex"]);
     const target = before.cards[0]?.obligationId;
     await as(db, 0);
     expect(
@@ -200,9 +199,7 @@ describe("Operator console", { timeout: 30_000 }, () => {
       "select app_private.operator_void_card($1, 'Unsafe for injury', '2026-03-05T12:00Z') as data",
       [target],
     );
-    expect(after.cards.map((c) => c.obligationId)).toEqual([
-      before.cards[1]?.obligationId,
-    ]);
+    expect(after.cards).toEqual([]);
     const rows = await db.query<{ o: string; offer: string; reason: string }>(
       `select o.status as o, (select string_agg(status, ',') from app_private.card_offers
          where obligation_id = o.obligation_id) as offer, v.reason
@@ -224,14 +221,12 @@ describe("Operator console", { timeout: 30_000 }, () => {
         ),
       ),
     ).toBe("P0002");
-    // The next owed card is offered as usual.
-    await db.query(
-      "select app_private.advance_consequences('2026-03-05T12:02Z')",
+    // With nothing owed, the next miss owes a fresh card.
+    await owe();
+    const owed = await db.query<{ n: number }>(
+      "select count(*)::int as n from app_private.consequence_obligations where membership_id = $1 and status = 'open'",
+      [memberships[0]],
     );
-    const next = await db.query<{ n: number }>(
-      "select count(*)::int as n from app_private.card_offers where obligation_id = $1 and status = 'initial'",
-      [before.cards[1]?.obligationId],
-    );
-    expect(next.rows[0]?.n).toBe(1);
+    expect(owed.rows[0]?.n).toBe(1);
   });
 });
