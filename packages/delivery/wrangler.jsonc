@@ -13,6 +13,18 @@
   "preview_urls": false,
   // Keep values set in the dashboard when a deploy runs.
   "keep_vars": true,
+  // Run next to Supabase (AWS us-east-1): each request makes several database and Auth round
+  // trips, so running near the member instead made them cross the ocean one by one.
+  "placement": { "mode": "targeted", "region": "aws:us-east-1" },
+  // Pooled database connections near Supabase (Workers Free, caching off so reads stay fresh).
+  // cloudflare.ts uses it in place of DATABASE_URL. `wrangler dev` uses localConnectionString.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "657acc2fe26544bfba97129fe974390f",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    }
+  ],
   // Weekly rollover, cleanup, and push delivery, as the Node process did every minute.
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }

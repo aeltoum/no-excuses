@@ -423,7 +423,12 @@ function dbError(error: unknown): ApiResponse {
   if (code === "23505" || code === "23514")
     return fail("idempotency_conflict", 409);
   if (code === "22023" || code === "22P02") return fail("invalid_request", 400);
-  console.error("API database operation failed", code ?? "unknown");
+  // Errors without a SQLSTATE come from the connection, not from SQL, so their
+  // message (e.g. a timeout or pool limit) carries no member data.
+  console.error(
+    "API database operation failed",
+    code ?? `unknown: ${String((error as Error)?.message).slice(0, 200)}`,
+  );
   return fail("domain_failure", 500);
 }
 

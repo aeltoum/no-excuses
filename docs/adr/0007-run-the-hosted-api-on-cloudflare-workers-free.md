@@ -28,8 +28,9 @@ keep-awake traffic is needed.
 - Work that ran after a response with `setImmediate` (push delivery, photo deletion) now runs
   inside `ctx.waitUntil` on Workers.
 - Each request and cron run opens its own small `pg` pool, because a Worker cannot share a
-  connection between requests. `DATABASE_URL` is the Supabase pooler URL. An optional free
-  Hyperdrive binding named `HYPERDRIVE` replaces it when configured.
+  connection between requests. They connect through a free Hyperdrive config (`HYPERDRIVE`,
+  caching off), which keeps pooled connections to the Supabase session pooler; `DATABASE_URL`
+  remains the fallback.
 - Web Push uses WebCrypto and `fetch` (`web-push.ts`, RFC 8291 and RFC 8292) instead of the
   Node-only `web-push` package. Existing VAPID keys and subscriptions keep working.
 - Server secrets live in the Worker's Cloudflare settings. `wrangler.jsonc` holds no values.
@@ -39,8 +40,7 @@ keep-awake traffic is needed.
 - Workers Free allows 100,000 requests a day, 10 ms CPU per request or cron run, 50 outbound
   requests per run, and 6 open connections per run. One cron run sends at most 20 pushes and
   finishes at most 10 Auth deletions; the rest wait for the next minute.
-- Each request opens a new database connection, which adds a few round trips to Supabase.
-  Hyperdrive (free) removes most of that if needed.
+- Hyperdrive Free allows 100,000 database queries a day; minute maintenance uses roughly 30,000.
 - If a quota runs out, accept errors until the daily reset or seek new approval. Do not enable
   Workers Paid without approval.
 
