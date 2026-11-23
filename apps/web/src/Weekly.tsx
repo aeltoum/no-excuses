@@ -1379,7 +1379,7 @@ export function Weekly({
                           {(() => {
                             // One urgent status at most; the rest lives in member detail.
                             const status = groupOwed[item.membershipId]
-                              ? `Owes ${groupOwed[item.membershipId]} card${groupOwed[item.membershipId] === 1 ? "" : "s"}`
+                              ? "Owes a card"
                               : awaitingReview.has(item.membershipId)
                                 ? "Needs your vote"
                                 : weekOffPending.has(item.membershipId)

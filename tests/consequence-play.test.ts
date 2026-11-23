@@ -174,14 +174,15 @@ const advance = (db: PGlite, at: string) =>
 afterEach(async () => Promise.all(opened.splice(0).map((db) => db.close())));
 
 describe("Consequence play loop", { timeout: 30_000 }, () => {
-  it("offers three short cards, redraws once, and completes after two approvals", async () => {
+  it("offers three cards, redraws once, and completes after two approvals", async () => {
     const db = await database();
     await owe(db);
+    // A second miss while a card is owed adds nothing: one card at most.
     await owe(db, 0, "2026-03-09T00:01Z");
     expect((await home(db, 0)).offer).toBeNull();
     await advance(db, "2026-03-09T00:30Z");
     const first = await home(db, 0);
-    expect(first.owed).toBe(2);
+    expect(first.owed).toBe(1);
     expect(first.offer?.canRedraw).toBe(true);
     expect(first.offer?.cards).toHaveLength(3);
     const offerId = first.offer?.offerId as string;
@@ -223,22 +224,21 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     expect(peer.reviews).toMatchObject([
       { memberName: "Alex", title: picked?.title, clipPath },
     ]);
-    expect(peer.groupOwed).toEqual({ [memberships[0] as string]: 2 });
+    expect(peer.groupOwed).toEqual({ [memberships[0] as string]: 1 });
     const claimId = peer.reviews[0]?.claimId as string;
     await command(db, 1, "respond", claimId, "approve");
     await command(db, 2, "respond", claimId, "approve");
 
     const done = await home(db, 0);
-    expect(done.owed).toBe(1);
+    expect(done.owed).toBe(0);
     expect(done.attempt).toBeNull();
-    expect(done.offer?.canRedraw).toBe(true);
+    expect(done.offer).toBeNull();
     expect(done.logBlocked).toBe(false);
   });
 
-  it("offers the next card as soon as proof is sent; silent reviews approve after 48 hours", async () => {
+  it("adds no card for a miss while one is in review; silent reviews approve after 48 hours", async () => {
     const db = await database();
     await owe(db);
-    await owe(db, 0, "2026-03-09T00:01Z");
     await advance(db, "2026-03-09T00:30Z");
     const offer = (await home(db, 0)).offer;
     const firstAttempt = (
@@ -252,39 +252,26 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     ).attempt?.attemptId as string;
     const clip = await recordClip(db, 0, firstAttempt);
     const claimed = await command(db, 0, "claim", firstAttempt, clip);
-    // The second card is on offer right away while friends review the first.
-    expect(claimed.offer?.cards).toHaveLength(3);
     expect(claimed.attempt).toMatchObject({
       attemptId: firstAttempt,
       status: "review",
     });
-    const next = claimed.offer as NonNullable<Home["offer"]>;
-    const second = await command(
-      db,
-      0,
-      "select",
-      next.offerId,
-      next.cards[0]?.cardId,
-      "2026-03-09T02:00Z",
-    );
-    expect(second.attempt?.status).toBe("active");
-    expect(second.attempt?.attemptId).not.toBe(firstAttempt);
-    expect(
-      (second as Home & { inReview: { attemptId: string }[] }).inReview,
-    ).toMatchObject([{ attemptId: firstAttempt }]);
+    await owe(db, 0, "2026-03-09T03:00Z");
+    const during = await home(db, 0);
+    expect(during.owed).toBe(1);
+    expect(during.offer).toBeNull();
 
-    // Nobody answered: once the 48-hour review ends, the first card counts as done.
+    // Nobody answered: once the 48-hour review ends, the card counts as done.
     await advance(db, "2026-03-11T01:00Z");
     const after = await home(db, 0, "2026-03-11T01:00Z");
-    expect(after.owed).toBe(1);
-    expect(after.attempt?.attemptId).toBe(second.attempt?.attemptId);
-    expect((after as Home & { inReview: unknown[] }).inReview).toEqual([]);
+    expect(after.owed).toBe(0);
+    expect(after.attempt).toBeNull();
+    expect(after.offer).toBeNull();
   });
 
-  it("brings a rejected card back only after the card in play is done", async () => {
+  it("brings a rejected card back as a fresh offer without adding a card", async () => {
     const db = await database();
     await owe(db);
-    await owe(db, 0, "2026-03-09T00:01Z");
     await advance(db, "2026-03-09T00:30Z");
     const offer = (await home(db, 0)).offer;
     const firstAttempt = (
@@ -296,27 +283,20 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
         offer?.cards[0]?.cardId,
       )
     ).attempt?.attemptId as string;
-    const claimed = await command(
+    await command(
       db,
       0,
       "claim",
       firstAttempt,
       await recordClip(db, 0, firstAttempt),
     );
-    await command(
-      db,
-      0,
-      "select",
-      claimed.offer?.offerId as string,
-      claimed.offer?.cards[0]?.cardId,
-    );
     const claimId = (await home(db, 1)).reviews[0]?.claimId as string;
     await command(db, 1, "respond", claimId, "reject");
     await command(db, 2, "respond", claimId, "reject");
     const rejected = await home(db, 0);
-    expect(rejected.owed).toBe(2);
-    expect(rejected.offer).toBeNull();
-    expect(rejected.attempt?.status).toBe("active");
+    expect(rejected.owed).toBe(1);
+    expect(rejected.attempt).toBeNull();
+    expect(rejected.offer?.cards).toHaveLength(3);
   });
 
   it("denies a pause request once enough members reject it", async () => {
@@ -345,7 +325,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     expect((await home(db, 1)).pauseReviews).toEqual([]);
   });
 
-  it("adds another owed card when the 48-hour deadline passes", async () => {
+  it("keeps the one owed card and re-deals it when the 48-hour deadline passes", async () => {
     const db = await database();
     await owe(db);
     await advance(db, "2026-03-09T00:30Z");
@@ -363,7 +343,7 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
     );
     await advance(db, "2026-03-11T01:00Z");
     const after = await home(db, 0, "2026-03-11T01:00Z");
-    expect(after.owed).toBe(2);
+    expect(after.owed).toBe(1);
     expect(after.attempt).toBeNull();
     expect(after.offer?.cards).toHaveLength(3);
   });
@@ -371,7 +351,6 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
   it("reminds silent reviewers 12 hours out and approves a review with no rejections", async () => {
     const db = await database();
     await owe(db);
-    await owe(db, 0, "2026-03-09T00:01Z");
     await advance(db, "2026-03-09T00:30Z");
     const offer = (await home(db, 0)).offer;
     await command(
@@ -409,9 +388,9 @@ describe("Consequence play loop", { timeout: 30_000 }, () => {
 
     await advance(db, "2026-03-11T01:00Z");
     const after = await home(db, 0, "2026-03-11T01:00Z");
-    expect(after.owed).toBe(1);
+    expect(after.owed).toBe(0);
     expect(after.attempt).toBeNull();
-    expect(after.offer?.cards).toHaveLength(3);
+    expect(after.offer).toBeNull();
   });
 
   it("pauses expiry for safety and reoffers when the member is ready", async () => {

@@ -2027,47 +2027,6 @@ body:has(.caption-compose, .post-compose) .home-log-button {
   font-size: 1.4rem;
 }
 
-/* Consequence debt meter: five slots in the Barbell's dashed-slot grammar. */
-.debt-meter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.debt-label,
-.debt-value {
-  font-family: "Big Shoulders Display", sans-serif;
-  font-size: 1.25rem;
-  font-weight: 800;
-  line-height: 1;
-}
-.debt-label {
-  text-transform: uppercase;
-}
-.debt-value {
-  min-width: 52px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.debt-cells {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
-.debt-cells i {
-  height: 14px;
-  border: 1.5px dashed var(--empty-slot);
-  border-radius: 3px;
-}
-.debt-cells i.filled {
-  border: 0;
-  background: var(--error);
-}
-.debt-high .debt-value,
-.debt-maxed .debt-value {
-  color: var(--error);
-}
-
 .crash-detail {
   max-height: 40vh;
   overflow: auto;

@@ -123,33 +123,6 @@ const hoursLeft = (until: string) => {
   return hours <= 1 ? "under 1 hour" : `${hours} hours`;
 };
 
-const debtCap = 5;
-// Owed cards stack toward the backlog cap of five; the meter heats up as it fills.
-function DebtMeter({ owed }: { owed: number }) {
-  const level = owed >= debtCap ? "maxed" : owed >= 3 ? "high" : "low";
-  return (
-    <div
-      className={`debt-meter debt-${level}`}
-      role="img"
-      aria-label={`${owed} of ${debtCap} Consequence cards owed`}
-    >
-      <span className="debt-label">Owed</span>
-      <span className="debt-cells" aria-hidden="true">
-        {Array.from({ length: debtCap }, (_, index) => (
-          <i
-            // biome-ignore lint/suspicious/noArrayIndexKey: fixed five-cell meter
-            key={index}
-            className={index < owed ? "filled" : undefined}
-          />
-        ))}
-      </span>
-      <span className="debt-value">
-        {owed >= debtCap ? "Maxed" : `${owed}/${debtCap}`}
-      </span>
-    </div>
-  );
-}
-
 const verdictMark: Record<string, string> = {
   approve: "✓",
   reject: "✕",
@@ -397,14 +370,14 @@ export function Consequences({
         onClick={() => setExpanded(!expanded)}
       >
         <span className="consequence-strip-mark" aria-hidden="true">
-          {home.owed > 0 ? home.owed : "✓"}
+          {home.owed > 0 ? "!" : "✓"}
         </span>
         <span className="consequence-strip-text">
           <strong>
             {home.owed > 0
               ? attempt?.status === "active"
                 ? attempt.title
-                : `You owe ${home.owed} Consequence ${home.owed === 1 ? "card" : "cards"}`
+                : "You owe a Consequence card"
               : "Consequence cards"}
           </strong>
           <small>
@@ -427,11 +400,7 @@ export function Consequences({
         <div className="consequence-body">
           {home.owed > 0 && (
             <div className="owed-card">
-              <p className="owed-count">
-                You owe {home.owed} Consequence{" "}
-                {home.owed === 1 ? "card" : "cards"}
-              </p>
-              <DebtMeter owed={home.owed} />
+              <p className="owed-count">You owe a Consequence card</p>
               {offer && (
                 <button type="button" onClick={() => setPicking(true)}>
                   Choose your card

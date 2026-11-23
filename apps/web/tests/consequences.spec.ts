@@ -363,19 +363,17 @@ test("owed Consequence card is picked, completed, and friends' claims approved",
   // The card sits in a slim strip under the barbells; a friend's claim waiting
   // on your vote opens it.
   await expect(
-    page.getByRole("button", { name: /You owe 1 Consequence card/ }),
+    page.getByRole("button", { name: /You owe a Consequence card/ }),
   ).toHaveAttribute("aria-expanded", "true");
   await expect(
     page.getByRole("list", { name: "Friends this week" }).getByRole("listitem"),
-  ).toHaveText(["MAMaya2 of 3 workoutsOwes 2 cardsNudge"]);
-  await expect(
-    page.getByRole("img", { name: "1 of 5 Consequence cards owed" }),
-  ).toContainText("1/5");
+  ).toHaveText(["MAMaya2 of 3 workoutsOwes a cardNudge"]);
+  await expect(page.locator(".debt-meter")).toHaveCount(0);
 
   await page.reload();
   await expect(dialog).toHaveCount(0);
   const strip = page.getByRole("button", {
-    name: /You owe 1 Consequence card/,
+    name: /You owe a Consequence card/,
   });
   await expect(strip).toBeVisible();
   if ((await strip.getAttribute("aria-expanded")) === "false")
