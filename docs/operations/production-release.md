@@ -10,14 +10,17 @@ Production deploys through Cloudflare (owner decision 2026-11-11). One script,
 
 It runs two ways:
 
-- **Automatic (default):** Cloudflare Workers Builds, connected to the GitHub repository on the
-  `no-excuses-api` Worker, production branch `main`, deploy command `pnpm release`. Set its
-  build variables: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and the
-  secret `SUPABASE_DB_URL`. Workers Builds supplies Cloudflare credentials.
+- **Automatic (default):** `.github/workflows/deploy-web.yml` runs on every push to `main` (and by
+  manual dispatch), in the same order, under the `production-release` concurrency lock. It uses
+  the repository secrets and variables below.
 - **Manual:** `pnpm release` from a clean `main` checkout after `wrangler login`, with the four
-  values above in the git-ignored `.env.production.local`.
+  values in the git-ignored `.env.production.local`.
 
-`.github/workflows/deploy-web.yml` no longer runs on push; it stays as a manual fallback.
+Cloudflare Workers Builds is not a release path. It never deployed a push to main (2026-11-23,
+DECK-3: the #309 and #315 merges stayed undeployed until a manual run). If it is ever connected,
+`pnpm release` exits early under Workers Builds (`WORKERS_CI`) so it cannot double-deploy or race
+the workflow on migrations. Disconnect it in the dashboard (Workers & Pages, `no-excuses-api`,
+Settings, Builds) to stop the no-op builds.
 
 The production concurrency lock never cancels an active release. GitHub may replace an older
 pending run with a newer pending run; the next release applies all missing migrations. A

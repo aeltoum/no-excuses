@@ -1,8 +1,11 @@
 name: Deploy production
 
-# Production now deploys through Cloudflare (scripts/deploy-production.sh, run by
-# Cloudflare Workers Builds or `pnpm release`). This workflow stays as a manual fallback.
+# The automatic production path: every push to main deploys (checks, migrations, API, web).
+# Cloudflare Workers Builds never deployed a push (DECK-3), so `pnpm release` exits early under
+# Workers Builds and this workflow is the only automatic release. Manual dispatch re-runs it.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 # All production mutations share one lock. Never cancel an applying migration.

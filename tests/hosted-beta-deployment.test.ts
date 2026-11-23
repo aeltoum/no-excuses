@@ -48,4 +48,15 @@ describe("hosted beta deployment configuration", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(workflow).not.toMatch(/render/i);
   });
+
+  it("deploys every push to main from one locked workflow; Workers Builds stands down", async () => {
+    const workflow = await read(".github/workflows/deploy-web.yml");
+    expect(workflow).toMatch(/on:\s+push:\s+branches: \[main\]/);
+    expect(workflow).toContain("group: production-release");
+    expect(workflow).toContain("cancel-in-progress: false");
+    const script = await read("scripts/deploy-production.sh");
+    const skip = script.indexOf('if [ -n "${WORKERS_CI:-}" ]');
+    expect(skip).toBeGreaterThan(-1);
+    expect(skip).toBeLessThan(script.indexOf("supabase db push"));
+  });
 });
