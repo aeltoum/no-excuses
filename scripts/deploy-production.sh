@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Production release, in the same order the old GitHub workflow used. Runs from a
-# developer machine (`pnpm release`) or from Cloudflare Workers Builds on pushes to main.
+# developer machine (`pnpm release`). Pushes to main deploy through .github/workflows/deploy-web.yml.
 #
 # Needs in the environment (or in the git-ignored .env.production.local):
 #   SUPABASE_DB_URL         Supabase session-pooler URL with password (server-only)
@@ -10,6 +10,13 @@
 # Cloudflare auth: `wrangler login` locally, or CLOUDFLARE_API_TOKEN and
 # CLOUDFLARE_ACCOUNT_ID in Workers Builds.
 set -euo pipefail
+
+# GitHub Actions (deploy-web.yml, on push to main) is the one automatic release path. If Workers
+# Builds is ever connected, it must not race that workflow on migrations, so it does nothing.
+if [ -n "${WORKERS_CI:-}" ]; then
+  echo "Workers Builds release skipped: GitHub Actions deploys production on push to main."
+  exit 0
+fi
 cd "$(dirname "$0")/.."
 
 if [ -f .env.production.local ]; then
@@ -23,13 +30,13 @@ for key in SUPABASE_DB_URL VITE_API_BASE_URL VITE_SUPABASE_URL VITE_SUPABASE_ANO
   if [ -z "${!key:-}" ]; then echo "Missing configuration: $key" >&2; exit 1; fi
 done
 
-commit="${WORKERS_CI_COMMIT_SHA:-$(git rev-parse HEAD)}"
-branch="${WORKERS_CI_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+commit="$(git rev-parse HEAD)"
+branch="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$branch" != "main" ]; then
   echo "Production releases run from main only (on $branch)." >&2
   exit 1
 fi
-if [ -z "${WORKERS_CI:-}" ] && [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "Commit or stash tracked changes first; the release must match $commit." >&2
   exit 1
 fi
