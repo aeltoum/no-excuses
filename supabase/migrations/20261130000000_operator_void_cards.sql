@@ -111,4 +111,4 @@ grant execute on function app_private.operator_console_core(timestamptz),
   app_private.operator_void_card(uuid, text, timestamptz)
   to service_role;
 
-insert into app_private.schema_versions (version) values (62);
+insert into app_private.schema_versions (version) values (63);
