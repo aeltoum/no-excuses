@@ -25,8 +25,19 @@ type Hold = {
   reason: string;
   startsAt: string;
 };
+type OwedCard = {
+  obligationId: string;
+  membershipId: string;
+  member: string;
+  group: string;
+  reason: "missed_target" | "rejected_report" | "card_expiry";
+  createdAt: string;
+  card: string | null;
+  expiresAt: string | null;
+};
 type Console = {
   cases: Case[];
+  cards?: OwedCard[];
   holds: Hold[];
   suspended: Array<{ accountId: string; name: string }>;
   groups: Array<{
@@ -41,6 +52,11 @@ const kindLabel: Record<Case["kind"], string> = {
   member_report: "Reported member",
   safety_block: "Safety block",
   proof_report: "Reported photos",
+};
+const owedLabel: Record<OwedCard["reason"], string> = {
+  missed_target: "Missed target",
+  rejected_report: "Rejected report",
+  card_expiry: "Expired card",
 };
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
@@ -68,6 +84,7 @@ export function OperatorConsole({
   const [holdGroup, setHoldGroup] = useState("");
   const [holdMember, setHoldMember] = useState("");
   const [holdReason, setHoldReason] = useState("");
+  const [voidReasons, setVoidReasons] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -136,6 +153,26 @@ export function OperatorConsole({
       "/v1/operator/resolve",
       { caseId: item.id, action },
       `${label}: done.`,
+    );
+  };
+
+  const voidCard = async (item: OwedCard) => {
+    const reason = (voidReasons[item.obligationId] ?? "").trim();
+    if (
+      !reason ||
+      !(await ask({
+        title: "Remove this card?",
+        body: `${item.member} owes one card fewer${item.card ? ` and “${item.card}” closes` : ""}. Streaks and Crowns stay. This can’t be undone.`,
+        confirm: "Remove card",
+        tone: "danger",
+      }))
+    )
+      return;
+    await run(
+      `void:${item.obligationId}`,
+      "/v1/operator/void-card",
+      { obligationId: item.obligationId, reason },
+      `Card removed from ${item.member}.`,
     );
   };
 
@@ -218,6 +255,61 @@ export function OperatorConsole({
                       {busy === `${item.id}:${action}` ? "Working…" : label}
                     </button>
                   ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section aria-labelledby="cards-heading">
+        <h2 id="cards-heading">
+          Owed cards{" "}
+          <span className="feed-badge">{state.cards?.length ?? 0}</span>
+        </h2>
+        <p className="hint">
+          Remove a wrongly assigned, unsafe, or broken card. The member owes one
+          fewer; the next owed card is offered as usual.
+        </p>
+        {(state.cards ?? []).length === 0 ? (
+          <p className="hint">Nobody owes a card.</p>
+        ) : (
+          <ul className="operator-cases">
+            {(state.cards ?? []).map((item) => (
+              <li key={item.obligationId}>
+                <strong>
+                  {item.member} · {item.card ?? "No card picked yet"}
+                </strong>
+                <span>
+                  {item.group} · {owedLabel[item.reason]} ·{" "}
+                  {when(item.createdAt)}
+                  {item.expiresAt ? ` · due ${when(item.expiresAt)}` : ""}
+                </span>
+                <div className="operator-actions">
+                  <input
+                    aria-label={`Why remove ${item.member}’s card`}
+                    placeholder="Reason"
+                    maxLength={200}
+                    value={voidReasons[item.obligationId] ?? ""}
+                    onChange={(event) =>
+                      setVoidReasons((current) => ({
+                        ...current,
+                        [item.obligationId]: event.target.value,
+                      }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={
+                      busy !== null ||
+                      !(voidReasons[item.obligationId] ?? "").trim()
+                    }
+                    onClick={() => void voidCard(item)}
+                  >
+                    {busy === `void:${item.obligationId}`
+                      ? "Removing…"
+                      : "Remove card"}
+                  </button>
                 </div>
               </li>
             ))}

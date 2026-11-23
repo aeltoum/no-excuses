@@ -450,8 +450,7 @@ function protectedHandler(
     if (!parsed.success) return fail("invalid_request", 400);
     const body = parsed.data as Record<string, unknown>;
     let context:
-      | { key: string; hash: string; id: string; now: string }
-      | undefined;
+      { key: string; hash: string; id: string; now: string } | undefined;
     if (command) {
       const key = request.headers["idempotency-key"];
       if (!uuid(key)) return fail("idempotency_required", 400);
@@ -1874,6 +1873,23 @@ const operatorRoutes = (request: Request, path: string) =>
             body.accountId,
             now,
           ]),
+        ),
+      );
+    }
+    if (path === "/v1/operator/void-card") {
+      if (
+        !anyUuid(body.obligationId) ||
+        typeof body.reason !== "string" ||
+        !body.reason.trim() ||
+        body.reason.length > 200
+      )
+        return invalid();
+      return ok(
+        await withCasePhotos(
+          await data(
+            "select app_private.operator_void_card($1,$2,$3) as data",
+            [body.obligationId, body.reason, now],
+          ),
         ),
       );
     }
