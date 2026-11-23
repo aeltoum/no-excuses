@@ -113,13 +113,66 @@ test("no posts in the window shows faded outlines and a muted line, no button", 
     page.getByText("Workouts your crew logs show up here, newest day first."),
   ).toBeVisible();
   await expect(page.locator(".feed-ghosts > span")).toHaveCount(3);
-  await noButtonsIn(page, "No posts this week or last.");
+  // Older posts stay one tap away.
+  const earlier = page.getByRole("button", { name: "Earlier posts (1)" });
+  await expect(earlier).toBeVisible();
   await expect(caught(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Needs you/ })).toHaveCount(0);
   await noSideScroll(page);
   await axe(page);
   if (shots) await page.screenshot({ path: `${shots}/none.png` });
+  await earlier.click();
+  await expect(
+    page.getByRole("button", { name: /^Maya, .*Open post$/ }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: "No posts this week or last." }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^Earlier posts/ }),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("a feed with recent posts offers older ones below", async ({ page }) => {
+  await open(page, [post(1, 1), post(2, 21), post(3, 30)]);
+  await expect(
+    page.getByRole("button", { name: /^Maya, .*Open post$/ }),
+  ).toHaveCount(1);
+  await page.getByRole("button", { name: "Earlier posts (2)" }).click();
+  await expect(
+    page.getByRole("button", { name: /^Maya, .*Open post$/ }),
+  ).toHaveCount(3);
+});
+
+test("a failed refresh shows the error, never the empty message", async ({
+  page,
+}) => {
+  let fail = false;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, ({ path }) => {
+    if (path.endsWith("/weekly-target")) return target();
+    if (path === "/v1/proof/feed") return fail ? 500 : [];
+    return undefined;
+  });
+  await expect(
+    page.getByRole("heading", { name: "No posts this week or last." }),
+  ).toBeVisible();
+  fail = true;
+  await page.reload();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Couldn’t load the proof feed." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No posts this week or last." }),
+  ).toHaveCount(0);
+  fail = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No posts this week or last." }),
+  ).toBeVisible();
 });
 
 test("the caught-up divider waits for every in-scope post to be seen", async ({
