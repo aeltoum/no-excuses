@@ -328,18 +328,38 @@ export const nudgeMember = (
     body: { membershipId },
   });
 
+// Proof photos fill the feed at up to ~430 CSS px wide on 3x phones, so 1280 px on the
+// long edge is sharp on every device we ship to. Supabase Free has no image transforms,
+// so this one file serves both the feed tile and the opened post (same signed URL, one
+// download, then browser cache). The byte budget bounds noisy shots that JPEG can't
+// squeeze: each step down in quality is tried until the photo fits.
+export const photoMaxEdge = 1280;
+export const photoByteBudget = 300 * 1024;
+const photoQualities = [0.8, 0.7, 0.6, 0.5];
+
 // Re-encoding through a canvas strips EXIF (including location) and bounds the upload size.
-export async function compressPhoto(file: Blob, max = 1600): Promise<Blob> {
+// JPEG, not WebP: Safari's canvas can't encode WebP and silently returns PNG instead.
+export async function compressPhoto(
+  file: Blob,
+  max = photoMaxEdge,
+  budget = photoByteBudget,
+): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const context = canvas.getContext("2d");
+  if (context) context.imageSmoothingQuality = "high";
+  context?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.8),
-  );
+  let blob: Blob | null = null;
+  for (const quality of photoQualities) {
+    blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality),
+    );
+    if (!blob || blob.size <= budget) break;
+  }
   if (!blob) throw new ApiError("failure", "Couldn’t process that photo.");
   return blob;
 }
@@ -367,7 +387,7 @@ export async function uploadProofPhoto(
         "cache-control": "max-age=31536000",
       },
       body: photo,
-      // Photos are bounded to 1600 px, so a minute covers slow mobile links;
+      // Photos are bounded to 1280 px and ~300 KB, so a minute covers slow mobile links;
       // a stalled upload must fail, never spin forever.
       signal: AbortSignal.timeout(60_000),
     });
