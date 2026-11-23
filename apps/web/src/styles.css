@@ -5046,6 +5046,10 @@ html.post-viewer-open body {
 .feed-solo {
   color: var(--muted);
 }
+.feed-earlier {
+  justify-self: start;
+  margin-top: 12px;
+}
 .feed-ghosts {
   display: flex;
   gap: 10px;

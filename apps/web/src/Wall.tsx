@@ -344,6 +344,10 @@ export function ProofFeed({
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  // A failed refresh under a saved feed: the posts stay, the failure shows.
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  // Posts before last week sit behind Earlier posts until asked for.
+  const [showEarlier, setShowEarlier] = useState(false);
   const fresh = useFreshness();
   // Posts the viewer just acted on; their buttons hide before the refetch lands.
   const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
@@ -511,13 +515,15 @@ export function ProofFeed({
         );
         onItems(next);
         setState("ready");
+        setRefreshFailed(false);
       })
       .catch((error) => {
         if (!active) return;
         if (error instanceof ApiError && error.kind === "unauthorized")
           onRevoked();
-        // Cached posts stay on screen when a refresh fails.
+        // Cached posts stay on screen when a refresh fails, with the failure shown.
         if (!previous) setState("error");
+        else setRefreshFailed(true);
       });
     return () => {
       active = false;
@@ -749,8 +755,15 @@ export function ProofFeed({
   const needsVote = (item: ProofItem) =>
     !decided.has(item.workoutCheckinId) && item.canVote && !item.myVote;
   const windowStart = feedWindowStart(windowEndsAt);
-  const inWindow = (item: ProofItem) =>
-    windowStart === null || Date.parse(item.submittedAt) >= windowStart;
+  const recent = (at: string) =>
+    windowStart === null || Date.parse(at) >= windowStart;
+  const inWindow = (item: ProofItem) => showEarlier || recent(item.submittedAt);
+  const earlierCount = showEarlier
+    ? 0
+    : items.filter(
+        (item) =>
+          item.reviewStatus !== "questioned" && !recent(item.submittedAt),
+      ).length;
   const byNewest = (left: ProofItem, right: ProofItem) =>
     Date.parse(right.submittedAt) - Date.parse(left.submittedAt);
   // Questioned posts leave the rows for Needs you; one still open for a vote stays reachable.
@@ -775,8 +788,7 @@ export function ProofFeed({
   // Approved Consequence clips sit in the day the Group approved them.
   const clipDays = new Map<string, ConsequencePost[]>();
   for (const clip of clips) {
-    if (windowStart !== null && Date.parse(clip.approvedAt) < windowStart)
-      continue;
+    if (!showEarlier && !recent(clip.approvedAt)) continue;
     const key = dayLabel(clip.approvedAt);
     clipDays.set(key, [...(clipDays.get(key) ?? []), clip]);
     if (!days.has(key)) days.set(key, []);
@@ -795,6 +807,16 @@ export function ProofFeed({
   // Only what waits on the viewer counts; voted and own questioned posts stay listed.
   const needsCount = questioned.filter(needsVote).length + needsExtraCount;
   const needsShown = questioned.length > 0 || needsExtraShown;
+  const earlier =
+    earlierCount > 0 ? (
+      <button
+        type="button"
+        className="secondary-button feed-earlier"
+        onClick={() => setShowEarlier(true)}
+      >
+        Earlier posts ({earlierCount})
+      </button>
+    ) : null;
   const viewed = items.find((item) => item.workoutCheckinId === viewing);
   const viewedClip = clips.find((clip) => clipPostId(clip) === viewing);
 
@@ -1420,7 +1442,7 @@ export function ProofFeed({
             <span className="skeleton day-skeleton-tile" />
           </span>
         </div>
-      ) : state === "error" ? (
+      ) : state === "error" || (state === "ready" && refreshFailed) ? (
         <div className="proof-feed-note">
           <p role="alert">Couldn’t load the proof feed.</p>
           <button
@@ -1473,7 +1495,7 @@ export function ProofFeed({
       )}
       {state === "ready" &&
         (days.size === 0 ? (
-          solo ? (
+          refreshFailed ? null : solo ? (
             <p className="feed-empty feed-solo">Your crew’s posts land here.</p>
           ) : (
             <div className="feed-empty">
@@ -1484,6 +1506,7 @@ export function ProofFeed({
               </span>
               <h2>No posts this week or last.</h2>
               <p>Workouts your crew logs show up here, newest day first.</p>
+              {earlier}
             </div>
           )
         ) : (
@@ -1542,6 +1565,7 @@ export function ProofFeed({
                     : [row];
                 })}
             </ol>
+            {earlier}
           </>
         ))}
       {(viewed || viewedClip) && (
